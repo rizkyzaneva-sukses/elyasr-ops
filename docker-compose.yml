@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: zaneva_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: zaneva_user
+      POSTGRES_PASSWORD: zaneva_pass_dev
+      POSTGRES_DB: zaneva_ops
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zaneva_user -d zaneva_ops"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: zaneva_app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://zaneva_user:zaneva_pass_dev@db:5432/zaneva_ops
+      SESSION_SECRET: dev-secret-change-in-production-32chars
+      NODE_ENV: production
+      NEXT_PUBLIC_APP_NAME: ZANEVA Business Operation
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

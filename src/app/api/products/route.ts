@@ -1,0 +1,84 @@
+import { NextRequest } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { getSession } from '@/lib/session'
+import { apiSuccess, apiError, getPagination } from '@/lib/utils'
+
+// GET /api/products
+export async function GET(request: NextRequest) {
+  const session = await getSession()
+  if (!session.isLoggedIn) return apiError('Unauthorized', 401)
+
+  const { searchParams } = request.nextUrl
+  const search = searchParams.get('search') || ''
+  const categoryId = searchParams.get('categoryId') || ''
+  const isActive = searchParams.get('isActive')
+  const { skip, take } = getPagination({
+    page: Number(searchParams.get('page') || 1),
+    limit: Number(searchParams.get('limit') || 50),
+  })
+
+  const where = {
+    ...(search && {
+      OR: [
+        { sku: { contains: search, mode: 'insensitive' as const } },
+        { productName: { contains: search, mode: 'insensitive' as const } },
+      ],
+    }),
+    ...(categoryId && { categoryId }),
+    ...(isActive !== null && isActive !== '' && { isActive: isActive === 'true' }),
+  }
+
+  const [products, total] = await Promise.all([
+    prisma.masterProduct.findMany({
+      where,
+      include: { category: true },
+      orderBy: { productName: 'asc' },
+      skip,
+      take,
+    }),
+    prisma.masterProduct.count({ where }),
+  ])
+
+  return apiSuccess({ products, total, skip, take })
+}
+
+// POST /api/products
+export async function POST(request: NextRequest) {
+  const session = await getSession()
+  if (!session.isLoggedIn) return apiError('Unauthorized', 401)
+  if (!['OWNER', 'FINANCE'].includes(session.userRole)) return apiError('Forbidden', 403)
+
+  const body = await request.json()
+  const { sku, productName, categoryId, unit, hpp, rop, leadTimeDays, stokAwal, variantInfo } = body
+
+  if (!sku || !productName) return apiError('SKU dan nama produk wajib diisi')
+
+  // Check duplicate SKU
+  const existing = await prisma.masterProduct.findUnique({ where: { sku } })
+  if (existing) return apiError(`SKU "${sku}" sudah terdaftar`)
+
+  // Get category name if categoryId provided
+  let categoryName: string | null = null
+  if (categoryId) {
+    const cat = await prisma.productCategory.findUnique({ where: { id: categoryId } })
+    categoryName = cat?.categoryName ?? null
+  }
+
+  const product = await prisma.masterProduct.create({
+    data: {
+      sku: sku.trim().toUpperCase(),
+      productName: productName.trim(),
+      categoryId: categoryId || null,
+      categoryName,
+      unit: unit || 'pcs',
+      hpp: hpp || 0,
+      rop: rop || 0,
+      leadTimeDays: leadTimeDays || 0,
+      stokAwal: stokAwal || 0,
+      variantInfo: variantInfo || null,
+      createdBy: session.username,
+    },
+  })
+
+  return apiSuccess(product, 201)
+}
