@@ -18,15 +18,15 @@ ARG DATABASE_URL
 ARG SESSION_SECRET
 ARG NEXT_PUBLIC_APP_NAME
 
-ENV DATABASE_URL=$DATABASE_URL
-ENV SESSION_SECRET=$SESSION_SECRET
-ENV NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME
+ENV DATABASE_URL=${DATABASE_URL}
+ENV SESSION_SECRET=${SESSION_SECRET}
+ENV NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME}
 
 # Generate Prisma client
 RUN npx prisma generate
 
 # Build Next.js
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 # ── Stage 3: runner ────────────────────────────────────
@@ -34,8 +34,8 @@ FROM node:20-alpine AS runner
 RUN apk add --no-cache openssl
 WORKDIR /app
 
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -52,8 +52,8 @@ COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 USER nextjs
 
 EXPOSE 3000
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
 # Sync schema to DB then start app
 CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node server.js"]
