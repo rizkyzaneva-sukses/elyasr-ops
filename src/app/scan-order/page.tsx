@@ -132,10 +132,10 @@ export default function ScanOrderPage() {
         })
         setFlashEnabled(!flashEnabled)
       } else {
-        toast({ title: 'Flash tidak didukung', description: 'Perangkat ini tidak mendukung fitur flash pada browser.', variant: 'destructive' })
+        toast({ title: 'Flash tidak didukung', description: 'Perangkat ini tidak mendukung fitur flash pada browser.', type: 'error' })
       }
     } catch {
-      toast({ title: 'Gagal', description: 'Gagal menyalakan flash', variant: 'destructive' })
+      toast({ title: 'Gagal', description: 'Gagal menyalakan flash', type: 'error' })
     }
   }
 
@@ -260,10 +260,10 @@ export default function ScanOrderPage() {
         })
         toast({ title: 'Upload berhasil!', description: `${json.data.success} resi diproses.` })
       } else {
-        toast({ title: 'Upload gagal', description: json.error, variant: 'destructive' })
+        toast({ title: 'Upload gagal', description: json.error, type: 'error' })
       }
     } catch {
-      toast({ title: 'Error', description: 'Gagal menghubungi server', variant: 'destructive' })
+      toast({ title: 'Error', description: 'Gagal menghubungi server', type: 'error' })
     } finally {
       setUploadLoading(false)
       if (e.target) e.target.value = ''

@@ -11,23 +11,21 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
 
   const body = await request.json()
     const { 
-          sku, name, description, unit, buyPrice, sellPrice, 
-          stock, minStock, categoryId, vendorId, isActive 
+          sku, productName, unit, hpp, rop, leadTimeDays,
+          categoryId, categoryName, isActive 
     } = body
 
-  const product = await prisma.product.update({
+  const product = await prisma.masterProduct.update({
         where: { id: params.id },
         data: {
                 ...(sku && { sku }),
-                ...(name && { name }),
-                ...(description !== undefined && { description }),
+                ...(productName && { productName }),
                 ...(unit && { unit }),
-                ...(buyPrice !== undefined && { buyPrice: Number(buyPrice) }),
-                ...(sellPrice !== undefined && { sellPrice: Number(sellPrice) }),
-                ...(stock !== undefined && { stock: Number(stock) }),
-                ...(minStock !== undefined && { minStock: Number(minStock) }),
-                ...(categoryId && { categoryId }),
-                ...(vendorId && { vendorId }),
+                ...(hpp !== undefined && { hpp: Number(hpp) }),
+                ...(rop !== undefined && { rop: Number(rop) }),
+                ...(leadTimeDays !== undefined && { leadTimeDays: Number(leadTimeDays) }),
+                ...(categoryId !== undefined && { categoryId }),
+                ...(categoryName !== undefined && { categoryName }),
                 ...(isActive !== undefined && { isActive }),
         },
   })

@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
         await prisma.auditLog.create({
           data: {
             entityType: 'Order',
-            action: 'SCAN_BULK',
+            action: 'SCAN',
             entityId: matchedOrder.id,
             refOrderNo: matchedOrder.orderNo,
             afterJson: { status: terkirimStatus, airwaybill: awb },
