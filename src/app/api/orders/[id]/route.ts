@@ -3,39 +3,38 @@ import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { apiSuccess, apiError } from '@/lib/utils'
 
-export async function PUT(request: NextRequest, props: { params: Promise<{ id: string }> }) {
-    const params = await props.params;
-    const session = await getSession()
-    if (!session.isLoggedIn) return apiError('Unauthorized', 401)
-    if (session.userRole !== 'OWNER') return apiError('Forbidden', 403)
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession()
+  if (!session.isLoggedIn) return apiError('Unauthorized', 401)
+  if (session.userRole !== 'OWNER') return apiError('Forbidden', 403)
 
+  const { id } = await params
   const body = await request.json()
-    const { status, airwaybill, qty, realOmzet, totalProductPrice } = body
+  const { status, airwaybill, qty, realOmzet, totalProductPrice } = body
 
-  // We should create an audit log
-  const order = await prisma.order.findUnique({ where: { id: params.id } })
-    if (!order) return apiError('Order not found', 404)
+  const order = await prisma.order.findUnique({ where: { id } })
+  if (!order) return apiError('Order not found', 404)
 
   const updated = await prisma.order.update({
-        where: { id: params.id },
-        data: {
-                ...(status !== undefined && { status }),
-                ...(airwaybill !== undefined && { airwaybill }),
-                ...(qty !== undefined && { qty: Number(qty) }),
-                ...(realOmzet !== undefined && { realOmzet: Number(realOmzet) }),
-                ...(totalProductPrice !== undefined && { totalProductPrice: Number(totalProductPrice) }),
-        },
+    where: { id },
+    data: {
+      ...(status !== undefined && { status }),
+      ...(airwaybill !== undefined && { airwaybill }),
+      ...(qty !== undefined && { qty: Number(qty) }),
+      ...(realOmzet !== undefined && { realOmzet: Number(realOmzet) }),
+      ...(totalProductPrice !== undefined && { totalProductPrice: Number(totalProductPrice) }),
+    },
   })
 
   await prisma.auditLog.create({
-        data: {
-                entityType: 'Order',
-                entityId: params.id,
-                action: 'UPDATE',
-                note: `Owner edited order ${order.orderNo}`,
-                performedBy: session.username,
-        },
+    data: {
+      entityType: 'Order',
+      entityId: id,
+      action: 'UPDATE',
+      note: `Owner edited order ${order.orderNo}`,
+      performedBy: session.username,
+    }
   })
 
-  return apiSuccess(updated)
+  return apiSuccess({ message: 'Pesanan berhasil diperbarui', order: updated })
 }
