@@ -3,19 +3,19 @@ import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { apiSuccess, apiError } from '@/lib/utils'
 
-export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
   if (!session.isLoggedIn) return apiError('Unauthorized', 401)
 
   const product = await prisma.masterProduct.findUnique({
-    where: { id: params.id },
+    where: { id: (await params).id },
     include: { category: true },
   })
   if (!product) return apiError('Produk tidak ditemukan', 404)
   return apiSuccess(product)
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
   if (!session.isLoggedIn) return apiError('Unauthorized', 401)
   if (!['OWNER', 'FINANCE'].includes(session.userRole)) return apiError('Forbidden', 403)
@@ -30,7 +30,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 
   const product = await prisma.masterProduct.update({
-    where: { id: params.id },
+    where: { id: (await params).id },
     data: {
       productName,
       categoryId: categoryId || null,
@@ -47,14 +47,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   return apiSuccess(product)
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
   if (!session.isLoggedIn) return apiError('Unauthorized', 401)
   if (session.userRole !== 'OWNER') return apiError('Forbidden', 403)
 
   // Soft delete
   const product = await prisma.masterProduct.update({
-    where: { id: params.id },
+    where: { id: (await params).id },
     data: { isActive: false },
   })
   return apiSuccess(product)

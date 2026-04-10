@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
 
 // ── Chunked insert helper (tidak ada batas baris) ─────
 // Dipanggil dari POST di atas, replace createMany biasa
-export async function insertInChunks(
+async function insertInChunks(
   data: any[],
   chunkSize = 500
 ): Promise<number> {

@@ -12,13 +12,13 @@ function nowJakarta(): Date {
 // POST /api/scan/[id]/commit
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession()
   if (!session.isLoggedIn) return apiError('Unauthorized', 401)
   if (!['OWNER', 'FINANCE', 'STAFF'].includes(session.userRole)) return apiError('Forbidden', 403)
 
-  const batch = await prisma.inventoryScanBatch.findUnique({ where: { id: params.id } })
+  const batch = await prisma.inventoryScanBatch.findUnique({ where: { id: (await params).id } })
   if (!batch) return apiError('Batch tidak ditemukan', 404)
   if (batch.status !== 'DRAFT') return apiError('Batch sudah diproses')
 
@@ -40,7 +40,7 @@ export async function POST(
         sku,
         trxDate: batch.batchDate,
         direction: batch.direction,
-        reason: (batch.reason as string) || 'ADJUSTMENT',
+        reason: (batch.reason as any) || 'ADJUSTMENT',
         qty: items[sku],
         batchId: batch.id,
         createdBy: session.username,

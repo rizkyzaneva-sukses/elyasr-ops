@@ -398,7 +398,7 @@ model Payout {
   totalIncome   Int       @map("total_income")
   walletId      String    @map("wallet_id")
 
-  orderId       String?   @map("order_id")
+  orderId       String?   @unique @map("order_id")
   order         Order?    @relation(fields: [orderId], references: [id])
   wallet        Wallet    @relation(fields: [walletId], references: [id])
 

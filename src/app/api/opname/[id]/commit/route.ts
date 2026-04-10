@@ -12,14 +12,14 @@ function nowJakarta(): Date {
 // POST /api/opname/[id]/commit
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession()
   if (!session.isLoggedIn) return apiError('Unauthorized', 401)
   if (!['OWNER', 'FINANCE'].includes(session.userRole)) return apiError('Forbidden', 403)
 
   const batch = await prisma.stockOpnameBatch.findUnique({
-    where: { id: params.id },
+    where: { id: (await params).id },
     include: { items: true },
   })
   if (!batch) return apiError('Batch opname tidak ditemukan', 404)

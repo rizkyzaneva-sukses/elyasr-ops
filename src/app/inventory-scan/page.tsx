@@ -66,7 +66,7 @@ export default function InventoryScanPage() {
     (productsData ?? []).map((p: any) => [p.productName.toLowerCase(), p])
   )
 
-  const findProduct = (val: string) => {
+  const findProduct = (val: string): any => {
     const v = val.trim().toLowerCase()
     return productMap.get(v) || productByName.get(v)
   }

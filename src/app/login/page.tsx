@@ -5,7 +5,9 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/components/providers'
 import { Loader2, Eye, EyeOff, LogIn } from 'lucide-react'
 
-export default function LoginPage() {
+import { Suspense } from 'react'
+
+function LoginPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -136,5 +138,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPage />
+    </Suspense>
   )
 }

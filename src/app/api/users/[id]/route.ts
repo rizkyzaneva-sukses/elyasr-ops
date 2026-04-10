@@ -4,7 +4,7 @@ import { getSession } from '@/lib/session'
 import { apiSuccess, apiError } from '@/lib/utils'
 import bcrypt from 'bcryptjs'
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
   if (!session.isLoggedIn) return apiError('Unauthorized', 401)
   if (session.userRole !== 'OWNER') return apiError('Forbidden', 403)
@@ -18,7 +18,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 
   const user = await prisma.appUser.update({
-    where: { id: params.id },
+    where: { id: (await params).id },
     data: updateData,
     select: { id: true, username: true, fullName: true, userRole: true, isActive: true },
   })
