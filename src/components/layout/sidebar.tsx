@@ -150,11 +150,11 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       <div className="px-4 py-5 border-b border-zinc-800 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-            <span className="text-sm font-bold text-emerald-400">Z</span>
+            <span className="text-sm font-bold text-emerald-400">E</span>
           </div>
           <div>
-            <p className="text-sm font-semibold text-white">ZANEVA</p>
-            <p className="text-[10px] text-zinc-500">Business Operation</p>
+            <p className="text-sm font-semibold text-white">ELYASR</p>
+            <p className="text-[10px] text-zinc-500">Management System</p>
           </div>
         </div>
         {onMobileClose && (
@@ -227,9 +227,9 @@ export function MobileHeader({ onMenuOpen }: { onMenuOpen: () => void }) {
       </button>
       <div className="flex items-center gap-2">
         <div className="w-6 h-6 rounded bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-          <span className="text-xs font-bold text-emerald-400">Z</span>
+          <span className="text-xs font-bold text-emerald-400">E</span>
         </div>
-        <span className="text-sm font-semibold text-white">ZANEVA</span>
+        <span className="text-sm font-semibold text-white">ELYASR</span>
       </div>
     </header>
   )

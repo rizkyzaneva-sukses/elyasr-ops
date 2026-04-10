@@ -65,9 +65,9 @@ function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 mb-4">
-            <span className="text-2xl font-bold text-emerald-400">Z</span>
+            <span className="text-2xl font-bold text-emerald-400">E</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">ZANEVA</h1>
+          <h1 className="text-2xl font-bold text-white">ELYASR</h1>
           <p className="text-zinc-400 text-sm mt-1">Business Operation System</p>
         </div>
 
@@ -134,7 +134,7 @@ function LoginPage() {
         </div>
 
         <p className="text-center text-zinc-600 text-xs mt-6">
-          © {new Date().getFullYear()} ZANEVA Holdings. All rights reserved.
+          © {new Date().getFullYear()} ELYASR Holdings. All rights reserved.
         </p>
       </div>
     </div>
