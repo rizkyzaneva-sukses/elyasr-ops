@@ -2,9 +2,18 @@
 
 import { AppLayout } from '@/components/layout/app-layout'
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { formatDate, downloadCSV } from '@/lib/utils'
-import { Package, Search, Download, AlertTriangle, RefreshCw, ChevronDown, History, X } from 'lucide-react'
+import { Package, Search, Download, AlertTriangle, RefreshCw, ChevronDown, History, X, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+
+type SortDir = 'asc' | 'desc'
+type SortCol = 'sku' | 'productName' | 'soh' | 'rop' | 'hpp' | 'value' | null
+
+function SortIcon({ col, sortCol, sortDir }: { col: string; sortCol: SortCol; sortDir: SortDir }) {
+  if (sortCol !== col) return <ArrowUpDown size={12} className="text-zinc-600 ml-1 inline-block" />
+  if (sortDir === 'asc') return <ArrowUp size={12} className="text-emerald-400 ml-1 inline-block" />
+  return <ArrowDown size={12} className="text-emerald-400 ml-1 inline-block" />
+}
 
 function LedgerModal({ sku, productName, onClose }: { sku: string; productName: string; onClose: () => void }) {
   const { data: ledger, isLoading } = useQuery({
@@ -76,6 +85,18 @@ export default function InventoryPage() {
   const [filter, setFilter] = useState<'all' | 'low' | 'empty'>('all')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [selectedLedgerSku, setSelectedLedgerSku] = useState<{sku: string, name: string} | null>(null)
+  const [sortCol, setSortCol] = useState<SortCol>(null)
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
+
+  function handleSort(col: SortCol) {
+    if (sortCol === col) {
+      if (sortDir === 'asc') setSortDir('desc')
+      else { setSortCol(null); setSortDir('asc') }
+    } else {
+      setSortCol(col)
+      setSortDir('asc')
+    }
+  }
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['inventory', search, filter],
@@ -98,8 +119,28 @@ export default function InventoryPage() {
   const categories = [...new Set(allProducts.map((p: any) => p.categoryName).filter(Boolean))] as string[]
   const filtered = categoryFilter ? products.filter((p: any) => p.categoryName === categoryFilter) : products
 
+  const sorted = useMemo(() => {
+    if (!sortCol) return filtered
+    return [...filtered].sort((a: any, b: any) => {
+      let va: any, vb: any
+      if (sortCol === 'value') {
+        va = (a.soh ?? 0) * (a.hpp ?? 0)
+        vb = (b.soh ?? 0) * (b.hpp ?? 0)
+      } else {
+        va = a[sortCol]
+        vb = b[sortCol]
+      }
+      if (typeof va === 'number' && typeof vb === 'number') {
+        return sortDir === 'asc' ? va - vb : vb - va
+      }
+      return sortDir === 'asc'
+        ? String(va ?? '').localeCompare(String(vb ?? ''))
+        : String(vb ?? '').localeCompare(String(va ?? ''))
+    })
+  }, [filtered, sortCol, sortDir])
+
   const handleExport = () => {
-    downloadCSV('stok-inventory.csv', filtered.map((p: any) => ({
+    downloadCSV('stok-inventory.csv', sorted.map((p: any) => ({
       SKU: p.sku,
       'Nama Produk': p.productName,
       Kategori: p.categoryName || '',
@@ -186,12 +227,37 @@ export default function InventoryPage() {
           <table className="data-table">
             <thead>
               <tr>
-                <th className="w-32">SKU</th>
-                <th>Nama Produk</th>
+                <th className="w-32">
+                  <button onClick={() => handleSort('sku')} className="flex items-center hover:text-zinc-200 transition-colors">
+                    SKU<SortIcon col="sku" sortCol={sortCol} sortDir={sortDir} />
+                  </button>
+                </th>
+                <th>
+                  <button onClick={() => handleSort('productName')} className="flex items-center hover:text-zinc-200 transition-colors">
+                    Nama Produk<SortIcon col="productName" sortCol={sortCol} sortDir={sortDir} />
+                  </button>
+                </th>
                 <th className="w-28">Kategori</th>
-                <th className="w-20 text-center">SOH</th>
-                <th className="w-20 text-center">ROP</th>
-                <th className="w-20 text-right">HPP</th>
+                <th className="w-20 text-center">
+                  <button onClick={() => handleSort('soh')} className="flex items-center mx-auto hover:text-zinc-200 transition-colors">
+                    SOH<SortIcon col="soh" sortCol={sortCol} sortDir={sortDir} />
+                  </button>
+                </th>
+                <th className="w-20 text-center">
+                  <button onClick={() => handleSort('rop')} className="flex items-center mx-auto hover:text-zinc-200 transition-colors">
+                    ROP<SortIcon col="rop" sortCol={sortCol} sortDir={sortDir} />
+                  </button>
+                </th>
+                <th className="w-20 text-right">
+                  <button onClick={() => handleSort('hpp')} className="flex items-center ml-auto hover:text-zinc-200 transition-colors">
+                    HPP<SortIcon col="hpp" sortCol={sortCol} sortDir={sortDir} />
+                  </button>
+                </th>
+                <th className="w-28 text-right">
+                  <button onClick={() => handleSort('value')} className="flex items-center ml-auto hover:text-zinc-200 transition-colors">
+                    Value<SortIcon col="value" sortCol={sortCol} sortDir={sortDir} />
+                  </button>
+                </th>
                 <th className="w-24">Status</th>
                 <th className="w-28">Last Opname</th>
                 <th className="w-16">Aksi</th>
@@ -200,19 +266,19 @@ export default function InventoryPage() {
             <tbody>
               {isLoading ? (
                 Array.from({ length: 10 }).map((_, i) => (
-                  <tr key={i}>{Array.from({ length: 8 }).map((_, j) => (
+                  <tr key={i}>{Array.from({ length: 9 }).map((_, j) => (
                     <td key={j}><div className="h-4 bg-zinc-800 rounded animate-pulse" /></td>
                   ))}</tr>
                 ))
-              ) : filtered.length === 0 ? (
+              ) : sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-12 text-zinc-600">
+                  <td colSpan={9} className="text-center py-12 text-zinc-600">
                     <Package size={32} className="mx-auto mb-2 opacity-30" />
                     <p>Tidak ada produk ditemukan</p>
                   </td>
                 </tr>
               ) : (
-                filtered.map((p: any) => (
+                sorted.map((p: any) => (
                   <tr key={p.id}>
                     <td><span className="font-mono text-xs text-zinc-400">{p.sku}</span></td>
                     <td>
@@ -229,6 +295,9 @@ export default function InventoryPage() {
                     <td className="text-center text-xs text-zinc-500">{p.rop}</td>
                     <td className="text-right text-xs text-zinc-400">
                       {p.hpp ? `Rp ${p.hpp.toLocaleString('id')}` : '—'}
+                    </td>
+                    <td className="text-right text-xs text-zinc-500">
+                      {(p.soh > 0 && p.hpp > 0) ? `Rp ${(p.soh * p.hpp).toLocaleString('id')}` : '—'}
                     </td>
                     <td><StockBadge status={p.stockStatus} /></td>
                     <td className="text-[10px] text-zinc-600">{p.lastOpnameDate ? formatDate(p.lastOpnameDate) : '—'}</td>
@@ -248,7 +317,7 @@ export default function InventoryPage() {
           </table>
         </div>
         <div className="px-4 py-2 border-t border-zinc-800">
-          <p className="text-xs text-zinc-600">Menampilkan {filtered.length} produk</p>
+          <p className="text-xs text-zinc-600">Menampilkan {sorted.length} produk</p>
         </div>
       </div>
     </AppLayout>

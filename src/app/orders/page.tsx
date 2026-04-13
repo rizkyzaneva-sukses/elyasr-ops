@@ -19,12 +19,14 @@ const STATUS_GROUPS = [
   { key: 'perlu_dikirim', label: 'Perlu Dikirim' },
   { key: 'terkirim', label: 'Terkirim' },
   { key: 'dicairkan', label: 'Dicairkan' },
+  { key: 'retur', label: 'Retur' },
   { key: 'batal', label: 'Dibatalkan' },
 ]
 
 function StatusBadge({ status }: { status: string }) {
   if (!status) return <span className="badge-muted">—</span>
   const s = status.toLowerCase()
+  if (s === 'retur') return <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-orange-900/40 text-orange-400">Retur</span>
   if (s.startsWith('terkirim')) return <span className="badge-success">Terkirim</span>
   if (s.includes('batal') || s.includes('cancel')) return <span className="badge-danger">Batal</span>
   if (s.includes('selesai') || s.includes('delivered')) return <span className="badge-info">Selesai</span>

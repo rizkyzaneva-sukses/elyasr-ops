@@ -1,21 +1,32 @@
 'use client'
 
 import { AppLayout } from '@/components/layout/app-layout'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useToast } from '@/components/ui/toaster'
-import { ScanLine, Plus, Minus, RotateCcw, Package, CheckCircle, Trash2, Upload } from 'lucide-react'
+import { ScanLine, Plus, Minus, CheckCircle, Trash2, Upload, Search, X, AlertCircle } from 'lucide-react'
 import Papa from 'papaparse'
 
 type TabKey = 'masuk' | 'keluar' | 'retur'
 
-const TABS: { key: TabKey; label: string; direction: 'IN' | 'OUT'; reason: string }[] = [
+const SCAN_TABS: { key: TabKey; label: string; direction: 'IN' | 'OUT'; reason: string }[] = [
   { key: 'masuk',   label: 'Scan Masuk',   direction: 'IN',  reason: 'PURCHASE' },
   { key: 'keluar',  label: 'Scan Keluar',  direction: 'OUT', reason: 'SALES' },
   { key: 'retur',   label: 'Scan Retur',   direction: 'IN',  reason: 'RETURN_SALES' },
 ]
 
 interface ScanItem { sku: string; productName: string; qty: number }
+
+interface ReturOrder {
+  orderId: string
+  orderNo: string
+  airwaybill: string
+  status: string
+  platform: string | null
+  items: { sku: string; productName: string; qty: number }[]
+}
+
+type KondisiType = 'Baik' | 'Rusak' | 'Tidak Sesuai'
 
 function beep(times = 1) {
   try {
@@ -34,6 +45,337 @@ function beep(times = 1) {
   } catch {}
 }
 
+// ─── Modal Konfirmasi Retur ──────────────────────────────────────
+function ReturModal({
+  order,
+  allProducts,
+  onConfirm,
+  onClose,
+}: {
+  order: ReturOrder
+  allProducts: any[]
+  onConfirm: (payload: { sku: string; qtyRetur: number; kondisi: KondisiType }) => void
+  onClose: () => void
+}) {
+  const defaultSku = order.items[0]?.sku ?? ''
+  const defaultQty = order.items[0]?.qty ?? 1
+
+  const [selectedSku, setSelectedSku] = useState(defaultSku)
+  const [qtyRetur, setQtyRetur] = useState(defaultQty)
+  const [kondisi, setKondisi] = useState<KondisiType>('Baik')
+  const [productSearch, setProductSearch] = useState('')
+  const [showDropdown, setShowDropdown] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  const selectedProduct = allProducts.find(p => p.sku === selectedSku)
+  const displayName = selectedProduct
+    ? `${selectedProduct.sku} — ${selectedProduct.productName}`
+    : selectedSku
+
+  const filteredProducts = productSearch.length >= 1
+    ? allProducts.filter(p =>
+        p.sku.toLowerCase().includes(productSearch.toLowerCase()) ||
+        p.productName.toLowerCase().includes(productSearch.toLowerCase())
+      ).slice(0, 30)
+    : allProducts.slice(0, 30)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const kondisiOptions: KondisiType[] = ['Baik', 'Rusak', 'Tidak Sesuai']
+  const kondisiColors: Record<KondisiType, string> = {
+    'Baik': 'bg-emerald-700 text-white',
+    'Rusak': 'bg-red-700 text-white',
+    'Tidak Sesuai': 'bg-yellow-700 text-white',
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div className="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-md shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+          <div>
+            <h2 className="text-base font-bold text-white">Konfirmasi Retur</h2>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              {order.orderNo} · {order.platform ?? '—'} ·{' '}
+              <span className="text-orange-400">{order.status}</span>
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-zinc-500 hover:text-zinc-300 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Produk dari order asli (info) */}
+          {order.items.length > 0 && (
+            <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-400">
+              <p className="text-zinc-500 mb-1">Produk di order asli:</p>
+              {order.items.map(i => (
+                <p key={i.sku} className="font-mono">{i.sku} × {i.qty}</p>
+              ))}
+            </div>
+          )}
+
+          {/* Dropdown Produk yang Diretur */}
+          <div>
+            <label className="block text-xs text-zinc-400 mb-1.5 font-medium">
+              Produk yang Diretur
+            </label>
+            <div className="relative" ref={dropdownRef}>
+              <button
+                type="button"
+                onClick={() => { setShowDropdown(v => !v); setProductSearch('') }}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-left text-zinc-200 hover:border-zinc-600 transition-colors flex items-center justify-between"
+              >
+                <span className="truncate">{displayName || 'Pilih produk...'}</span>
+                <Search size={12} className="text-zinc-500 shrink-0 ml-2" />
+              </button>
+
+              {showDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl overflow-hidden">
+                  <div className="p-2 border-b border-zinc-700">
+                    <input
+                      autoFocus
+                      value={productSearch}
+                      onChange={e => setProductSearch(e.target.value)}
+                      placeholder="Cari SKU atau nama produk..."
+                      className="w-full bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                    />
+                  </div>
+                  <div className="max-h-44 overflow-y-auto divide-y divide-zinc-700/50">
+                    {filteredProducts.map(p => (
+                      <button
+                        key={p.sku}
+                        type="button"
+                        onClick={() => {
+                          setSelectedSku(p.sku)
+                          setShowDropdown(false)
+                          setProductSearch('')
+                        }}
+                        className={`w-full text-left px-3 py-2 text-xs hover:bg-zinc-700 transition-colors ${
+                          selectedSku === p.sku ? 'bg-emerald-900/30 text-emerald-300' : 'text-zinc-300'
+                        }`}
+                      >
+                        <span className="font-mono text-zinc-400">{p.sku}</span>
+                        <span className="ml-2">{p.productName}</span>
+                      </button>
+                    ))}
+                    {filteredProducts.length === 0 && (
+                      <p className="text-center text-zinc-600 py-3 text-xs">Produk tidak ditemukan</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Qty Retur */}
+          <div>
+            <label className="block text-xs text-zinc-400 mb-1.5 font-medium">Qty Retur</label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setQtyRetur(q => Math.max(1, q - 1))}
+                className="w-8 h-8 rounded bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white hover:bg-zinc-700 flex items-center justify-center transition-colors"
+              >
+                <Minus size={12} />
+              </button>
+              <input
+                type="number"
+                min={1}
+                value={qtyRetur}
+                onChange={e => setQtyRetur(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-20 text-center bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+              />
+              <button
+                type="button"
+                onClick={() => setQtyRetur(q => q + 1)}
+                className="w-8 h-8 rounded bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white hover:bg-zinc-700 flex items-center justify-center transition-colors"
+              >
+                <Plus size={12} />
+              </button>
+              <span className="text-xs text-zinc-600 ml-1">unit</span>
+            </div>
+          </div>
+
+          {/* Kondisi Produk */}
+          <div>
+            <label className="block text-xs text-zinc-400 mb-1.5 font-medium">Kondisi Produk</label>
+            <div className="flex gap-2">
+              {kondisiOptions.map(k => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setKondisi(k)}
+                  className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-all ${
+                    kondisi === k
+                      ? kondisiColors[k] + ' border-transparent'
+                      : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-600'
+                  }`}
+                >
+                  {kondisi === k ? '● ' : '○ '}{k}
+                </button>
+              ))}
+            </div>
+            {kondisi !== 'Baik' && (
+              <p className="text-xs text-zinc-500 mt-1.5 flex items-center gap-1">
+                <AlertCircle size={10} />
+                Stok tetap bertambah meskipun kondisi {kondisi.toLowerCase()}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 pb-5 flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 text-sm text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-colors"
+          >
+            Batal
+          </button>
+          <button
+            disabled={!selectedSku || qtyRetur < 1}
+            onClick={() => onConfirm({ sku: selectedSku, qtyRetur, kondisi })}
+            className="flex-1 py-2.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            ✓ Konfirmasi Retur
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Tab Retur (scan by resi) ────────────────────────────────────
+function TabRetur({ allProducts }: { allProducts: any[] }) {
+  const qc = useQueryClient()
+  const { toast } = useToast()
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const [airwaybill, setAirwaybill] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [order, setOrder] = useState<ReturOrder | null>(null)
+  const [confirming, setConfirming] = useState(false)
+
+  useEffect(() => { inputRef.current?.focus() }, [])
+
+  const handleScan = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const val = airwaybill.trim()
+    if (!val) return
+    setLoading(true)
+    setError('')
+    setOrder(null)
+    try {
+      const res = await fetch(`/api/orders/by-resi?airwaybill=${encodeURIComponent(val)}`)
+      const json = await res.json()
+      if (!res.ok) {
+        setError(json.error || 'Order tidak ditemukan')
+        beep(3)
+        return
+      }
+      beep(1)
+      setOrder(json.data)
+    } catch (err: any) {
+      setError(err.message || 'Gagal fetch order')
+      beep(3)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleConfirm = async (payload: { sku: string; qtyRetur: number; kondisi: KondisiType }) => {
+    if (!order) return
+    setConfirming(true)
+    try {
+      const res = await fetch('/api/scan/retur', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderNo: order.orderNo,
+          airwaybill: order.airwaybill,
+          items: [{ sku: payload.sku, qtyRetur: payload.qtyRetur, kondisi: payload.kondisi }],
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+
+      beep(1)
+      toast({ title: json.data.message, type: 'success' })
+      setOrder(null)
+      setAirwaybill('')
+      qc.invalidateQueries({ queryKey: ['inventory'] })
+      qc.invalidateQueries({ queryKey: ['orders'] })
+      setTimeout(() => inputRef.current?.focus(), 100)
+    } catch (err: any) {
+      toast({ title: err.message || 'Retur gagal', type: 'error' })
+      beep(3)
+    } finally {
+      setConfirming(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4 max-w-lg">
+      {order && !confirming && (
+        <ReturModal
+          order={order}
+          allProducts={allProducts}
+          onConfirm={handleConfirm}
+          onClose={() => { setOrder(null); setAirwaybill(''); inputRef.current?.focus() }}
+        />
+      )}
+
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+        <p className="text-sm font-medium text-zinc-400 mb-3">📦 Scan Retur — Input No. Resi</p>
+
+        <form onSubmit={handleScan} className="flex gap-2">
+          <div className="relative flex-1">
+            <ScanLine size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <input
+              ref={inputRef}
+              value={airwaybill}
+              onChange={e => { setAirwaybill(e.target.value); setError('') }}
+              placeholder="Scan / ketik no. resi..."
+              className={`w-full bg-zinc-800 border rounded-lg pl-8 pr-3 py-2.5 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-2 transition-colors ${
+                error ? 'border-red-700 focus:ring-red-500/50' : 'border-zinc-700 focus:ring-emerald-500/50'
+              }`}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading || !airwaybill.trim()}
+            className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+          >
+            {loading ? 'Cari...' : 'Cari'}
+          </button>
+        </form>
+
+        {error && (
+          <p className="text-red-400 text-xs mt-2 bg-red-900/20 border border-red-900 rounded px-3 py-2 flex items-center gap-1.5">
+            <AlertCircle size={12} /> {error}
+          </p>
+        )}
+
+        <p className="text-xs text-zinc-600 mt-3">
+          Scan resi pesanan yang diretur. Bisa scan order TERKIRIM maupun DICAIRKAN.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ─── Halaman Utama ───────────────────────────────────────────────
 export default function InventoryScanPage() {
   const qc = useQueryClient()
   const { toast } = useToast()
@@ -47,7 +389,7 @@ export default function InventoryScanPage() {
   const lockRef = useRef(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const tab = TABS.find(t => t.key === activeTab)!
+  const tab = SCAN_TABS.find(t => t.key === activeTab)!
 
   // Load all products for lookup
   const { data: productsData } = useQuery({
@@ -102,8 +444,8 @@ export default function InventoryScanPage() {
   }
 
   const updateQty = (sku: string, delta: number) => {
-    setItems(prev => prev
-      .map(i => i.sku === sku ? { ...i, qty: Math.max(1, i.qty + delta) } : i)
+    setItems(prev =>
+      prev.map(i => i.sku === sku ? { ...i, qty: Math.max(1, i.qty + delta) } : i)
     )
   }
 
@@ -137,12 +479,11 @@ export default function InventoryScanPage() {
     })
   }
 
-  // Commit batch
+  // Commit batch (Masuk / Keluar)
   const handleCommit = async () => {
     if (items.length === 0) return
     setCommitting(true)
     try {
-      // Create batch
       const batchRes = await fetch('/api/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -155,7 +496,6 @@ export default function InventoryScanPage() {
       const batchData = await batchRes.json()
       if (!batchRes.ok) throw new Error(batchData.error)
 
-      // Commit it
       const commitRes = await fetch(`/api/scan/${batchData.data.id}/commit`, { method: 'POST' })
       const commitData = await commitRes.json()
       if (!commitRes.ok) throw new Error(commitData.error)
@@ -176,9 +516,9 @@ export default function InventoryScanPage() {
     }
   }
 
-  // Switch tab → reset items
+  // Switch tab → reset items (tab Retur tidak punya items, tidak perlu confirm)
   const switchTab = (key: TabKey) => {
-    if (items.length > 0 && !confirm('Ganti tab akan menghapus item saat ini. Lanjutkan?')) return
+    if (activeTab !== 'retur' && items.length > 0 && !confirm('Ganti tab akan menghapus item saat ini. Lanjutkan?')) return
     setActiveTab(key)
     setItems([])
     setLookupError('')
@@ -200,7 +540,7 @@ export default function InventoryScanPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
-        {TABS.map(t => (
+        {SCAN_TABS.map(t => (
           <button
             key={t.key}
             onClick={() => switchTab(t.key)}
@@ -215,112 +555,117 @@ export default function InventoryScanPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Input panel */}
-        <div className="space-y-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-            <p className="text-sm font-medium text-zinc-400 mb-3">
-              {tab.direction === 'IN' ? '📥' : '📤'} {tab.label}
-            </p>
+      {/* Tab Retur — flow berbeda: scan resi, bukan SKU */}
+      {activeTab === 'retur' ? (
+        <TabRetur allProducts={productsData ?? []} />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Input panel */}
+          <div className="space-y-4">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+              <p className="text-sm font-medium text-zinc-400 mb-3">
+                {tab.direction === 'IN' ? '📥' : '📤'} {tab.label}
+              </p>
 
-            {/* SKU Input */}
-            <form onSubmit={handleSkuSubmit} className="flex gap-2 mb-3">
-              <div className="relative flex-1">
-                <ScanLine size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-                <input
-                  ref={skuRef}
-                  value={skuInput}
-                  onChange={e => setSkuInput(e.target.value)}
-                  placeholder="Scan / ketik SKU atau nama produk..."
-                  className={`w-full bg-zinc-800 border rounded-lg pl-8 pr-3 py-2.5 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-2 transition-colors ${
-                    lookupError ? 'border-red-700 focus:ring-red-500/50' : 'border-zinc-700 focus:ring-emerald-500/50'
-                  }`}
-                />
+              {/* SKU Input */}
+              <form onSubmit={handleSkuSubmit} className="flex gap-2 mb-3">
+                <div className="relative flex-1">
+                  <ScanLine size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                  <input
+                    ref={skuRef}
+                    value={skuInput}
+                    onChange={e => setSkuInput(e.target.value)}
+                    placeholder="Scan / ketik SKU atau nama produk..."
+                    className={`w-full bg-zinc-800 border rounded-lg pl-8 pr-3 py-2.5 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-2 transition-colors ${
+                      lookupError ? 'border-red-700 focus:ring-red-500/50' : 'border-zinc-700 focus:ring-emerald-500/50'
+                    }`}
+                  />
+                </div>
+                <button type="submit" className="bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors">
+                  Tambah
+                </button>
+              </form>
+
+              {lookupError && (
+                <p className="text-red-400 text-xs mb-2 bg-red-900/20 border border-red-900 rounded px-3 py-2">{lookupError}</p>
+              )}
+
+              {/* CSV Upload */}
+              <div className="flex items-center gap-2">
+                <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleCSV} />
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                >
+                  <Upload size={12} /> Upload CSV
+                </button>
+                <span className="text-zinc-700 text-xs">Format: PRODUK, QTY</span>
               </div>
-              <button type="submit" className="bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors">
-                Tambah
-              </button>
-            </form>
-
-            {lookupError && (
-              <p className="text-red-400 text-xs mb-2 bg-red-900/20 border border-red-900 rounded px-3 py-2">{lookupError}</p>
-            )}
-
-            {/* CSV Upload */}
-            <div className="flex items-center gap-2">
-              <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleCSV} />
-              <button
-                onClick={() => fileRef.current?.click()}
-                className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
-              >
-                <Upload size={12} /> Upload CSV
-              </button>
-              <span className="text-zinc-700 text-xs">Format: PRODUK, QTY</span>
             </div>
-          </div>
 
-          {/* Commit */}
-          {items.length > 0 && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm text-zinc-400">{items.length} SKU · {totalItems} unit total</p>
-                <button onClick={() => setItems([])} className="text-zinc-600 hover:text-red-400 transition-colors text-xs flex items-center gap-1">
-                  <Trash2 size={12} /> Reset
+            {/* Commit */}
+            {items.length > 0 && (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm text-zinc-400">{items.length} SKU · {totalItems} unit total</p>
+                  <button onClick={() => setItems([])} className="text-zinc-600 hover:text-red-400 transition-colors text-xs flex items-center gap-1">
+                    <Trash2 size={12} /> Reset
+                  </button>
+                </div>
+                <button
+                  onClick={handleCommit}
+                  disabled={committing || committed}
+                  className={`w-full py-3 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2 ${
+                    committed
+                      ? 'bg-emerald-800 text-emerald-300'
+                      : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                  }`}
+                >
+                  {committed ? <><CheckCircle size={16} /> Berhasil!</> : committing ? 'Menyimpan...' : `✓ Commit ${tab.label}`}
                 </button>
               </div>
-              <button
-                onClick={handleCommit}
-                disabled={committing || committed}
-                className={`w-full py-3 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2 ${
-                  committed
-                    ? 'bg-emerald-800 text-emerald-300'
-                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                }`}
-              >
-                {committed ? <><CheckCircle size={16} /> Berhasil!</> : committing ? 'Menyimpan...' : `✓ Commit ${tab.label}`}
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Item list */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
-            <p className="text-sm font-medium text-zinc-400">Item Scan</p>
-            <span className="text-xs text-zinc-600">{items.length} SKU</span>
+            )}
           </div>
-          {items.length === 0 ? (
-            <div className="py-16 text-center">
-              <ScanLine size={32} className="mx-auto mb-2 text-zinc-700" />
-              <p className="text-zinc-600 text-sm">Belum ada item</p>
-              <p className="text-zinc-700 text-xs mt-1">Scan atau ketik SKU untuk memulai</p>
+
+          {/* Item list */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
+              <p className="text-sm font-medium text-zinc-400">Item Scan</p>
+              <span className="text-xs text-zinc-600">{items.length} SKU</span>
             </div>
-          ) : (
-            <div className="divide-y divide-zinc-800 max-h-96 overflow-y-auto">
-              {items.map(item => (
-                <div key={item.sku} className="flex items-center gap-3 px-4 py-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-zinc-200 truncate">{item.productName}</p>
-                    <p className="text-[10px] font-mono text-zinc-600">{item.sku}</p>
+            {items.length === 0 ? (
+              <div className="py-16 text-center">
+                <ScanLine size={32} className="mx-auto mb-2 text-zinc-700" />
+                <p className="text-zinc-600 text-sm">Belum ada item</p>
+                <p className="text-zinc-700 text-xs mt-1">Scan atau ketik SKU untuk memulai</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-zinc-800 max-h-96 overflow-y-auto">
+                {items.map(item => (
+                  <div key={item.sku} className="flex items-center gap-3 px-4 py-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-zinc-200 truncate">{item.productName}</p>
+                      <p className="text-[10px] font-mono text-zinc-600">{item.sku}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => updateQty(item.sku, -1)} className="w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 flex items-center justify-center transition-colors">
+                        <Minus size={10} />
+                      </button>
+                      <span className="w-8 text-center text-sm font-bold text-white">{item.qty}</span>
+                      <button onClick={() => updateQty(item.sku, +1)} className="w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 flex items-center justify-center transition-colors">
+                        <Plus size={10} />
+                      </button>
+                      <button onClick={() => removeItem(item.sku)} className="w-6 h-6 rounded hover:bg-red-900/30 text-zinc-600 hover:text-red-400 flex items-center justify-center transition-colors ml-1">
+                        <Trash2 size={10} />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => updateQty(item.sku, -1)} className="w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 flex items-center justify-center transition-colors">
-                      <Minus size={10} />
-                    </button>
-                    <span className="w-8 text-center text-sm font-bold text-white">{item.qty}</span>
-                    <button onClick={() => updateQty(item.sku, +1)} className="w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 flex items-center justify-center transition-colors">
-                      <Plus size={10} />
-                    </button>
-                    <button onClick={() => removeItem(item.sku)} className="w-6 h-6 rounded hover:bg-red-900/30 text-zinc-600 hover:text-red-400 flex items-center justify-center transition-colors ml-1">
-                      <Trash2 size={10} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </AppLayout>
   )
 }

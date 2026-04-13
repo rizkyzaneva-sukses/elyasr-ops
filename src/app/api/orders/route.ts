@@ -57,6 +57,8 @@ export async function GET(request: NextRequest) {
     statusFilter = { status: { startsWith: 'TERKIRIM' } }
   } else if (statusGroup === 'dicairkan') {
     statusFilter = { payout: { isNot: null } }
+  } else if (statusGroup === 'retur') {
+    statusFilter = { status: 'RETUR' }
   } else if (statusGroup === 'batal') {
     statusFilter = {
       OR: [
