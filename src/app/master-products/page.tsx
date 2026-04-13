@@ -211,6 +211,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
 }
 
 export default function MasterProductsPage() {
+  const qc = useQueryClient()
   const { toast } = useToast()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
