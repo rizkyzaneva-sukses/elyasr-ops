@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
   const { orderNo, airwaybill, items } = body as {
     orderNo: string
     airwaybill: string
-    items: { sku: string; qtyRetur: number; kondisi: 'Baik' | 'Rusak' | 'Tidak Sesuai' }[]
+    items: { sku: string; qtyRetur: number; kondisi: 'Baik' | 'Rusak' | 'Tidak Sesuai'; note?: string }[]
   }
 
   if (!orderNo) return apiError('orderNo tidak boleh kosong')
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
   await prisma.$transaction(async (tx) => {
     // 1. Buat entri InventoryLedger untuk setiap item
     for (const item of items) {
-      const note = `Retur ${orderNo} - Kondisi: ${item.kondisi}`
+      const note = `Retur ${orderNo} - Kondisi: ${item.kondisi}${item.note ? ` - Catatan: ${item.note}` : ''}`
       await tx.inventoryLedger.create({
         data: {
           sku: item.sku,
@@ -73,14 +73,14 @@ export async function POST(request: NextRequest) {
     })
 
     // 3. Buat OrderScanLog dengan detail kondisi
-    const kondisiSummary = items.map(i => `${i.sku}: ${i.kondisi}`).join(', ')
+    const kondisiSummary = items.map(i => `${i.sku}: ${i.kondisi}${i.note ? ` (${i.note})` : ''}`).join(', ')
     await tx.orderScanLog.create({
       data: {
         orderId: order.id,
         orderNo,
         scannedAt: now,
         scannedBy: session.username,
-        note: `Retur dikonfirmasi. Kondisi: ${kondisiSummary}`,
+        note: `Retur dikonfirmasi. Konfirmasi: ${kondisiSummary}`,
       },
     })
 
@@ -100,6 +100,7 @@ export async function POST(request: NextRequest) {
             sku: i.sku,
             qtyRetur: i.qtyRetur,
             kondisi: i.kondisi,
+            note: i.note,
           })),
           totalQtyRetur: totalQty,
         },

@@ -62,7 +62,7 @@ function ReturModal({
 }: {
   order: ReturOrder
   allProducts: any[]
-  onConfirm: (payload: { sku: string; qtyRetur: number; kondisi: KondisiType }) => void
+  onConfirm: (payload: { sku: string; qtyRetur: number; kondisi: KondisiType; note: string }) => void
   onClose: () => void
 }) {
   const defaultSku = order.items[0]?.sku ?? ''
@@ -71,6 +71,7 @@ function ReturModal({
   const [selectedSku, setSelectedSku] = useState(defaultSku)
   const [qtyRetur, setQtyRetur] = useState(defaultQty)
   const [kondisi, setKondisi] = useState<KondisiType>('Baik')
+  const [note, setNote] = useState('')
   const [productSearch, setProductSearch] = useState('')
   const [showDropdown, setShowDropdown] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -240,6 +241,17 @@ function ReturModal({
               </p>
             )}
           </div>
+
+          {/* Catatan (Alasan Retur / Perbedaan Barang) */}
+          <div>
+            <label className="block text-xs text-zinc-400 mb-1.5 font-medium">Catatan (Penting jika barang beda dari order)</label>
+            <textarea
+               value={note}
+               onChange={e => setNote(e.target.value)}
+               placeholder="Contoh: Salah kirim, barang aslinya size S bukan M"
+               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 resize-none h-16"
+            />
+          </div>
         </div>
 
         {/* Footer */}
@@ -251,8 +263,8 @@ function ReturModal({
             Batal
           </button>
           <button
-            disabled={!selectedSku || qtyRetur < 1}
-            onClick={() => onConfirm({ sku: selectedSku, qtyRetur, kondisi })}
+            disabled={!selectedSku || qtyRetur < 1 || (selectedSku !== defaultSku && note.trim().length === 0)}
+            onClick={() => onConfirm({ sku: selectedSku, qtyRetur, kondisi, note })}
             className="flex-1 py-2.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             ✓ Konfirmasi Retur
@@ -302,7 +314,7 @@ function TabRetur({ allProducts }: { allProducts: any[] }) {
     }
   }
 
-  const handleConfirm = async (payload: { sku: string; qtyRetur: number; kondisi: KondisiType }) => {
+  const handleConfirm = async (payload: { sku: string; qtyRetur: number; kondisi: KondisiType; note: string }) => {
     if (!order) return
     setConfirming(true)
     try {
@@ -312,7 +324,7 @@ function TabRetur({ allProducts }: { allProducts: any[] }) {
         body: JSON.stringify({
           orderNo: order.orderNo,
           airwaybill: order.airwaybill,
-          items: [{ sku: payload.sku, qtyRetur: payload.qtyRetur, kondisi: payload.kondisi }],
+          items: [{ sku: payload.sku, qtyRetur: payload.qtyRetur, kondisi: payload.kondisi, note: payload.note }],
         }),
       })
       const json = await res.json()
@@ -391,6 +403,7 @@ export default function InventoryScanPage() {
   const [items, setItems] = useState<ScanItem[]>([])
   const [skuInput, setSkuInput] = useState('')
   const [lookupError, setLookupError] = useState('')
+  const [showSuggest, setShowSuggest] = useState(false)
   const [committing, setCommitting] = useState(false)
   const [committed, setCommitted] = useState(false)
   const skuRef = useRef<HTMLInputElement>(null)
@@ -635,12 +648,34 @@ export default function InventoryScanPage() {
                           <input
                             ref={skuRef}
                             value={skuInput}
-                            onChange={e => setSkuInput(e.target.value)}
+                            onChange={e => { setSkuInput(e.target.value); setShowSuggest(true) }}
+                            onBlur={() => setTimeout(() => setShowSuggest(false), 200)}
                             placeholder="Scan/ketik SKU..."
                             className={`w-full bg-zinc-800 border rounded-lg pl-8 pr-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-2 transition-colors ${
                               lookupError ? 'border-red-700 focus:ring-red-500/50' : 'border-zinc-700 focus:ring-emerald-500/50'
                             }`}
                           />
+                          {showSuggest && skuInput.length >= 2 && (
+                             <div className="absolute top-full left-0 z-20 w-full mt-1 max-h-48 overflow-y-auto bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl divide-y divide-zinc-700/50 custom-scrollbar">
+                               {(productsData ?? [])
+                                 .filter((p: any) => p.sku.toLowerCase().includes(skuInput.toLowerCase()) || p.productName.toLowerCase().includes(skuInput.toLowerCase()))
+                                 .slice(0, 15)
+                                 .map((p: any) => (
+                                   <button
+                                     key={p.sku}
+                                     type="button"
+                                     onMouseDown={(e) => {
+                                       e.preventDefault()
+                                       setSkuInput(p.sku)
+                                       setShowSuggest(false)
+                                     }}
+                                     className="w-full text-left px-3 py-2.5 text-xs hover:bg-zinc-700 transition-colors flex flex-col justify-center"
+                                   >
+                                      <div className="truncate"><span className="font-mono text-emerald-400 mr-2">{p.sku}</span><span className="text-zinc-200">{p.productName}</span></div>
+                                   </button>
+                                 ))}
+                             </div>
+                          )}
                         </div>
                     </div>
                     <div>
@@ -707,12 +742,35 @@ export default function InventoryScanPage() {
                     <input
                       ref={skuRef}
                       value={skuInput}
-                      onChange={e => setSkuInput(e.target.value)}
+                      onChange={e => { setSkuInput(e.target.value); setShowSuggest(true) }}
+                      onBlur={() => setTimeout(() => setShowSuggest(false), 200)}
                       placeholder="Scan / ketik SKU atau nama produk..."
                       className={`w-full bg-zinc-800 border rounded-lg pl-8 pr-3 py-2.5 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-2 transition-colors ${
                         lookupError ? 'border-red-700 focus:ring-red-500/50' : 'border-zinc-700 focus:ring-emerald-500/50'
                       }`}
                     />
+                    {showSuggest && skuInput.length >= 2 && (
+                       <div className="absolute top-full left-0 z-20 w-full mt-1 max-h-48 overflow-y-auto bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl divide-y divide-zinc-700/50 custom-scrollbar">
+                         {(productsData ?? [])
+                           .filter((p: any) => p.sku.toLowerCase().includes(skuInput.toLowerCase()) || p.productName.toLowerCase().includes(skuInput.toLowerCase()))
+                           .slice(0, 15)
+                           .map((p: any) => (
+                             <button
+                               key={p.sku}
+                               type="button"
+                               onMouseDown={(e) => {
+                                 e.preventDefault()
+                                 setSkuInput('')
+                                 setShowSuggest(false)
+                                 addItem(p.sku)
+                               }}
+                               className="w-full text-left px-3 py-2.5 text-xs hover:bg-zinc-700 transition-colors flex flex-col justify-center"
+                             >
+                                <div className="truncate"><span className="font-mono text-emerald-400 mr-2">{p.sku}</span><span className="text-zinc-200">{p.productName}</span></div>
+                             </button>
+                           ))}
+                       </div>
+                    )}
                   </div>
                   <button type="submit" className="bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors">
                     Tambah
