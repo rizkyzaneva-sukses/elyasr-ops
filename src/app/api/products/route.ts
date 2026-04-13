@@ -82,3 +82,24 @@ export async function POST(request: NextRequest) {
 
   return apiSuccess(product, 201)
 }
+
+// DELETE /api/products
+export async function DELETE(request: NextRequest) {
+  const session = await getSession()
+  if (!session.isLoggedIn) return apiError('Unauthorized', 401)
+  if (session.userRole !== 'OWNER') return apiError('Forbidden', 403)
+
+  try {
+    const body = await request.json()
+    const { ids } = body
+    if (!ids || !Array.isArray(ids)) return apiError('Parameter ids tidak valid')
+
+    const result = await prisma.masterProduct.deleteMany({
+      where: { id: { in: ids } }
+    })
+
+    return apiSuccess({ message: `${result.count} produk berhasil dihapus` })
+  } catch (err: any) {
+    return apiError(err.message || 'Gagal menghapus produk', 500)
+  }
+}

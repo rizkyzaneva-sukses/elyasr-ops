@@ -5,7 +5,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { downloadCSV } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
-import { Database, Plus, Download, Upload, Search, Edit2, ChevronLeft, ChevronRight, FileDown } from 'lucide-react'
+import { useAuth } from '@/components/providers'
+import { Database, Plus, Download, Upload, Search, Edit2, ChevronLeft, ChevronRight, FileDown, Trash, Loader2 } from 'lucide-react'
 import Papa from 'papaparse'
 
 function ProductModal({ product, categories, onClose }: { product?: any; categories: any[]; onClose: () => void }) {
@@ -215,6 +216,9 @@ export default function MasterProductsPage() {
   const [page, setPage] = useState(1)
   const [modal, setModal] = useState<'add' | 'edit' | 'import' | null>(null)
   const [selected, setSelected] = useState<any>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [deleting, setDeleting] = useState(false)
+  const { user } = useAuth()
   const limit = 50
 
   const { data, isLoading } = useQuery({
@@ -249,6 +253,31 @@ export default function MasterProductsPage() {
       Kategori: p.categoryName || '',
       Status: p.isActive ? 'Aktif' : 'Nonaktif',
     })))
+  }
+
+  const handleDeleteSelected = async () => {
+    if (!confirm(`Yakin menghapus ${selectedIds.length} produk terpilih?`)) return
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/products', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds }),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        toast({ title: json.data?.message || 'Produk berhasil dihapus', type: 'success' })
+        setSelectedIds([])
+        qc.invalidateQueries({ queryKey: ['products'] })
+        qc.invalidateQueries({ queryKey: ['products-all'] })
+      } else {
+        toast({ title: json.error || 'Gagal hapus', type: 'error' })
+      }
+    } catch (err: any) {
+      toast({ title: `Error: ${err.message}`, type: 'error' })
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
@@ -293,11 +322,41 @@ export default function MasterProductsPage() {
         />
       </div>
 
+      {selectedIds.length > 0 && user?.userRole === 'OWNER' && (
+        <div className="mb-4 bg-emerald-900/30 border border-emerald-800/50 rounded-xl px-4 py-3 flex items-center justify-between">
+          <p className="text-sm text-emerald-300 font-medium">{selectedIds.length} produk terpilih</p>
+          <div className="flex gap-2">
+            <button onClick={() => setSelectedIds([])} className="text-xs text-zinc-400 hover:text-zinc-200 px-3 py-1.5">Batal</button>
+            <button 
+              onClick={handleDeleteSelected} 
+              disabled={deleting}
+              className="flex items-center gap-1.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors"
+             >
+              {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash size={12} />}
+              Hapus
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead>
               <tr>
+                {user?.userRole === 'OWNER' && (
+                  <th className="w-10">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-zinc-700 bg-zinc-800 accent-emerald-500 w-3.5 h-3.5"
+                      checked={products.length > 0 && selectedIds.length === products.length}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedIds(products.map((p: any) => p.id))
+                        else setSelectedIds([])
+                      }}
+                    />
+                  </th>
+                )}
                 <th className="w-32">SKU</th>
                 <th>Nama Produk</th>
                 <th className="w-24">Kategori</th>
@@ -311,15 +370,28 @@ export default function MasterProductsPage() {
             <tbody>
               {isLoading ? (
                 Array.from({ length: 8 }).map((_, i) => (
-                  <tr key={i}>{Array.from({ length: 8 }).map((_, j) => (
+                  <tr key={i}>{Array.from({ length: user?.userRole === 'OWNER' ? 9 : 8 }).map((_, j) => (
                     <td key={j}><div className="h-4 bg-zinc-800 rounded animate-pulse" /></td>
                   ))}</tr>
                 ))
               ) : products.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-10 text-zinc-600">Tidak ada produk</td></tr>
+                <tr><td colSpan={user?.userRole === 'OWNER' ? 9 : 8} className="text-center py-10 text-zinc-600">Tidak ada produk</td></tr>
               ) : (
                 products.map((p: any) => (
-                  <tr key={p.id}>
+                  <tr key={p.id} className={selectedIds.includes(p.id) ? 'bg-zinc-800/50' : ''}>
+                    {user?.userRole === 'OWNER' && (
+                      <td>
+                        <input 
+                          type="checkbox" 
+                          className="rounded border-zinc-700 bg-zinc-800 accent-emerald-500 w-3.5 h-3.5"
+                          checked={selectedIds.includes(p.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedIds(prev => [...prev, p.id])
+                            else setSelectedIds(prev => prev.filter(id => id !== p.id))
+                          }}
+                        />
+                      </td>
+                    )}
                     <td><span className="font-mono text-xs text-zinc-400">{p.sku}</span></td>
                     <td><p className="text-sm text-zinc-200">{p.productName}</p></td>
                     <td><span className="text-xs text-zinc-500">{p.categoryName || '—'}</span></td>
