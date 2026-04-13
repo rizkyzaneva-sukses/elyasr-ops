@@ -388,25 +388,31 @@ model Wallet {
 // 11. Payout
 // ─────────────────────────────────────────────
 model Payout {
-  id            String    @id @default(cuid())
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  createdBy     String?   @map("created_by")
+  id                String    @id @default(cuid())
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  createdBy         String?   @map("created_by")
 
-  orderNo       String    @unique @map("order_no")
-  releasedDate  DateTime  @map("released_date")
-  omzet         Int
-  platformFee   Int       @map("platform_fee")
-  amsFee        Int       @map("ams_fee")
-  totalIncome   Int       @map("total_income")
-  walletId      String    @map("wallet_id")
+  orderNo           String    @unique @map("order_no")
+  releasedDate      DateTime  @map("released_date")
+  platform          String?   @map("platform")
+  omzet             Int
+  platformFee       Int       @map("platform_fee")
+  amsFee            Int       @map("ams_fee")
+  platformFeeOther  Int       @default(0) @map("platform_fee_other")
+  bebanOngkir       Int       @default(0) @map("beban_ongkir")
+  totalIncome       Int       @map("total_income")
+  walletId          String    @map("wallet_id")
+  source            String?   @map("source")
 
-  orderId       String?   @unique @map("order_id")
-  order         Order?    @relation(fields: [orderId], references: [id])
-  wallet        Wallet    @relation(fields: [walletId], references: [id])
+  orderId           String?   @unique @map("order_id")
+  order             Order?    @relation(fields: [orderId], references: [id])
+  wallet            Wallet    @relation(fields: [walletId], references: [id])
 
   @@index([orderNo])
   @@index([walletId])
+  @@index([platform])
+  @@index([releasedDate])
   @@map("payouts")
 }
 
