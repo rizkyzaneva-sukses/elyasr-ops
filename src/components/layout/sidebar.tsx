@@ -52,7 +52,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: '/finance',
-    label: 'Keuangan',
+    label: 'Finance Room',
     icon: Wallet,
     roles: ['OWNER', 'FINANCE'],
     children: [

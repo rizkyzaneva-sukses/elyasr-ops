@@ -306,7 +306,7 @@ export default function FinancePage() {
       <div className="page-header">
         <h1 className="page-title flex items-center gap-2">
           <Wallet size={22} className="text-emerald-400" />
-          Keuangan
+          Finance Room
         </h1>
         <div className="flex gap-2">
           <button onClick={() => setShowManageWallets(true)} className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-blue-400 rounded-lg px-3 py-2 text-sm transition-colors border border-zinc-700 font-medium">
