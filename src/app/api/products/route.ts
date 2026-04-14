@@ -12,9 +12,11 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get('search') || ''
   const categoryId = searchParams.get('categoryId') || ''
   const isActive = searchParams.get('isActive')
+  const paramLimit = searchParams.get('limit')
+  const isAll = paramLimit === 'all'
   const { skip, take } = getPagination({
     page: Number(searchParams.get('page') || 1),
-    limit: Number(searchParams.get('limit') || 50),
+    limit: Number(paramLimit || 50),
   })
 
   const where = {
@@ -38,9 +40,9 @@ export async function GET(request: NextRequest) {
   allProducts.sort((a, b) => a.sku.localeCompare(b.sku, undefined, { numeric: true, sensitivity: 'base' }))
 
   const total = allProducts.length
-  const products = allProducts.slice(skip, skip + take)
+  const products = isAll ? allProducts : allProducts.slice(skip, skip + take)
 
-  return apiSuccess({ products, total, skip, take })
+  return apiSuccess({ products, total, skip, take: isAll ? total : take })
 }
 
 // POST /api/products

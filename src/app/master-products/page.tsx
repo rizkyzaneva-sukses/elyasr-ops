@@ -303,7 +303,7 @@ export default function MasterProductsPage() {
     setExporting(true)
     toast({ title: 'Menyiapkan file ekspor...', type: 'success' })
     try {
-      const res = await fetch('/api/products?limit=100000')
+      const res = await fetch('/api/products?limit=all')
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Failed to export')
       
