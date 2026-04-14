@@ -56,9 +56,11 @@ export async function POST(request: NextRequest) {
 
   if (!sku || !productName) return apiError('SKU dan nama produk wajib diisi')
 
+  const trimmedSku = sku.trim().toUpperCase()
+  
   // Check duplicate SKU
-  const existing = await prisma.masterProduct.findUnique({ where: { sku } })
-  if (existing) return apiError(`SKU "${sku}" sudah terdaftar`)
+  const existing = await prisma.masterProduct.findUnique({ where: { sku: trimmedSku } })
+  if (existing) return apiError(`SKU "${trimmedSku}" sudah terdaftar`)
 
   // Get category name if categoryId provided
   let categoryName: string | null = null
@@ -69,7 +71,7 @@ export async function POST(request: NextRequest) {
 
   const product = await prisma.masterProduct.create({
     data: {
-      sku: sku.trim().toUpperCase(),
+      sku: trimmedSku,
       productName: productName.trim(),
       categoryId: categoryId || null,
       categoryName,

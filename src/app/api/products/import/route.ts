@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Check duplicate SKU
-      const existing = await prisma.masterProduct.findUnique({ where: { sku: sku.toString().trim() } })
+      const existing = await prisma.masterProduct.findUnique({ where: { sku: sku.toString().trim().toUpperCase() } })
 
       let categoryId = null
       let matchedCategoryName = null

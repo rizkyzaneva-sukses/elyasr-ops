@@ -18,7 +18,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
   const product = await prisma.masterProduct.update({
         where: { id: params.id },
         data: {
-                ...(sku && { sku }),
+                ...(sku && { sku: sku.trim().toUpperCase() }),
                 ...(productName && { productName }),
                 ...(unit && { unit }),
                 ...(hpp !== undefined && { hpp: Number(hpp) }),
