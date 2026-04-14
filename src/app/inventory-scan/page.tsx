@@ -74,19 +74,29 @@ function ReturModal({
   const [note, setNote] = useState('')
   const [productSearch, setProductSearch] = useState('')
   const [showDropdown, setShowDropdown] = useState(false)
+  const [suggestResults, setSuggestResults] = useState<any[]>([])
+  const [suggestLoading, setSuggestLoading] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const suggestDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const selectedProduct = allProducts.find(p => p.sku === selectedSku)
   const displayName = selectedProduct
     ? `${selectedProduct.sku} — ${selectedProduct.productName}`
     : selectedSku
 
-  const filteredProducts = productSearch.length >= 1
-    ? allProducts.filter(p =>
-        p.sku.toLowerCase().includes(productSearch.toLowerCase()) ||
-        p.productName.toLowerCase().includes(productSearch.toLowerCase())
-      ).slice(0, 30)
-    : allProducts.slice(0, 30)
+  const fetchSuggest = useCallback((q: string) => {
+    if (suggestDebounce.current) clearTimeout(suggestDebounce.current)
+    if (!q || q.length < 2) { setSuggestResults([]); return }
+    suggestDebounce.current = setTimeout(async () => {
+      setSuggestLoading(true)
+      try {
+        const res = await fetch(`/api/products/search?q=${encodeURIComponent(q)}&limit=15`)
+        const json = await res.json()
+        setSuggestResults(json.data ?? [])
+      } catch { setSuggestResults([]) }
+      finally { setSuggestLoading(false) }
+    }, 200)
+  }, [])
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -154,13 +164,17 @@ function ReturModal({
                     <input
                       autoFocus
                       value={productSearch}
-                      onChange={e => setProductSearch(e.target.value)}
+                      onChange={e => { setProductSearch(e.target.value); fetchSuggest(e.target.value) }}
                       placeholder="Cari SKU atau nama produk..."
                       className="w-full bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
                     />
                   </div>
-                  <div className="max-h-44 overflow-y-auto divide-y divide-zinc-700/50">
-                    {filteredProducts.map(p => (
+                  <div className="max-h-52 overflow-y-auto divide-y divide-zinc-700/50 custom-scrollbar">
+                    {suggestLoading && <p className="text-center py-3 text-xs text-zinc-500 animate-pulse">Mencari...</p>}
+                    {!suggestLoading && productSearch.length < 2 && (
+                      <p className="text-center py-3 text-xs text-zinc-500">Ketik min 2 huruf untuk mencari...</p>
+                    )}
+                    {!suggestLoading && suggestResults.map(p => (
                       <button
                         key={p.sku}
                         type="button"
@@ -168,6 +182,7 @@ function ReturModal({
                           setSelectedSku(p.sku)
                           setShowDropdown(false)
                           setProductSearch('')
+                          setSuggestResults([])
                         }}
                         className={`w-full text-left px-3 py-2 text-xs hover:bg-zinc-700 transition-colors ${
                           selectedSku === p.sku ? 'bg-emerald-900/30 text-emerald-300' : 'text-zinc-300'
@@ -177,8 +192,8 @@ function ReturModal({
                         <span className="ml-2">{p.productName}</span>
                       </button>
                     ))}
-                    {filteredProducts.length === 0 && (
-                      <p className="text-center text-zinc-600 py-3 text-xs">Produk tidak ditemukan</p>
+                    {!suggestLoading && productSearch.length >= 2 && suggestResults.length === 0 && (
+                      <p className="text-center py-3 text-xs text-zinc-500">Produk tidak ditemukan</p>
                     )}
                   </div>
                 </div>
