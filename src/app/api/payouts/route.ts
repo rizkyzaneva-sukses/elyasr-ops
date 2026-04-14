@@ -242,6 +242,14 @@ export async function POST(request: NextRequest) {
   const ledgerCat    = `Payout ${platform}`
   const CHUNK        = 200
 
+  // Normalize row keys (trim whitespace) — TikTok CSV headers may have trailing spaces
+  const normalizedRawRows: Record<string, unknown>[] = rawRows.map((row: Record<string, unknown>) => {
+    if (source !== 'tiktok_income') return row
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(row)) out[k.trim()] = v
+    return out
+  })
+
   let normalCount    = 0
   let returCount     = 0
   let bebanCount     = 0
@@ -254,7 +262,7 @@ export async function POST(request: NextRequest) {
   const invalidRows: { rowNumber: number; value: string; reason: string }[] = []
   
   // Filter valid rows based on source to keep line numbers accurate
-  const mappedRows = rawRows.map((row, idx) => ({ ...row, __lineNum: idx + 2 })) // +2 because header is row 1
+  const mappedRows = normalizedRawRows.map((row, idx) => ({ ...row, __lineNum: idx + 2 })) // +2 because header is row 1
   let filteredRows: any[] = []
   
   if (source === 'tiktok_income') {
@@ -269,7 +277,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (filteredRows.length === 0 && rawRows.length > 0) {
-    const cols = Object.keys(rawRows[0] || {}).slice(0, 7).join(', ')
+    const cols = Object.keys(normalizedRawRows[0] || {}).slice(0, 7).join(', ')
     return apiError(`Format file tidak sesuai atau kosong. Kolom terdeteksi: ${cols}`)
   }
 

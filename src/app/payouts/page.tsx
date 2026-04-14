@@ -273,30 +273,76 @@ export default function PayoutsPage() {
     setImporting(true)
     setTiktokModal(false)
     try {
-      if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls') && !file.name.endsWith('.csv')) {
-        throw new Error('Format file harus Excel (.xlsx) atau CSV')
+      const isCsv  = file.name.endsWith('.csv')
+      const isXlsx = file.name.endsWith('.xlsx') || file.name.endsWith('.xls')
+      if (!isCsv && !isXlsx) {
+        throw new Error('Format file harus Excel (.xlsx) atau CSV (.csv)')
       }
 
-      const buffer = await file.arrayBuffer()
-      const wb     = XLSX.read(buffer, { type: 'array' })
-
-      // Read periode from Reports sheet
-      const wsRep   = wb.Sheets['Reports']
-      let periodeFrom = '', periodeTo = ''
-      if (wsRep) {
-        const repData = XLSX.utils.sheet_to_json<unknown[]>(wsRep, { header: 1, defval: '' }) as unknown[][]
-        const periodeStr = String((repData[1] as unknown[])[1] ?? '')
-        // Format: "2026/02/01-2026/03/31"
-        const parts = periodeStr.split('-')
-        if (parts.length >= 2) {
-          periodeFrom = parts[0].trim().replace(/\//g, '-')
-          periodeTo   = parts[1].trim().replace(/\//g, '-')
+      /** Normalize a raw row so all keys are trimmed (handles TikTok trailing-space headers) */
+      function normalizeRow(row: Record<string, unknown>): Record<string, unknown> {
+        const out: Record<string, unknown> = {}
+        for (const [k, v] of Object.entries(row)) {
+          out[k.trim()] = v
         }
+        return out
       }
 
-      const ws = wb.Sheets['Order details']
-      if (!ws) { throw new Error('Sheet "Order details" tidak ditemukan') }
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: 0 })
+      let rows: Record<string, unknown>[] = []
+      let periodeFrom = ''
+      let periodeTo   = ''
+
+      if (isCsv) {
+        // ── CSV path: use PapaParse ───────────────────────────────────
+        const text = await file.text()
+        const parsed = await new Promise<Papa.ParseResult<Record<string, unknown>>>((resolve) => {
+          Papa.parse<Record<string, unknown>>(text, {
+            header: true,
+            skipEmptyLines: true,
+            complete: resolve,
+          })
+        })
+        // Normalize all header keys (trim trailing/leading whitespace)
+        rows = parsed.data.map(normalizeRow)
+
+        // Derive periode from MIN/MAX of "Order settled time" column
+        const times: Date[] = []
+        for (const row of rows) {
+          const raw = String(row['Order settled time'] || '').trim()
+          if (raw) {
+            const d = new Date(raw.replace(/\//g, '-'))
+            if (!isNaN(d.getTime())) times.push(d)
+          }
+        }
+        if (times.length > 0) {
+          const minD = new Date(Math.min(...times.map(d => d.getTime())))
+          const maxD = new Date(Math.max(...times.map(d => d.getTime())))
+          periodeFrom = minD.toISOString().slice(0, 10)
+          periodeTo   = maxD.toISOString().slice(0, 10)
+        }
+      } else {
+        // ── XLSX path ─────────────────────────────────────────────────
+        const buffer = await file.arrayBuffer()
+        const wb     = XLSX.read(buffer, { type: 'array' })
+
+        // Read periode from Reports sheet
+        const wsRep = wb.Sheets['Reports']
+        if (wsRep) {
+          const repData = XLSX.utils.sheet_to_json<unknown[]>(wsRep, { header: 1, defval: '' }) as unknown[][]
+          const periodeStr = String((repData[1] as unknown[])[1] ?? '')
+          // Format: "2026/02/01-2026/03/31"
+          const parts = periodeStr.split('-')
+          if (parts.length >= 2) {
+            periodeFrom = parts[0].trim().replace(/\//g, '-')
+            periodeTo   = parts[1].trim().replace(/\//g, '-')
+          }
+        }
+
+        const ws = wb.Sheets['Order details']
+        if (!ws) throw new Error('Sheet "Order details" tidak ditemukan')
+        const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: 0 })
+        rows = rawRows.map(normalizeRow)
+      }
 
       const payload = {
         source: 'tiktok_income',
@@ -390,7 +436,7 @@ export default function PayoutsPage() {
           {/* Hidden file inputs */}
           <input ref={csvRef}    type="file" accept=".csv"  className="hidden" onChange={handleCsvUpload} />
           <input ref={shopeeRef} type="file" accept=".xlsx" className="hidden" onChange={handleShopeeFile} />
-          <input ref={tiktokRef} type="file" accept=".xlsx" className="hidden" onChange={handleTiktokFile} />
+          <input ref={tiktokRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleTiktokFile} />
 
           {/* CSV Manual */}
           <button
@@ -741,7 +787,7 @@ export default function PayoutsPage() {
                     <option key={w.id} value={w.id}>{w.name}</option>
                   ))}
               </select>
-              <p className="text-[11px] text-zinc-600">Format: Excel (.xlsx) TikTok Seller Center · Sheet "Order details"</p>
+              <p className="text-[11px] text-zinc-600">Format: Excel (.xlsx) atau CSV (.csv) dari TikTok Seller Center</p>
             </div>
             <div className="px-5 py-4 flex justify-end gap-2 border-t border-zinc-800">
               <button onClick={() => setTiktokModal(false)}
