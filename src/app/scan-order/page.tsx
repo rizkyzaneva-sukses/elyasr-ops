@@ -55,11 +55,9 @@ function beep(type: ScanStatusType) {
 function getKresekInfo(items: { sku: string; qty: number; productName: string }[] = []) {
   if (items.length === 0) return null
 
-  let totalQty = 0
   let kresekQty = 0
 
   items.forEach(item => {
-    totalQty += item.qty
     const name = (item.productName || '').toLowerCase()
     if (!name.includes('miki hat') && !name.includes('peci uas')) {
       kresekQty += item.qty
@@ -70,7 +68,7 @@ function getKresekInfo(items: { sku: string; qty: number; productName: string }[
   if (kresekQty <= 1) kresekName = '🟡 Silver'
   else if (kresekQty === 2) kresekName = '🟡 Kuning'
 
-  return { totalQty, kresekName }
+  return { totalQty: kresekQty, kresekName }
 }
 
 function OrderItemsInfo({ items, receiverName }: { items?: {sku: string, qty: number, productName: string}[], receiverName?: string }) {
@@ -396,16 +394,23 @@ export default function ScanOrderPage() {
                 </>
              )}
 
-             {cameraOverlay === 'success' && (
-                <div className="absolute inset-0 bg-emerald-600/95 flex flex-col items-center justify-center text-white z-10 transition-all text-center p-6 backdrop-blur-md animate-in fade-in duration-200">
-                   <div className="rounded-full bg-white/20 p-5 mb-5 shadow-lg shadow-emerald-900/50">
+             {cameraOverlay === 'success' && (() => {
+               const kInfo = lastResult ? getKresekInfo(lastResult.items) : null;
+               const isSilver = kInfo?.kresekName.includes('Silver');
+               const isKuning = kInfo?.kresekName.includes('Kuning');
+               const bgClass = isSilver ? 'bg-zinc-600/95' : isKuning ? 'bg-amber-600/95' : kInfo ? 'bg-slate-700/95' : 'bg-emerald-600/95';
+               const shadowClass = isSilver ? 'shadow-zinc-900/50' : isKuning ? 'shadow-amber-900/50' : kInfo ? 'shadow-slate-900/50' : 'shadow-emerald-900/50';
+               return (
+                <div className={`absolute inset-0 flex flex-col items-center justify-center text-white z-10 transition-all text-center p-6 backdrop-blur-md animate-in fade-in duration-200 ${bgClass}`}>
+                   <div className={`rounded-full bg-white/20 p-5 mb-5 shadow-lg ${shadowClass}`}>
                      <CheckCircle size={56} className="text-white"/>
                    </div>
                    <div className="text-4xl font-black tracking-tight mb-3 drop-shadow-md">TERKIRIM</div>
                    <div className="text-2xl font-mono bg-black/20 px-5 py-2.5 rounded-xl mb-3 shadow-inner">{lastResult?.orderNo}</div>
                    <OrderItemsInfo items={lastResult?.items} receiverName={lastResult?.receiverName} />
                 </div>
-             )}
+               );
+             })()}
 
              {cameraOverlay === 'duplicate' && (
                 <div className="absolute inset-0 bg-amber-500/95 flex flex-col items-center justify-center text-black z-10 p-6 text-center backdrop-blur-md animate-in fade-in duration-200">
@@ -498,33 +503,39 @@ export default function ScanOrderPage() {
            </div>
         )}
 
-        {!cameraMode && lastResult && !uploadLoading && !bulkResult && (
-          <div className={`rounded-3xl p-6 mb-6 border transition-all shadow-xl animate-in fade-in duration-200 ${
-            lastResult.statusType === 'success'
-              ? 'bg-emerald-950/40 border-emerald-800/50'
-              : lastResult.statusType === 'duplicate'
-              ? 'bg-amber-950/40 border-amber-800/50'
-              : 'bg-red-950/40 border-red-800/50'
-          }`}>
+        {!cameraMode && lastResult && !uploadLoading && !bulkResult && (() => {
+          const kInfo = lastResult.statusType === 'success' ? getKresekInfo(lastResult.items) : null;
+          const isSilver = kInfo?.kresekName.includes('Silver');
+          const isKuning = kInfo?.kresekName.includes('Kuning');
+          const isPutih = kInfo && !isSilver && !isKuning;
+          
+          let cardBg = lastResult.statusType === 'success' ? (isSilver ? 'bg-zinc-800/80 border-zinc-500/50' : isKuning ? 'bg-amber-950/40 border-amber-600/50' : isPutih ? 'bg-slate-800/80 border-slate-400/50' : 'bg-emerald-950/40 border-emerald-800/50') : lastResult.statusType === 'duplicate' ? 'bg-amber-950/40 border-amber-800/50' : 'bg-red-950/40 border-red-800/50';
+
+          let iconBg = lastResult.statusType === 'success' ? (isSilver ? 'bg-zinc-700/50' : isKuning ? 'bg-amber-900/50' : isPutih ? 'bg-slate-700/50' : 'bg-emerald-900/50') : lastResult.statusType === 'duplicate' ? 'bg-amber-900/50' : 'bg-red-900/50';
+
+          let iconColor = lastResult.statusType === 'success' ? (isSilver ? 'text-zinc-300' : isKuning ? 'text-amber-400' : isPutih ? 'text-slate-200' : 'text-emerald-400') : lastResult.statusType === 'duplicate' ? 'text-amber-400' : 'text-red-400';
+
+          let textColor = lastResult.statusType === 'success' ? (isSilver ? 'text-zinc-200' : isKuning ? 'text-amber-300' : isPutih ? 'text-slate-100' : 'text-emerald-300') : '';
+
+          let badgeColor = isSilver ? 'text-zinc-300 bg-zinc-800' : isKuning ? 'text-amber-400 bg-amber-950' : isPutih ? 'text-slate-200 bg-slate-800' : 'text-emerald-400 bg-emerald-950';
+
+          return (
+          <div className={`rounded-3xl p-6 mb-6 border transition-all shadow-xl animate-in fade-in duration-200 ${cardBg}`}>
             <div className="flex items-start gap-5">
-              <div className={`p-3 rounded-2xl ${
-                  lastResult.statusType === 'success' ? 'bg-emerald-900/50' : 
-                  lastResult.statusType === 'duplicate' ? 'bg-amber-900/50' : 
-                  'bg-red-900/50'
-              }`}>
+              <div className={`p-3 rounded-2xl ${iconBg}`}>
                 {lastResult.statusType === 'success'
-                  ? <CheckCircle size={32} className="text-emerald-400" />
+                  ? <CheckCircle size={32} className={iconColor} />
                   : lastResult.statusType === 'duplicate'
-                  ? <ScanLine size={32} className="text-amber-400" />
-                  : <XCircle size={32} className="text-red-400" />
+                  ? <ScanLine size={32} className={iconColor} />
+                  : <XCircle size={32} className={iconColor} />
                 }
               </div>
               <div className="flex-1 mt-1">
                 {lastResult.statusType === 'success' ? (
                   <>
-                    <p className="font-bold text-emerald-300 text-xl">Berhasil!</p>
+                    <p className={`font-bold text-xl ${textColor}`}>Berhasil!</p>
                     <p className="text-base text-zinc-300 mt-1.5 flex items-center gap-2 flex-wrap">
-                      Order <span className="text-white font-mono bg-black/30 px-2 py-0.5 rounded-md font-medium border border-white/5">{lastResult.orderNo}</span> → <span className="text-emerald-400 font-bold bg-emerald-950 px-2 py-0.5 rounded-md">TERKIRIM</span>
+                      Order <span className="text-white font-mono bg-black/30 px-2 py-0.5 rounded-md font-medium border border-white/5">{lastResult.orderNo}</span> → <span className={`font-bold px-2 py-0.5 rounded-md ${badgeColor}`}>TERKIRIM</span>
                     </p>
                     <OrderItemsInfo items={lastResult.items} receiverName={lastResult.receiverName} />
                   </>
@@ -548,7 +559,8 @@ export default function ScanOrderPage() {
               </div>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {scanHistory.length > 0 && (
           <div className="bg-zinc-900/80 border border-zinc-800/80 rounded-3xl overflow-hidden shadow-lg backdrop-blur-md">
