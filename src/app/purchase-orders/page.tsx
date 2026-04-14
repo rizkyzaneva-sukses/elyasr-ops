@@ -2,7 +2,7 @@
 
 import { AppLayout } from '@/components/layout/app-layout'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { formatRupiah, formatDate, downloadCSV } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
 import { FileText, Plus, ChevronLeft, ChevronRight, Search, Eye, FileDown, Printer, X, CreditCard, ChevronDown } from 'lucide-react'
@@ -15,10 +15,14 @@ const PAY_STATUS_COLOR: Record<string, string> = {
   UNPAID: 'badge-danger', PARTIAL_PAID: 'badge-warning', PAID: 'badge-success',
 }
 
-function POItemSelect({ item, products, onSelect }: { item: any; products: any[]; onSelect: (sku: string) => void }) {
+function POItemSelect({ item, onSelect }: { item: any; onSelect: (sku: string) => void }) {
   const [open, setOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [suggestions, setSuggestions] = useState<any[]>([])
+  const [loadingSuggest, setLoadingSuggest] = useState(false)
+  const [displayName, setDisplayName] = useState(item.sku ? item.sku : 'Pilih SKU...')
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -30,48 +34,81 @@ function POItemSelect({ item, products, onSelect }: { item: any; products: any[]
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  const selectedProduct = products.find(p => p.sku === item.sku)
-  const display = selectedProduct ? `${selectedProduct.sku} — ${selectedProduct.productName}` : 'Pilih SKU...'
+  // Fetch suggestions from API on keystroke with debounce
+  const fetchSuggestions = useCallback((q: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (!q.trim()) {
+      setSuggestions([])
+      return
+    }
+    debounceRef.current = setTimeout(async () => {
+      setLoadingSuggest(true)
+      try {
+        const res = await fetch(`/api/products/search?q=${encodeURIComponent(q)}&limit=30`)
+        const json = await res.json()
+        setSuggestions(json.data ?? [])
+      } catch {
+        setSuggestions([])
+      } finally {
+        setLoadingSuggest(false)
+      }
+    }, 200)
+  }, [])
 
-  const filtered = searchQuery.length > 0
-    ? products.filter(p => p.sku.toLowerCase().includes(searchQuery.toLowerCase()) || p.productName.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 50)
-    : products.slice(0, 50)
+  const handleOpen = () => {
+    setOpen(true)
+    setSearchQuery('')
+    setSuggestions([])
+  }
+
+  const handleSelect = (p: any) => {
+    onSelect(p.sku)
+    setDisplayName(`${p.sku} — ${p.productName}`)
+    setOpen(false)
+    setSearchQuery('')
+  }
 
   return (
     <div className="relative flex-1" ref={dropdownRef}>
       <button
         type="button"
-        onClick={() => { setOpen(!open); setSearchQuery('') }}
+        onClick={handleOpen}
         className="w-full text-left bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none flex justify-between items-center transition-colors hover:border-zinc-600"
       >
-        <span className="truncate">{display}</span>
+        <span className="truncate">{displayName}</span>
         <ChevronDown size={14} className="text-zinc-500 shrink-0 ml-2" />
       </button>
 
       {open && (
-        <div className="absolute z-10 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl overflow-hidden">
+        <div className="absolute z-50 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl overflow-hidden">
           <div className="p-2 border-b border-zinc-700">
             <input
               autoFocus
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Cari SKU atau nama produk..."
+              onChange={e => { setSearchQuery(e.target.value); fetchSuggestions(e.target.value) }}
+              placeholder="Ketik SKU atau nama produk..."
               className="w-full bg-zinc-900 border border-zinc-700 rounded px-2.5 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
             />
           </div>
-          <div className="max-h-44 overflow-y-auto divide-y divide-zinc-700/50">
-            {filtered.map(p => (
+          <div className="max-h-52 overflow-y-auto divide-y divide-zinc-700/50">
+            {loadingSuggest && (
+              <p className="text-center py-3 text-xs text-zinc-500 animate-pulse">Mencari...</p>
+            )}
+            {!loadingSuggest && suggestions.map(p => (
               <button
                 key={p.sku}
                 type="button"
-                onClick={() => { onSelect(p.sku); setOpen(false) }}
+                onClick={() => handleSelect(p)}
                 className={`w-full text-left px-3 py-2 text-xs hover:bg-zinc-700 transition-colors ${item.sku === p.sku ? 'bg-emerald-900/30 text-emerald-300' : 'text-zinc-300'}`}
               >
                 <span className="font-mono text-emerald-400/80 mr-1.5">{p.sku}</span>— {p.productName}
               </button>
             ))}
-            {filtered.length === 0 && (
+            {!loadingSuggest && searchQuery.length > 0 && suggestions.length === 0 && (
               <p className="text-center py-3 text-xs text-zinc-500">Produk tidak ditemukan</p>
+            )}
+            {!loadingSuggest && searchQuery.length === 0 && (
+              <p className="text-center py-3 text-xs text-zinc-500">Ketik untuk mencari produk...</p>
             )}
           </div>
         </div>
@@ -80,7 +117,7 @@ function POItemSelect({ item, products, onSelect }: { item: any; products: any[]
   )
 }
 
-function CreatePOModal({ vendors, products, onClose }: { vendors: any[]; products: any[]; onClose: () => void }) {
+function CreatePOModal({ vendors, onClose }: { vendors: any[]; onClose: () => void }) {
   const qc = useQueryClient()
   const { toast } = useToast()
   const [vendorId, setVendorId] = useState('')
@@ -156,10 +193,9 @@ function CreatePOModal({ vendors, products, onClose }: { vendors: any[]; product
             <div className="space-y-2">
               {items.map((item, i) => (
                 <div key={i} className="flex gap-2">
-                  <POItemSelect 
-                    item={item} 
-                    products={products} 
-                    onSelect={(sku) => updateItem(i, 'sku', sku)} 
+                  <POItemSelect
+                    item={item}
+                    onSelect={(sku) => updateItem(i, 'sku', sku)}
                   />
                   <input type="number" min={1} value={item.qtyOrder} onChange={e => updateItem(i, 'qtyOrder', Number(e.target.value))}
                     className="w-24 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none"/>
@@ -451,8 +487,8 @@ export default function PurchaseOrdersPage() {
           }}
         />
       )}
-      {showCreate && vendors && products && (
-        <CreatePOModal vendors={vendors} products={products} onClose={() => setShowCreate(false)} />
+      {showCreate && vendors && (
+        <CreatePOModal vendors={vendors} products={products ?? []} onClose={() => setShowCreate(false)} />
       )}
       <div className="page-header">
         <h1 className="page-title flex items-center gap-2"><FileText size={22} className="text-emerald-400"/>Purchase Orders</h1>
