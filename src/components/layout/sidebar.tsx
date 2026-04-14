@@ -9,7 +9,7 @@ import {
   Package, ScanLine, ClipboardCheck, Building2, Wallet,
   Users, BookOpen, Database, Shield, Download, AlertTriangle,
   Store, TrendingUp, FileText, LogOut, ChevronDown, ChevronRight,
-  Truck, X, Menu
+  Truck, X, Menu, MessageSquarePlus
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -72,6 +72,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: Shield,
     roles: ['OWNER'],
   },
+  { href: '/suggest-revision', label: 'Suggest Revision', icon: MessageSquarePlus },
   { href: '/documentation', label: 'Dokumentasi', icon: BookOpen },
 ]
 

@@ -799,3 +799,20 @@ model ModalAwal {
 
   @@map("modal_awal")
 }
+
+// ─────────────────────────────────────────────
+// 28. SuggestRevision
+// ─────────────────────────────────────────────
+model SuggestRevision {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  title         String
+  description   String?
+  imagesBase64  String[] @default([]) @map("images_base64")
+  status        String   @default("PENDING")
+  createdBy     String?  @map("created_by")
+
+  @@map("suggest_revisions")
+}
