@@ -436,10 +436,6 @@ export default function PurchaseOrdersPage() {
     queryFn: () => fetch('/api/vendors?all=true').then(r => r.json()).then(d => d.data ?? []),
   })
 
-  const { data: products } = useQuery({
-    queryKey: ['products-all'],
-    queryFn: () => fetch('/api/products?limit=500&isActive=true').then(r => r.json()).then(d => d.data?.products ?? []),
-  })
 
   const pos = data?.purchaseOrders ?? []
   const total = data?.total ?? 0
@@ -488,7 +484,7 @@ export default function PurchaseOrdersPage() {
         />
       )}
       {showCreate && vendors && (
-        <CreatePOModal vendors={vendors} products={products ?? []} onClose={() => setShowCreate(false)} />
+        <CreatePOModal vendors={vendors} onClose={() => setShowCreate(false)} />
       )}
       <div className="page-header">
         <h1 className="page-title flex items-center gap-2"><FileText size={22} className="text-emerald-400"/>Purchase Orders</h1>
