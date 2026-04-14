@@ -138,6 +138,15 @@ export default function ScanOrderPage() {
   }, [cameraMode])
 
   useEffect(() => {
+    if (!cameraMode && lastResult && (lastResult.statusType === 'success' || lastResult.statusType === 'error')) {
+      const timer = setTimeout(() => {
+        setLastResult(null)
+      }, 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [lastResult, cameraMode])
+
+  useEffect(() => {
     if (cameraMode) {
       startCamera()
     } else {
@@ -290,7 +299,7 @@ export default function ScanOrderPage() {
   const processDuplicate = () => {
     if (!lastResult?.airwaybill) return
     setCameraOverlay(null)
-    executePost(lastResult.airwaybill, false)
+    executePost(lastResult.airwaybill, !cameraMode)
   }
 
   const closeOverlay = () => {
@@ -463,7 +472,7 @@ export default function ScanOrderPage() {
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   placeholder="Ketik atau scan barcode no. resi ..."
-                  disabled={loading || lockRef.current}
+                  disabled={loading}
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-12 pr-4 py-4 text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 text-base transition-all shadow-inner"
                   autoComplete="off"
                 />
