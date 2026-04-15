@@ -1,6 +1,5 @@
 'use client'
 
-import { AppLayout } from '@/components/layout/app-layout'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef, useCallback } from 'react'
 import { formatRupiah, formatDate } from '@/lib/utils'
@@ -87,8 +86,8 @@ function BreakdownRow({ shopeeVal, tiktokVal }: { shopeeVal: number; tiktokVal: 
   )
 }
 
-// ─── Main Page ────────────────────────────────────────
-export default function PayoutsPage() {
+// ─── Main Tab Component ────────────────────────────────
+export function PayoutTab() {
   const qc = useQueryClient()
   const { toast } = useToast()
   const { user } = useAuth()
@@ -309,7 +308,6 @@ export default function PayoutsPage() {
         throw new Error('Format file harus Excel (.xlsx) atau CSV (.csv)')
       }
 
-      /** Normalize a raw row so all keys are trimmed (handles TikTok trailing-space headers) */
       function normalizeRow(row: Record<string, unknown>): Record<string, unknown> {
         const out: Record<string, unknown> = {}
         for (const [k, v] of Object.entries(row)) {
@@ -323,7 +321,6 @@ export default function PayoutsPage() {
       let periodeTo   = ''
 
       if (isCsv) {
-        // ── CSV path: use PapaParse ───────────────────────────────────
         const text = await file.text()
         const parsed = await new Promise<Papa.ParseResult<Record<string, unknown>>>((resolve) => {
           Papa.parse<Record<string, unknown>>(text, {
@@ -332,10 +329,8 @@ export default function PayoutsPage() {
             complete: resolve,
           })
         })
-        // Normalize all header keys (trim trailing/leading whitespace)
         rows = parsed.data.map(normalizeRow)
 
-        // Derive periode from MIN/MAX of "Order settled time" column
         const times: Date[] = []
         for (const row of rows) {
           const raw = String(row['Order settled time'] || '').trim()
@@ -351,16 +346,13 @@ export default function PayoutsPage() {
           periodeTo   = maxD.toISOString().slice(0, 10)
         }
       } else {
-        // ── XLSX path ─────────────────────────────────────────────────
         const buffer = await file.arrayBuffer()
         const wb     = XLSX.read(buffer, { type: 'array' })
 
-        // Read periode from Reports sheet
         const wsRep = wb.Sheets['Reports']
         if (wsRep) {
           const repData = XLSX.utils.sheet_to_json<unknown[]>(wsRep, { header: 1, defval: '' }) as unknown[][]
           const periodeStr = String((repData[1] as unknown[])[1] ?? '')
-          // Format: "2026/02/01-2026/03/31"
           const parts = periodeStr.split('-')
           if (parts.length >= 2) {
             periodeFrom = parts[0].trim().replace(/\//g, '-')
@@ -422,7 +414,7 @@ export default function PayoutsPage() {
       })
       const json = await res.json()
       if (res.ok) {
-        setUploadResult(json.data) // Updated result without isPreview, meaning Success!
+        setUploadResult(json.data)
         setPendingPayload(null)
         toast({ title: 'Import berhasil!', type: 'success' })
         qc.invalidateQueries({ queryKey: ['payouts'] })
@@ -440,19 +432,17 @@ export default function PayoutsPage() {
 
   // ── Render ───────────────────────────────────────────
   return (
-    <AppLayout>
-      {/* ── Page Header ── */}
-      <div className="page-header">
-        <div>
-          <h1 className="page-title flex items-center gap-2">
-            <TrendingUp size={22} className="text-emerald-400" /> Payout
-          </h1>
-          <p className="text-zinc-500 text-sm mt-0.5">{total.toLocaleString('id')} record</p>
+    <>
+      {/* ── Header actions ── */}
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          <TrendingUp size={18} className="text-emerald-400" />
+          <span className="text-sm text-zinc-400">{total.toLocaleString('id')} record payout</span>
         </div>
         <div className="flex gap-2 items-center flex-wrap">
           {/* Wallet filter */}
           <select
-            id="wallet-filter"
+            id="payout-wallet-filter"
             value={walletId}
             onChange={e => { setWalletId(e.target.value); resetPage() }}
             className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none"
@@ -470,7 +460,7 @@ export default function PayoutsPage() {
 
           {/* CSV Manual */}
           <button
-            id="btn-upload-csv"
+            id="payout-btn-upload-csv"
             onClick={() => { if (!walletId) { toast({ title: 'Pilih wallet dulu', type: 'error' }); return }; csvRef.current?.click() }}
             disabled={importing}
             className="flex items-center gap-1.5 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors"
@@ -481,7 +471,7 @@ export default function PayoutsPage() {
 
           {/* Upload Shopee */}
           <button
-            id="btn-upload-shopee"
+            id="payout-btn-upload-shopee"
             onClick={() => { setModalWallet(''); setShopeeModal(true) }}
             disabled={importing}
             className="flex items-center gap-1.5 bg-orange-700 hover:bg-orange-600 disabled:opacity-50 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors"
@@ -492,7 +482,7 @@ export default function PayoutsPage() {
 
           {/* Upload TikTok */}
           <button
-            id="btn-upload-tiktok"
+            id="payout-btn-upload-tiktok"
             onClick={() => { setModalWallet(''); setTiktokModal(true) }}
             disabled={importing}
             className="flex items-center gap-1.5 bg-pink-700 hover:bg-pink-600 disabled:opacity-50 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors"
@@ -504,7 +494,7 @@ export default function PayoutsPage() {
           {/* Backfill tanggal cair — OWNER only */}
           {user?.userRole === 'OWNER' && (
             <button
-              id="btn-backfill-dates"
+              id="payout-btn-backfill-dates"
               onClick={handleBackfillDates}
               disabled={backfilling}
               title="Sinkronkan trx_date order dari data payout yang sudah ada"
@@ -550,35 +540,26 @@ export default function PayoutsPage() {
 
       {/* ── Summary Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 mb-6">
-        {/* Total Omzet */}
         <div className="stat-card">
           <p className="text-zinc-500 text-xs mb-0.5">Total Omzet</p>
           <p className="text-lg font-bold text-white">{formatRupiah(summary?.total.omzet ?? 0, true)}</p>
           <BreakdownRow shopeeVal={summary?.shopee.omzet ?? 0} tiktokVal={summary?.tiktok.omzet ?? 0} />
         </div>
-
-        {/* Total Cair */}
         <div className="stat-card">
           <p className="text-zinc-500 text-xs mb-0.5">Total Cair</p>
           <p className="text-lg font-bold text-emerald-400">{formatRupiah(summary?.total.totalCair ?? 0, true)}</p>
           <BreakdownRow shopeeVal={summary?.shopee.totalCair ?? 0} tiktokVal={summary?.tiktok.totalCair ?? 0} />
         </div>
-
-        {/* Fee Platform */}
         <div className="stat-card">
           <p className="text-zinc-500 text-xs mb-0.5">Fee Platform</p>
           <p className="text-lg font-bold text-red-400">{formatRupiah(summary?.total.feePlatform ?? 0, true)}</p>
           <BreakdownRow shopeeVal={summary?.shopee.feePlatform ?? 0} tiktokVal={summary?.tiktok.feePlatform ?? 0} />
         </div>
-
-        {/* Fee AMS */}
         <div className="stat-card">
           <p className="text-zinc-500 text-xs mb-0.5">Fee AMS</p>
           <p className="text-lg font-bold text-orange-400">{formatRupiah(summary?.total.feeAms ?? 0, true)}</p>
           <BreakdownRow shopeeVal={summary?.shopee.feeAms ?? 0} tiktokVal={summary?.tiktok.feeAms ?? 0} />
         </div>
-
-        {/* Beban Kerugian Ongkir */}
         <div className="stat-card border-red-900/40 bg-red-950/20">
           <p className="text-zinc-500 text-xs mb-0.5 flex items-center gap-1">
             <AlertTriangle size={10} className="text-red-500" /> Beban Ongkir
@@ -630,11 +611,11 @@ export default function PayoutsPage() {
             <p className="text-sm text-emerald-300 font-medium">{selectedIds.length} payout terpilih</p>
             <div className="flex gap-2">
               <button onClick={() => setSelectedIds([])} className="text-xs text-zinc-400 hover:text-zinc-200 px-3 py-1.5">Batal</button>
-              <button 
-                onClick={handleDeleteSelected} 
+              <button
+                onClick={handleDeleteSelected}
                 disabled={deleting}
                 className="flex items-center gap-1.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors"
-               >
+              >
                 {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash size={12} />}
                 Hapus
               </button>
@@ -648,8 +629,8 @@ export default function PayoutsPage() {
               <tr>
                 {user?.userRole === 'OWNER' && (
                   <th className="w-10">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       className="rounded border-zinc-700 bg-zinc-800 accent-emerald-500 w-3.5 h-3.5"
                       checked={payouts.length > 0 && selectedIds.length === payouts.length}
                       onChange={(e) => {
@@ -690,8 +671,8 @@ export default function PayoutsPage() {
                 <tr key={p.id} className={selectedIds.includes(p.id) ? 'bg-zinc-800/50' : ''}>
                   {user?.userRole === 'OWNER' && (
                     <td>
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         className="rounded border-zinc-700 bg-zinc-800 accent-emerald-500 w-3.5 h-3.5"
                         checked={selectedIds.includes(p.id)}
                         onChange={(e) => {
@@ -754,9 +735,7 @@ export default function PayoutsPage() {
         )}
       </div>
 
-      {/* ══════════════════════════════════════════
-          MODAL: Pilih Wallet Shopee
-      ══════════════════════════════════════════ */}
+      {/* ══ MODAL: Pilih Wallet Shopee ══ */}
       {shopeeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl w-full max-w-sm mx-4">
@@ -788,10 +767,7 @@ export default function PayoutsPage() {
               </p>
             </div>
             <div className="px-5 py-4 flex justify-end gap-2 border-t border-zinc-800">
-              <button onClick={() => setShopeeModal(false)}
-                className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">
-                Batal
-              </button>
+              <button onClick={() => setShopeeModal(false)} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">Batal</button>
               <button
                 disabled={!modalWallet}
                 onClick={() => shopeeRef.current?.click()}
@@ -804,9 +780,7 @@ export default function PayoutsPage() {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════
-          MODAL: Pilih Wallet TikTok
-      ══════════════════════════════════════════ */}
+      {/* ══ MODAL: Pilih Wallet TikTok ══ */}
       {tiktokModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl w-full max-w-sm mx-4">
@@ -838,10 +812,7 @@ export default function PayoutsPage() {
               </p>
             </div>
             <div className="px-5 py-4 flex justify-end gap-2 border-t border-zinc-800">
-              <button onClick={() => setTiktokModal(false)}
-                className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">
-                Batal
-              </button>
+              <button onClick={() => setTiktokModal(false)} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200">Batal</button>
               <button
                 disabled={!modalWallet}
                 onClick={() => tiktokRef.current?.click()}
@@ -854,9 +825,7 @@ export default function PayoutsPage() {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════
-          MODAL: Hasil Upload / Preview
-      ══════════════════════════════════════════ */}
+      {/* ══ MODAL: Hasil Upload / Preview ══ */}
       {uploadResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
@@ -870,7 +839,6 @@ export default function PayoutsPage() {
             </div>
 
             <div className="px-5 py-4 space-y-4 overflow-y-auto flex-1">
-              {/* Periode */}
               {(uploadResult.periodeFrom || uploadResult.totalBarisData > 0) && (
                 <div className="flex justify-between items-center bg-zinc-800/40 px-3 py-2 rounded-lg">
                   <p className="text-xs text-zinc-400">
@@ -882,7 +850,6 @@ export default function PayoutsPage() {
                 </div>
               )}
 
-              {/* Counts */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="bg-zinc-800/60 rounded-lg px-3 py-2.5">
                   <p className="text-[10px] text-zinc-500 mb-0.5">✓ Payout Normal</p>
@@ -902,42 +869,34 @@ export default function PayoutsPage() {
                 </div>
               </div>
 
-              {/* Totals */}
               <div className="border border-zinc-800 rounded-xl overflow-hidden">
                 <div className="flex justify-between items-center px-4 py-2.5 border-b border-zinc-800">
                   <span className="text-xs text-zinc-500">Potensi Masuk (Normal)</span>
-                  <span className="text-sm font-semibold text-emerald-400">
-                    +{formatRupiah(uploadResult.totalMasuk)}
-                  </span>
+                  <span className="text-sm font-semibold text-emerald-400">+{formatRupiah(uploadResult.totalMasuk)}</span>
                 </div>
                 <div className="flex justify-between items-center px-4 py-2.5">
                   <span className="text-xs text-zinc-500">Potensi Beban Kerugian Ongkir</span>
-                  <span className="text-sm font-semibold text-orange-400">
-                    {formatRupiah(uploadResult.totalBeban)}
-                  </span>
+                  <span className="text-sm font-semibold text-orange-400">{formatRupiah(uploadResult.totalBeban)}</span>
                 </div>
               </div>
 
-              {/* Debug Info */}
               {uploadResult.debug && (
-                <div className="bg-amber-900/20 border border-amber-900/50 rounded-xl p-3 space-y-2 mt-4">
-                  <p className="text-xs font-semibold text-amber-500 flex items-center gap-1">Debug Kolom (Info untuk Developer):</p>
+                <div className="bg-amber-900/20 border border-amber-900/50 rounded-xl p-3 space-y-2">
+                  <p className="text-xs font-semibold text-amber-500">Debug Kolom (Info untuk Developer):</p>
                   <p className="text-[10px] text-zinc-400">Kolom Omzet detected: <b className="text-amber-400">{uploadResult.debug.omzetColumn}</b></p>
                   <p className="text-[10px] text-zinc-400">Kolom Settlement detected: <b className="text-amber-400">{uploadResult.debug.settlementColumn}</b></p>
                   <div className="mt-2">
-                    <p className="text-[10px] text-zinc-500 mb-1">Semua Header di File (copy ini untuk diberikan ke developer):</p>
-                    <div className="bg-black/50 p-2 rounded text-[9px] text-zinc-400 font-mono break-all leading-relaxed max-h-24 overflow-y-auto custom-scrollbar">
+                    <p className="text-[10px] text-zinc-500 mb-1">Semua Header:</p>
+                    <div className="bg-black/50 p-2 rounded text-[9px] text-zinc-400 font-mono break-all leading-relaxed max-h-24 overflow-y-auto">
                       {uploadResult.debug.allColumns?.join(', ')}
                     </div>
                   </div>
                 </div>
               )}
 
-              
-              {/* Detail Gagal (Invalid Rows) */}
               {uploadResult.invalidRows && uploadResult.invalidRows.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-red-400 mb-2 flex items-center gap-1.5"><AlertTriangle size={13}/> Data Gagal Format ({uploadResult.invalidRows.length}):</p>
+                  <p className="text-xs font-semibold text-red-400 mb-2 flex items-center gap-1.5"><AlertTriangle size={13}/>Data Gagal Format ({uploadResult.invalidRows.length}):</p>
                   <div className="space-y-1.5 max-h-36 overflow-y-auto bg-red-950/20 border border-red-900/30 p-2 rounded-lg">
                     {uploadResult.invalidRows.map((inv, idx) => (
                       <div key={idx} className="text-xs flex gap-2">
@@ -952,7 +911,6 @@ export default function PayoutsPage() {
                 </div>
               )}
 
-              {/* Detail Beban Ongkir */}
               {uploadResult.detailBebanOngkir.length > 0 && (
                 <div>
                   <p className="text-xs text-zinc-500 mb-2">Detail Beban Kerugian Ongkir:</p>
@@ -967,7 +925,6 @@ export default function PayoutsPage() {
                 </div>
               )}
 
-              {/* Detail Duplikat */}
               {uploadResult.detailDuplikat.length > 0 && (
                 <div>
                   <p className="text-xs text-zinc-500 mb-2">Duplikat Database, akan dilewati ({uploadResult.detailDuplikat.length}):</p>
@@ -1008,6 +965,6 @@ export default function PayoutsPage() {
           </div>
         </div>
       )}
-    </AppLayout>
+    </>
   )
 }

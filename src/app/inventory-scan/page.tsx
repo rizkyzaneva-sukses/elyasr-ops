@@ -824,7 +824,7 @@ export default function InventoryScanPage() {
                 >
                   <Upload size={12} /> Upload CSV
                 </button>
-                <span className="text-zinc-700 text-xs">Format: PRODUK, QTY{activeTab === 'retur_pembelian' && ', TANGGAL_RETUR'}</span>
+                <span className="text-zinc-400 text-xs">Format: PRODUK, QTY{activeTab === 'retur_pembelian' && ', TANGGAL_RETUR'}</span>
               </div>
             </div>
 
@@ -869,7 +869,7 @@ export default function InventoryScanPage() {
                 {items.map(item => (
                   <div key={item.sku + (item.trxDate || '')} className="flex items-center gap-3 px-4 py-3">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-zinc-200 truncate">{item.productName}</p>
+                      <p className="text-sm text-zinc-200 truncate" title={item.productName}>{item.productName}</p>
                       <p className="text-[10px] font-mono text-zinc-600">{item.sku}</p>
                       {activeTab === 'retur_pembelian' && (
                         <p className="text-[10px] text-zinc-500 mt-1">Tanggal: {item.trxDate} {item.supplierName ? `| Supplier: ${item.supplierName}` : ''}</p>

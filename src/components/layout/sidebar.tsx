@@ -31,23 +31,23 @@ const NAV_ITEMS: NavItem[] = [
     icon: Package,
     roles: ['OWNER', 'FINANCE', 'STAFF'],
     children: [
-      { href: '/inventory', label: 'Stok Overview', icon: Package, roles: ['OWNER', 'FINANCE', 'STAFF'] },
-      { href: '/inventory-ledger', label: 'Inventory Ledger', icon: FileText, roles: ['OWNER', 'FINANCE', 'STAFF'] },
-      { href: '/inventory-scan', label: 'Scan Masuk/Keluar', icon: ScanLine, roles: ['OWNER', 'FINANCE', 'STAFF'] },
-      { href: '/stock-opname', label: 'Stock Opname', icon: ClipboardCheck, roles: ['OWNER', 'FINANCE'] },
-      { href: '/master-products', label: 'Master Produk', icon: Database, roles: ['OWNER', 'FINANCE'] },
+      { href: '/inventory?tab=overview',  label: 'Stok Overview',    icon: Package,        roles: ['OWNER', 'FINANCE', 'STAFF'] },
+      { href: '/inventory?tab=ledger',    label: 'Inventory Ledger', icon: FileText,        roles: ['OWNER', 'FINANCE', 'STAFF'] },
+      { href: '/inventory?tab=scan',      label: 'Scan Masuk/Keluar',icon: ScanLine,        roles: ['OWNER', 'FINANCE', 'STAFF'] },
+      { href: '/inventory?tab=opname',    label: 'Stock Opname',     icon: ClipboardCheck,  roles: ['OWNER', 'FINANCE'] },
+      { href: '/inventory?tab=master',    label: 'Master Produk',    icon: Database,        roles: ['OWNER', 'FINANCE'] },
     ],
   },
   {
-    href: '/purchase-orders',
+    href: '/procurement',
     label: 'Procurement',
     icon: Truck,
     roles: ['OWNER', 'FINANCE'],
     children: [
-      { href: '/purchase-orders', label: 'Purchase Orders', icon: FileText, roles: ['OWNER', 'FINANCE'] },
-      { href: '/vendors', label: 'Vendor', icon: Building2, roles: ['OWNER', 'FINANCE'] },
-      { href: '/vendor-payments', label: 'Pembayaran Vendor', icon: CreditCard, roles: ['OWNER', 'FINANCE'] },
-      { href: '/procurement', label: 'Monitoring', icon: BarChart3, roles: ['OWNER', 'FINANCE'] },
+      { href: '/procurement?tab=po',       label: 'Purchase Orders',    icon: FileText,   roles: ['OWNER', 'FINANCE'] },
+      { href: '/procurement?tab=vendor',   label: 'Vendor',             icon: Building2,  roles: ['OWNER', 'FINANCE'] },
+      { href: '/procurement?tab=payment',  label: 'Pembayaran Vendor',  icon: CreditCard, roles: ['OWNER', 'FINANCE'] },
+      { href: '/procurement?tab=monitor',  label: 'Monitoring',         icon: BarChart3,  roles: ['OWNER', 'FINANCE'] },
     ],
   },
   {
@@ -56,12 +56,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: Wallet,
     roles: ['OWNER', 'FINANCE'],
     children: [
-      { href: '/finance', label: 'Wallet & Ledger', icon: Wallet, roles: ['OWNER', 'FINANCE'] },
-      { href: '/aset-tetap', label: 'Aset Tetap', icon: Package, roles: ['OWNER', 'FINANCE'] },
-      { href: '/modal-awal', label: 'Modal Awal', icon: Database, roles: ['OWNER'] },
-      { href: '/payouts', label: 'Payout', icon: TrendingUp, roles: ['OWNER', 'FINANCE'] },
-      { href: '/utang-piutang', label: 'Utang & Piutang', icon: CreditCard, roles: ['OWNER', 'FINANCE'] },
-      { href: '/reports', label: 'Laporan', icon: BarChart3, roles: ['OWNER', 'FINANCE'] },
+      { href: '/finance?tab=wallet',   label: 'Wallet & Ledger', icon: Wallet,     roles: ['OWNER', 'FINANCE'] },
+      { href: '/finance?tab=aset',     label: 'Aset Tetap',      icon: Package,    roles: ['OWNER', 'FINANCE'] },
+      { href: '/finance?tab=modal',    label: 'Modal Awal',      icon: Database,   roles: ['OWNER'] },
+      { href: '/finance?tab=payout',   label: 'Payout',          icon: TrendingUp, roles: ['OWNER', 'FINANCE'] },
+      { href: '/finance?tab=utang',    label: 'Utang & Piutang', icon: CreditCard, roles: ['OWNER', 'FINANCE'] },
+      { href: '/finance?tab=laporan',  label: 'Laporan',         icon: BarChart3,  roles: ['OWNER', 'FINANCE'] },
     ],
   },
   { href: '/crm', label: 'CRM', icon: Users, roles: ['OWNER', 'FINANCE', 'STAFF'] },
@@ -84,12 +84,14 @@ function NavItemComponent({ item, level = 0 }: { item: NavItem; level?: number }
   // Check role access
   if (item.roles && user && !item.roles.includes(user.userRole)) return null
 
-  const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+  // Support ?tab= URLs: strip query for path comparison
+  const itemPath = item.href.split('?')[0]
+  const isActive = pathname === itemPath || pathname.startsWith(itemPath + '/')
   const hasChildren = item.children && item.children.length > 0
   const Icon = item.icon
 
   if (hasChildren) {
-    const isChildActive = item.children!.some(c => pathname === c.href || pathname.startsWith(c.href + '/'))
+    const isChildActive = item.children!.some(c => { const cp = c.href.split('?')[0]; return pathname === cp || pathname.startsWith(cp + '/') })
     const isExpanded = open || isChildActive
 
     return (
