@@ -293,8 +293,18 @@ export async function POST(request: NextRequest) {
   })
   const existingSet = new Set(existingPayouts.map(e => e.orderNo))
 
+  // ── Pre-fetch matching orders for orderId link + trxDate update ─────
+  const existingOrders = await prisma.order.findMany({
+    where: { orderNo: { in: allOrderNos } },
+    select: { id: true, orderNo: true },
+    distinct: ['orderNo'],
+  })
+  const orderIdMap = new Map(existingOrders.map(o => [o.orderNo, o.id]))
+
   const allPayoutInserts: any[] = []
   const allLedgerInserts: any[] = []
+  // Map orderNo → releasedDate, to patch orders.trx_date after insert
+  const orderDateUpdates: { orderNo: string; releasedDate: Date }[] = []
 
   // Process rows
   for (const row of filteredRows) {
@@ -357,7 +367,12 @@ export async function POST(request: NextRequest) {
         walletId,
         source:           'shopee_income',
         createdBy:        session.username,
+        orderId:          orderIdMap.get(orderNo) ?? null,
       })
+      // Track for trxDate update
+      if (orderIdMap.has(orderNo)) {
+        orderDateUpdates.push({ orderNo, releasedDate })
+      }
       allLedgerInserts.push({
         walletId,
         trxDate:  releasedDate,
@@ -431,7 +446,12 @@ export async function POST(request: NextRequest) {
         walletId,
         source:           'tiktok_income',
         createdBy:        session.username,
+        orderId:          orderIdMap.get(orderNo) ?? null,
       })
+      // Track for trxDate update
+      if (orderIdMap.has(orderNo)) {
+        orderDateUpdates.push({ orderNo, releasedDate })
+      }
       allLedgerInserts.push({
         walletId,
         trxDate:  releasedDate,
@@ -477,6 +497,23 @@ export async function POST(request: NextRequest) {
       if (cPayout.length > 0) ops.push(prisma.payout.createMany({ data: cPayout }))
       if (cLedger.length > 0) ops.push(prisma.walletLedger.createMany({ data: cLedger }))
       await prisma.$transaction(ops)
+    }
+  }
+
+  // ── Sync trx_date on matched orders ────────────────────────────────────
+  // Update orders.trx_date = payout.releasedDate for every matched order
+  if (orderDateUpdates.length > 0) {
+    const UPDATE_CHUNK = 100
+    for (let i = 0; i < orderDateUpdates.length; i += UPDATE_CHUNK) {
+      const chunk = orderDateUpdates.slice(i, i + UPDATE_CHUNK)
+      await Promise.all(
+        chunk.map(({ orderNo, releasedDate }) =>
+          prisma.order.updateMany({
+            where: { orderNo },
+            data: { trxDate: releasedDate },
+          })
+        )
+      )
     }
   }
 

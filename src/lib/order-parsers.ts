@@ -67,6 +67,7 @@ function isTikTokCancel(status: string): boolean {
  * - Voucher Ditanggung Penjual: hanya ambil dari baris PERTAMA per invoice
  * - Real Omzet per baris = (HargaAfterDisc - ((HargaAfterDisc - Voucher) * 14%)) * Qty
  * - SKU = Nomor Referensi SKU
+ * - Tanggal = Waktu Dana Dilepaskan (bukan Waktu Pesanan Dibuat)
  */
 export function parseShopeeOrders(
   rawRows: Record<string, unknown>[],
@@ -115,7 +116,7 @@ export function parseShopeeOrders(
         status,
         platform: 'Shopee',
         airwaybill: String(item['No. Resi'] || '').trim() || null,
-        orderCreatedAt: String(item['Waktu Pesanan Dibuat'] || '').trim() || null,
+        orderCreatedAt: String(item['Waktu Dana Dilepaskan'] || item['Waktu Pesanan Dibuat'] || '').trim() || null,
         sku,
         productName: String(item['Nama Produk'] || '').trim() || null,
         qty,
@@ -144,6 +145,7 @@ export function parseShopeeOrders(
  * - Real Omzet = SKU Subtotal After Discount * (1 - 14.1%)
  * - SKU = Seller SKU
  * - Setiap baris = 1 produk (TikTok sudah 1 row per SKU)
+ * - Tanggal = Order settled time (bukan Created Time)
  */
 export function parseTikTokOrders(
   rawRows: Record<string, unknown>[],
@@ -172,7 +174,7 @@ export function parseTikTokOrders(
       status,
       platform: 'TikTok',
       airwaybill: String(row['Tracking ID'] || '').trim() || null,
-      orderCreatedAt: String(row['Created Time'] || '').trim() || null,
+      orderCreatedAt: String(row['Order settled time'] || row['Created Time'] || '').trim() || null,
       sku,
       productName: String(row['Product Name'] || '').trim() || null,
       qty,
@@ -195,10 +197,10 @@ export function parseTikTokOrders(
 /** Deteksi platform dari header kolom */
 export function detectPlatform(headers: string[]): 'TikTok' | 'Shopee' | null {
   const headerSet = new Set(headers.map(h => h?.toLowerCase?.() ?? ''))
-  if (headerSet.has('order id') || headerSet.has('seller sku') || headerSet.has('tracking id')) {
+  if (headerSet.has('order id') || headerSet.has('seller sku') || headerSet.has('tracking id') || headerSet.has('order settled time')) {
     return 'TikTok'
   }
-  if (headerSet.has('no. pesanan') || headerSet.has('nomor referensi sku') || headerSet.has('waktu pesanan dibuat')) {
+  if (headerSet.has('no. pesanan') || headerSet.has('nomor referensi sku') || headerSet.has('waktu dana dilepaskan') || headerSet.has('waktu pesanan dibuat')) {
     return 'Shopee'
   }
   return null

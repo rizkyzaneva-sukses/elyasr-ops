@@ -10,7 +10,7 @@ import * as XLSX from 'xlsx'
 import { useAuth } from '@/components/providers'
 import {
   TrendingUp, Upload, Loader2, ChevronLeft, ChevronRight,
-  X, ShoppingBag, Music2, CalendarRange, AlertTriangle, Trash
+  X, ShoppingBag, Music2, CalendarRange, AlertTriangle, Trash, RefreshCw
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────
@@ -102,6 +102,7 @@ export default function PayoutsPage() {
   const [importing,  setImporting]  = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [deleting, setDeleting] = useState(false)
+  const [backfilling, setBackfilling] = useState(false)
 
   // Modal states
   const [shopeeModal,   setShopeeModal]   = useState(false)
@@ -168,6 +169,30 @@ export default function PayoutsPage() {
       toast({ title: `Error: ${err.message}`, type: 'error' })
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const handleBackfillDates = async () => {
+    if (!confirm('Sinkronisasi tanggal cair order dari data payout?\n\nProses ini akan update trx_date semua order yang punya payout. Lanjutkan?')) return
+    setBackfilling(true)
+    try {
+      const res = await fetch('/api/payouts/backfill-dates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dryRun: false }),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        toast({ title: `✓ ${json.data.updated} baris order berhasil disinkronkan`, type: 'success' })
+        qc.invalidateQueries({ queryKey: ['payouts'] })
+        qc.invalidateQueries({ queryKey: ['orders'] })
+      } else {
+        toast({ title: json.error || 'Gagal sinkronisasi', type: 'error' })
+      }
+    } catch (err: any) {
+      toast({ title: `Error: ${err.message}`, type: 'error' })
+    } finally {
+      setBackfilling(false)
     }
   }
 
@@ -470,6 +495,20 @@ export default function PayoutsPage() {
             <Music2 size={13} />
             Upload TikTok
           </button>
+
+          {/* Backfill tanggal cair — OWNER only */}
+          {user?.userRole === 'OWNER' && (
+            <button
+              id="btn-backfill-dates"
+              onClick={handleBackfillDates}
+              disabled={backfilling}
+              title="Sinkronkan trx_date order dari data payout yang sudah ada"
+              className="flex items-center gap-1.5 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-300 hover:text-white border border-zinc-600 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+            >
+              {backfilling ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+              Sinkron Tgl Cair
+            </button>
+          )}
         </div>
       </div>
 

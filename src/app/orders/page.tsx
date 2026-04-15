@@ -97,7 +97,7 @@ function ExportModal({
           {/* Mode selector */}
           <div className="space-y-2">
             {[
-              { val: 'order_date',  label: 'Tanggal Order', desc: 'Filter berdasarkan tanggal order dibuat' },
+              { val: 'order_date',  label: 'Tanggal Cair', desc: 'Filter berdasarkan Waktu Dana Dilepaskan (Shopee) / Order settled time (TikTok)' },
               { val: 'payout_date', label: 'Tanggal Pencairan', desc: 'Semua order yang order_no-nya cair di range ini' },
             ].map(opt => (
               <label key={opt.val} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
@@ -524,7 +524,7 @@ export default function OrdersPage() {
                 <th className="w-20 text-right">HPP</th>
                 <th className="w-24">Status</th>
                 <th className="w-20">Payout</th>
-                <th className="w-24">Tgl Pesan</th>
+                <th className="w-24">Tgl Cair</th>
                 {user?.userRole === 'OWNER' && <th className="w-16"></th>}
               </tr>
             </thead>
