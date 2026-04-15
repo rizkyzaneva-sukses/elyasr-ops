@@ -437,11 +437,10 @@ export default function InventoryScanPage() {
 
   const tab = SCAN_TABS.find(t => t.key === activeTab)!
 
-  // Load products for barcode lookup (large limit so direct scan always works)
   const { data: productsData } = useQuery({
     queryKey: ['products-all'],
     queryFn: async () => {
-      const res = await fetch('/api/products?limit=2000&isActive=true')
+      const res = await fetch('/api/products?limit=all&isActive=true')
       return res.json().then(d => d.data?.products ?? [])
     },
   })

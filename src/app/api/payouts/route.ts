@@ -378,10 +378,10 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      const rawDate = String(row['Tanggal Dana Diterima'] ?? '').trim()
+      const rawDate = String(row['Tanggal Dana Dilepaskan'] ?? '').trim()
       const releasedDate = rawDate ? new Date(rawDate) : new Date()
       if (isNaN(releasedDate.getTime())) {
-        invalidRows.push({ rowNumber: lineNum, value: orderNo, reason: 'Format Tanggal Dana Diterima tidak valid' })
+        invalidRows.push({ rowNumber: lineNum, value: orderNo, reason: 'Format Tanggal Dana Dilepaskan tidak valid' })
         continue
       }
 
