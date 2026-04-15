@@ -214,9 +214,24 @@ export default function ReportsPage() {
                 <div className="flex justify-between py-3 border-y-2 border-zinc-700 font-bold text-xl text-white">
                   <span>Laba Bersih (Net Profit)</span>
                   <span className={data.labaBersih >= 0 ? 'text-emerald-500' : 'text-red-500'}>
-                    {formatRupiah(data.labaBersih, true)}
+                    {formatRupiah(data.labaBersih)}
                   </span>
                 </div>
+
+                {/* Informasi Beban Kerugian TikTok */}
+                {(data.bebanKerugianTikTok ?? 0) > 0 && (
+                  <div className="mt-6 rounded-lg border border-amber-800/40 bg-amber-900/10 p-4">
+                    <p className="text-xs font-semibold text-amber-400 mb-2 uppercase tracking-wide">ℹ️ Informasi — Beban Kerugian TikTok</p>
+                    <div className="flex justify-between text-sm text-amber-200/80">
+                      <span>Total order negatif TikTok (retur/penyesuaian)</span>
+                      <span className="font-semibold">{formatRupiah(data.bebanKerugianTikTok)}</span>
+                    </div>
+                    <p className="text-xs text-amber-600 mt-2">
+                      Nilai ini <strong>sudah ter-net</strong> di dalam Pencairan Bersih TikTok — tidak mengurangi laba di atas secara terpisah.
+                      Order negatif TikTok saling mengurangi dengan order positif dalam satu batch settlement.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
