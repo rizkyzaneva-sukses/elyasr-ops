@@ -478,11 +478,6 @@ export async function POST(request: NextRequest) {
       // Report as invalid so user can investigate — don't silently count as "retur"
       if (settlement === 0) {
         returCount++
-        invalidRows.push({
-          rowNumber: row.__lineNum as number,
-          value:     orderNo,
-          reason:    'Settlement = 0 (net nol, mungkin full refund atau fee = omzet)',
-        })
         continue
       }
       // TikTok: transaksi negatif MENGURANGI total pencairan (saling mengurangi dengan order positif)
