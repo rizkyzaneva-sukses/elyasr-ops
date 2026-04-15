@@ -433,19 +433,38 @@ export async function POST(request: NextRequest) {
       const settlement = calc.yangDiterima
 
       if (settlement === 0) { returCount++; continue }
+      // TikTok: transaksi negatif MENGURANGI total pencairan (saling mengurangi dengan order positif)
+      // Bukan dipisah sebagai beban ongkir — sesuai cara TikTok hitung settlement batch
       if (settlement < 0) {
         bebanCount++
         totalBeban += settlement
         detailBeban.push({ orderNo, amount: settlement })
         const rawSettledDate = String(row['Order settled time'] || row['Waktu penyelesaian pesanan'] || '').trim()
         const trxDate = rawSettledDate ? new Date(rawSettledDate.replace(/\//g, '-')) : new Date()
+        // Tetap masuk sebagai PAYOUT (nilai negatif) supaya mengurangi total pencairan
+        allPayoutInserts.push({
+          orderNo,
+          releasedDate: isNaN(trxDate.getTime()) ? new Date() : trxDate,
+          platform,
+          omzet:            0,
+          platformFee:      0,
+          amsFee:           0,
+          platformFeeOther: 0,
+          bebanOngkir:      Math.round(Math.abs(settlement)),
+          totalIncome:      Math.round(settlement), // nilai negatif
+          walletId,
+          source:           'tiktok_income',
+          createdBy:        session.username,
+          orderId:          orderIdMap.get(orderNo) ?? null,
+        })
         allLedgerInserts.push({
           walletId,
           trxDate: isNaN(trxDate.getTime()) ? new Date() : trxDate,
-          trxType:  'EXPENSE',
-          category: 'Beban Kerugian Ongkir',
-          amount:   settlement,
-          note:     `Retur TikTok - ${orderNo}`,
+          trxType:  'PAYOUT',
+          category: ledgerCat,
+          amount:   Math.round(settlement), // negatif → mengurangi saldo
+          refOrderNo: orderNo,
+          note:     `Payout TikTok (minus) - ${orderNo}`,
           createdBy: session.username,
         })
         continue
@@ -473,6 +492,7 @@ export async function POST(request: NextRequest) {
         amsFee:           Math.round(Math.abs(calc.biayaAms)),
         platformFeeOther: 0,
         bebanOngkir:      0,
+        // Math.round() = bulatkan ke 1 Rp terdekat (akurat, bukan ke ribuan)
         totalIncome:      Math.round(settlement),
         walletId,
         source:           'tiktok_income',
@@ -488,6 +508,7 @@ export async function POST(request: NextRequest) {
         trxDate:  releasedDate,
         trxType:  'PAYOUT',
         category: ledgerCat,
+        // Math.round() = bulatkan ke 1 Rp terdekat (akurat, bukan ke ribuan)
         amount:   Math.round(settlement),
         refOrderNo: orderNo,
         note:     `Payout TikTok - ${orderNo}`,

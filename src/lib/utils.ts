@@ -6,18 +6,11 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // ── Format currency (IDR) ──────────────────────────────
+// Parameter `short` dipertahankan agar tidak perlu ubah semua call site,
+// tapi mode singkat DINONAKTIFKAN — semua angka selalu ditampilkan penuh
+// (misal: Rp172.000.000, bukan Rp172jt) sesuai permintaan tim.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function formatRupiah(amount: number, short = false): string {
-  if (short) {
-    if (Math.abs(amount) >= 1_000_000_000) {
-      return `Rp ${(amount / 1_000_000_000).toFixed(1)}M`
-    }
-    if (Math.abs(amount) >= 1_000_000) {
-      return `Rp ${(amount / 1_000_000).toFixed(1)}jt`
-    }
-    if (Math.abs(amount) >= 1_000) {
-      return `Rp ${(amount / 1_000).toFixed(0)}rb`
-    }
-  }
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
