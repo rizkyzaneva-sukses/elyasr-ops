@@ -522,22 +522,21 @@ export default function OrdersPage() {
                 <th className="w-28">Penerima</th>
                 <th className="w-28 text-right">Real Omzet</th>
                 <th className="w-20 text-right">HPP</th>
-                <th className="w-24">Status</th>
-                <th className="w-20">Payout</th>
-                <th className="w-24">Tgl Cair</th>
+                <th className="w-28">Status</th>
+                <th className="w-24 text-right">Payout</th>
                 {user?.userRole === 'OWNER' && <th className="w-16"></th>}
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 Array.from({ length: 8 }).map((_, i) => (
-                  <tr key={i}>{Array.from({ length: user?.userRole === 'OWNER' ? 13 : 12 }).map((_, j) => (
+                  <tr key={i}>{Array.from({ length: user?.userRole === 'OWNER' ? 12 : 11 }).map((_, j) => (
                     <td key={j}><div className="h-4 bg-zinc-800 rounded animate-pulse" /></td>
                   ))}</tr>
                 ))
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={user?.userRole === 'OWNER' ? 13 : 12} className="text-center py-12 text-zinc-600">
+                  <td colSpan={user?.userRole === 'OWNER' ? 12 : 11} className="text-center py-12 text-zinc-600">
                     <ShoppingCart size={32} className="mx-auto mb-2 opacity-30" />
                     <p>Tidak ada pesanan</p>
                     {canEdit && <p className="text-xs mt-1">Upload file dari TikTok atau Shopee untuk mulai</p>}
@@ -590,14 +589,25 @@ export default function OrdersPage() {
                     <td className="text-right">
                       <p className="text-xs text-zinc-500">{o.hpp ? formatRupiah(o.hpp, true) : '—'}</p>
                     </td>
-                    <td><StatusBadge status={o.status} /></td>
                     <td>
-                      {o.payout
-                        ? <span className="badge-info text-[10px]">Cair</span>
+                      <StatusBadge status={o.status} />
+                      {/* Tanggal relevan di bawah status */}
+                      {o.payoutReleasedDate ? (
+                        <p className="text-[9px] text-emerald-600 mt-0.5">
+                          Cair: {new Date(o.payoutReleasedDate).toLocaleDateString('id-ID', { day:'2-digit', month:'short' })}
+                        </p>
+                      ) : o.status?.toLowerCase().startsWith('terkirim') && o.orderCreatedAt ? (
+                        <p className="text-[9px] text-zinc-600 mt-0.5">
+                          {o.orderCreatedAt.slice(0, 10)}
+                        </p>
+                      ) : null}
+                    </td>
+                    <td className="text-right">
+                      {o.payoutAllocated != null
+                        ? <span className="text-xs font-semibold text-cyan-400">{formatRupiah(o.payoutAllocated, true)}</span>
                         : <span className="text-zinc-700 text-[10px]">—</span>
                       }
                     </td>
-                    <td className="text-[10px] text-zinc-500">{o.orderCreatedAt?.slice(0, 10) || '—'}</td>
                     {user?.userRole === 'OWNER' && (
                       <td>
                         <button onClick={() => setEditingOrder(o)} className="p-1 px-2 text-[10px] bg-zinc-800 text-zinc-400 hover:text-white rounded">

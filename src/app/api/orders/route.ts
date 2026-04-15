@@ -100,7 +100,6 @@ export async function GET(request: NextRequest) {
   const [orders, total] = await Promise.all([
     prisma.order.findMany({
       where,
-      include: { payout: { select: { releasedDate: true, totalIncome: true } } },
       orderBy: { createdAt: 'desc' },
       skip,
       take,
@@ -108,7 +107,46 @@ export async function GET(request: NextRequest) {
     prisma.order.count({ where }),
   ])
 
-  return apiSuccess({ orders, total })
+  // ── Proportional payout allocation ──────────────────────────────
+  // Collect unique orderNos from this page
+  const orderNos = [...new Set(orders.map(o => o.orderNo).filter(Boolean))]
+
+  // Fetch payouts for these orderNos
+  const payouts = orderNos.length > 0
+    ? await prisma.payout.findMany({
+        where: { orderNo: { in: orderNos } },
+        select: { orderNo: true, totalIncome: true, releasedDate: true },
+      })
+    : []
+  const payoutMap = new Map(payouts.map(p => [p.orderNo, p]))
+
+  // Sum realOmzet per orderNo (all DB items with same orderNo, not just this page)
+  const omzetSums = orderNos.length > 0
+    ? await prisma.order.groupBy({
+        by: ['orderNo'],
+        where: { orderNo: { in: orderNos } },
+        _sum: { realOmzet: true },
+      })
+    : []
+  const omzetSumMap = new Map(omzetSums.map(r => [r.orderNo, r._sum.realOmzet ?? 0]))
+
+  // Attach proportional payout to each order row
+  const ordersWithPayout = orders.map(o => {
+    const payout = payoutMap.get(o.orderNo)
+    if (!payout || !payout.totalIncome) return { ...o, payoutAllocated: null, payoutReleasedDate: null }
+
+    const totalOmzet = omzetSumMap.get(o.orderNo) ?? 0
+    const proportion = totalOmzet > 0 ? o.realOmzet / totalOmzet : 0
+    const payoutAllocated = Math.round(payout.totalIncome * proportion)
+
+    return {
+      ...o,
+      payoutAllocated,
+      payoutReleasedDate: payout.releasedDate,
+    }
+  })
+
+  return apiSuccess({ orders: ordersWithPayout, total })
 }
 
 // POST /api/orders — import file mentah TikTok/Shopee langsung
