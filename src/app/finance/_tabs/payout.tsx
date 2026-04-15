@@ -30,7 +30,9 @@ interface UploadResult {
   invalidRows: { rowNumber: number; value: string; reason: string }[]
   debug?: {
     omzetColumn: string
+    omzetRawValue?: unknown
     settlementColumn: string
+    settlementRawValue?: unknown
     allColumns: string[]
   }
 }
@@ -919,8 +921,8 @@ export function PayoutTab() {
               {uploadResult.debug && (
                 <div className="bg-amber-900/20 border border-amber-900/50 rounded-xl p-3 space-y-2">
                   <p className="text-xs font-semibold text-amber-500">Debug Kolom (Info untuk Developer):</p>
-                  <p className="text-[10px] text-zinc-400">Kolom Omzet detected: <b className="text-amber-400">{uploadResult.debug.omzetColumn}</b></p>
-                  <p className="text-[10px] text-zinc-400">Kolom Settlement detected: <b className="text-amber-400">{uploadResult.debug.settlementColumn}</b></p>
+                  <p className="text-[10px] text-zinc-400">Kolom Omzet detected: <b className="text-amber-400">{uploadResult.debug.omzetColumn}</b>{uploadResult.debug.omzetRawValue !== undefined && <span className="text-zinc-500"> (nilai sample: <span className="text-yellow-300">{String(uploadResult.debug.omzetRawValue)}</span>)</span>}</p>
+                  <p className="text-[10px] text-zinc-400">Kolom Settlement detected: <b className="text-amber-400">{uploadResult.debug.settlementColumn}</b>{uploadResult.debug.settlementRawValue !== undefined && <span className="text-zinc-500"> (nilai sample: <span className="text-yellow-300">{String(uploadResult.debug.settlementRawValue)}</span>)</span>}</p>
                   <div className="mt-2">
                     <p className="text-[10px] text-zinc-500 mb-1">Semua Header:</p>
                     <div className="bg-black/50 p-2 rounded text-[9px] text-zinc-400 font-mono break-all leading-relaxed max-h-24 overflow-y-auto">
