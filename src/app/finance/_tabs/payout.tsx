@@ -107,6 +107,7 @@ export function PayoutTab() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [deleting, setDeleting] = useState(false)
   const [backfilling, setBackfilling] = useState(false)
+  const [resetting,   setResetting]   = useState(false)
 
   // Modal states
   const [shopeeModal,   setShopeeModal]   = useState(false)
@@ -491,18 +492,53 @@ export function PayoutTab() {
             Upload TikTok
           </button>
 
-          {/* Backfill tanggal cair — OWNER only */}
+          {/* Backfill tanggal cair + Reset semua — OWNER only */}
           {user?.userRole === 'OWNER' && (
-            <button
-              id="payout-btn-backfill-dates"
-              onClick={handleBackfillDates}
-              disabled={backfilling}
-              title="Sinkronkan trx_date order dari data payout yang sudah ada"
-              className="flex items-center gap-1.5 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-300 hover:text-white border border-zinc-600 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
-            >
-              {backfilling ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-              Sinkron Tgl Cair
-            </button>
+            <>
+              <button
+                id="payout-btn-backfill-dates"
+                onClick={handleBackfillDates}
+                disabled={backfilling || resetting}
+                title="Sinkronkan trx_date order dari data payout yang sudah ada"
+                className="flex items-center gap-1.5 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-300 hover:text-white border border-zinc-600 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+              >
+                {backfilling ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                Sinkron Tgl Cair
+              </button>
+              <button
+                id="payout-btn-reset-all"
+                onClick={async () => {
+                  if (!confirm('⚠️ HAPUS SEMUA DATA PAYOUT?\n\nIni akan menghapus semua payout + wallet ledger PAYOUT + reset trxDate order.\n\nGunakan hanya sebelum re-import ulang dari awal.\n\nLanjutkan?')) return
+                  setResetting(true)
+                  try {
+                    const res = await fetch('/api/payouts/reset-all', {
+                      method: 'DELETE',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ confirm: 'YES_DELETE_ALL' }),
+                    })
+                    const json = await res.json()
+                    if (res.ok) {
+                      toast({ title: json.data.message, type: 'success' })
+                      qc.invalidateQueries({ queryKey: ['payouts'] })
+                      qc.invalidateQueries({ queryKey: ['payouts-summary'] })
+                      qc.invalidateQueries({ queryKey: ['wallets'] })
+                    } else {
+                      toast({ title: json.error || 'Gagal reset', type: 'error' })
+                    }
+                  } catch (err: any) {
+                    toast({ title: err.message, type: 'error' })
+                  } finally {
+                    setResetting(false)
+                  }
+                }}
+                disabled={resetting || backfilling}
+                title="Hapus SEMUA payout untuk re-import ulang"
+                className="flex items-center gap-1.5 bg-red-900/40 hover:bg-red-900/70 disabled:opacity-50 text-red-400 hover:text-red-300 border border-red-900/50 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+              >
+                {resetting ? <Loader2 size={13} className="animate-spin" /> : <Trash size={13} />}
+                Reset Semua
+              </button>
+            </>
           )}
         </div>
       </div>
