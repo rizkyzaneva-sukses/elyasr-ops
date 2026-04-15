@@ -69,6 +69,24 @@ export default function CRMPage() {
                 <tr><td colSpan={8} className="text-center py-12 text-zinc-600">
                   <Users size={32} className="mx-auto mb-2 opacity-30"/>
                   <p>Tidak ada data pelanggan</p>
+                  {data?.debug && (
+                    <div className="mt-4 text-left max-w-md mx-auto bg-zinc-800/50 rounded-lg p-3 text-xs">
+                      <p className="text-amber-400 font-semibold mb-2">🔍 Debug Info:</p>
+                      <p className="text-zinc-400">Total orders di DB: <span className="text-zinc-200">{data.debug.totalOrdersInDb}</span></p>
+                      <p className="text-zinc-400">Platform tersedia: <span className="text-zinc-200">{data.debug.availablePlatforms}</span></p>
+                      <p className="text-zinc-400">Filter aktif: <span className="text-zinc-200">{data.debug.filterUsed?.platform || 'Semua'}</span></p>
+                      {data.debug.statusDistribution?.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-zinc-500 mb-1">Status distribusi:</p>
+                          {data.debug.statusDistribution.map((s: any) => (
+                            <p key={s.status} className="text-zinc-400 pl-2">
+                              {s.status || '(kosong)'}: <span className="text-zinc-200">{s.count}</span>
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </td></tr>
               ) : buyers.map((b: any, i: number) => (
                 <tr key={`${b.receiver_name}-${b.buyer_username}-${i}`}>
