@@ -54,35 +54,33 @@ export async function GET(request: NextRequest) {
   }
   const totalFee = feeShopee + feeTikTok + feeAms + feeLainnya
 
-  // ── 2. HPP — dari Order yang orderNo-nya masuk payout periode ini ────────
-  // Ambil orderNo dari payout yang omzet > 0 (penjualan nyata, bukan retur/minus)
-  const payoutOrderNos = await prisma.payout.findMany({
+  // ── 2. HPP — dari Order yang trxDate-nya masuk periode (di-set saat upload payout) ──
+  // trxDate di-set = releasedDate payout ketika orderNo cocok; ini lebih andal dari
+  // string-matching Payout.orderNo → Order.orderNo yang bisa gagal karena format beda.
+  const paidOrders = await prisma.order.findMany({
     where: {
-      releasedDate: { gte: fromDate, lte: toDate },
-      omzet: { gt: 0 },
+      trxDate: { gte: fromDate, lte: toDate },
+      sku: { not: null },
     },
-    select: { orderNo: true },
-    distinct: ['orderNo'],
+    select: { sku: true, qty: true },
   })
-  const orderNoList = payoutOrderNos.map(p => p.orderNo)
+
+  // Hitung juga totalOrdersPaid dari payout (untuk info hint)
+  const payoutCount = await prisma.payout.count({
+    where: { releasedDate: { gte: fromDate, lte: toDate }, omzet: { gt: 0 } },
+  })
 
   let hpp = 0
-  if (orderNoList.length > 0) {
-    // Ambil sku + qty dari Order
-    const orders = await prisma.order.findMany({
-      where: { orderNo: { in: orderNoList } },
-      select: { sku: true, qty: true },
-    })
-
-    // Kumpulkan SKU unik lalu lookup HPP dari MasterProduct
-    const skuSet = [...new Set(orders.map(o => o.sku).filter(Boolean) as string[])]
+  const ordersFound = paidOrders.length
+  if (paidOrders.length > 0) {
+    const skuSet = [...new Set(paidOrders.map(o => o.sku as string))]
     const products = await prisma.masterProduct.findMany({
       where: { sku: { in: skuSet } },
       select: { sku: true, hpp: true },
     })
     const hppMap = new Map(products.map(p => [p.sku.toLowerCase(), p.hpp]))
 
-    for (const order of orders) {
+    for (const order of paidOrders) {
       const skuKey = (order.sku ?? '').toLowerCase()
       const unitHpp = hppMap.get(skuKey) ?? 0
       hpp += unitHpp * (order.qty ?? 1)
@@ -158,6 +156,7 @@ export async function GET(request: NextRequest) {
     labaBersih,
     // Info tambahan
     bebanKerugianTikTok,
-    totalOrdersPaid: orderNoList.length,
+    totalOrdersPaid: payoutCount,
+    ordersFound,
   })
 }

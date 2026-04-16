@@ -202,13 +202,17 @@ export function LaporanTab() {
                   <div className="flex justify-between pl-4 text-zinc-300">
                     <div>
                       <span>Harga Pokok Penjualan (HPP)</span>
-                      <p className="text-[11px] text-zinc-600 mt-0.5 flex items-center gap-1"><Info size={10}/>SUM(masterProduk.hpp × qty) dari {data.totalOrdersPaid} order yang dicairkan periode ini</p>
+                      <p className="text-[11px] text-zinc-600 mt-0.5 flex items-center gap-1"><Info size={10}/>SUM(masterProduk.hpp × qty) · {data.ordersFound ?? 0} item order ditemukan dari {data.totalOrdersPaid} payout periode ini</p>
                     </div>
                     <span className="text-red-400 shrink-0 ml-4">({formatRupiah(data.hpp,true)})</span>
                   </div>
                   {data.hpp === 0 && data.totalOrdersPaid > 0 && (
                     <div className="ml-4 mt-2 flex items-center gap-2 bg-amber-900/20 border border-amber-800/40 rounded-lg px-3 py-2">
-                      <span className="text-[11px] text-amber-400">HPP = 0. Pastikan HPP sudah diisi di Master Produk.</span>
+                      <span className="text-[11px] text-amber-400">
+                        {(data.ordersFound ?? 0) === 0
+                          ? 'HPP = 0. Data order belum terupload atau belum tersinkron dengan payout. Upload order CSV terlebih dahulu.'
+                          : 'HPP = 0. Pastikan HPP sudah diisi di Master Produk.'}
+                      </span>
                       <button onClick={handleSyncHpp} disabled={syncingHpp}
                         className="flex items-center gap-1 text-[11px] bg-amber-700/40 hover:bg-amber-700/70 disabled:opacity-50 text-amber-300 px-2 py-1 rounded-md transition-colors shrink-0">
                         {syncingHpp ? <RefreshCw size={10} className="animate-spin"/> : <RefreshCw size={10}/>}
