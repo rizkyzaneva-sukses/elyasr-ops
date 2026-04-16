@@ -11,64 +11,88 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = request.nextUrl
   const dateFrom = searchParams.get('dateFrom')
-  const dateTo = searchParams.get('dateTo')
-
+  const dateTo   = searchParams.get('dateTo')
   if (!dateFrom || !dateTo) return apiError('dateFrom dan dateTo wajib diisi')
 
   const fromDate = new Date(dateFrom)
-  const toDate = new Date(dateTo)
+  const toDate   = new Date(dateTo)
   toDate.setHours(23, 59, 59, 999)
 
-  const dateFilterOrders = {
-    orderCreatedAt: { gte: dateFrom, lte: dateTo + ' 23:59:59' }
-  }
-
-  // ── 1. Penjualan & HPP (dari Order, basis tanggal transaksi/upload) ─────
-  const orderAgg = await prisma.order.aggregate({
-    where: {
-      ...dateFilterOrders,
-      NOT: [
-        { status: { contains: 'batal' } },
-        { status: { contains: 'Cancel' } },
-        { status: { contains: 'Dibatalkan' } },
-      ],
-    },
-    _sum: { realOmzet: true, hpp: true },
-  })
-
-  const pendapatanKotor = orderAgg._sum.realOmzet || 0
-  const hpp = orderAgg._sum.hpp || 0
-  const labaKotor = pendapatanKotor - hpp
-
-  // ── 2. Biaya Penjualan (Fee Platform & AMS) dari Payout ─────────────────
+  // ── 1. Payout aggregate — basis tanggal cair (releasedDate) ─────────────
   const payoutBySource = await prisma.payout.groupBy({
     by: ['source'],
     where: { releasedDate: { gte: fromDate, lte: toDate } },
-    _sum: { platformFee: true, amsFee: true, platformFeeOther: true, bebanOngkir: true },
+    _sum: {
+      totalIncome:      true,
+      omzet:            true,
+      platformFee:      true,
+      amsFee:           true,
+      platformFeeOther: true,
+      bebanOngkir:      true,
+    },
   })
 
-  let feeShopee = 0, feeTikTok = 0, feeAms = 0, feeLainnya = 0, bebanKerugianTikTok = 0
+  let pencairanBersih = 0   // SUM(totalIncome) — actual cash masuk
+  let omzetKotor      = 0   // SUM(omzet) — gross sebelum fee
+  let feeShopee       = 0
+  let feeTikTok       = 0
+  let feeAms          = 0
+  let feeLainnya      = 0
+  let bebanKerugianTikTok = 0
+
   for (const row of payoutBySource) {
-    const pf  = row._sum.platformFee      || 0
-    const af  = row._sum.amsFee           || 0
-    const pfo = row._sum.platformFeeOther || 0
-    const bo  = row._sum.bebanOngkir      || 0
-    feeAms     += af
-    feeLainnya += pfo
-    if (row.source === 'shopee_income') feeShopee  += pf
-    else                                feeTikTok  += pf
-    if (row.source === 'tiktok_income') bebanKerugianTikTok += bo
+    pencairanBersih += row._sum.totalIncome      ?? 0
+    omzetKotor      += row._sum.omzet            ?? 0
+    feeAms          += row._sum.amsFee           ?? 0
+    feeLainnya      += row._sum.platformFeeOther ?? 0
+    if (row.source === 'shopee_income') {
+      feeShopee += row._sum.platformFee ?? 0
+    } else {
+      feeTikTok += row._sum.platformFee ?? 0
+      bebanKerugianTikTok += row._sum.bebanOngkir ?? 0
+    }
   }
-  const feePlatform = feeShopee + feeTikTok + feeAms + feeLainnya
+  const totalFee = feeShopee + feeTikTok + feeAms + feeLainnya
 
-  // ── 3. Pendapatan Lain (OTHER_INCOME) ────────────────────────────────────
-  const otherIncomes = await prisma.walletLedger.aggregate({
-    where: { trxType: 'OTHER_INCOME', trxDate: { gte: fromDate, lte: toDate } },
-    _sum: { amount: true },
+  // ── 2. HPP — dari Order yang orderNo-nya masuk payout periode ini ────────
+  // Ambil orderNo dari payout yang omzet > 0 (penjualan nyata, bukan retur/minus)
+  const payoutOrderNos = await prisma.payout.findMany({
+    where: {
+      releasedDate: { gte: fromDate, lte: toDate },
+      omzet: { gt: 0 },
+    },
+    select: { orderNo: true },
+    distinct: ['orderNo'],
   })
-  const otherIncome = otherIncomes._sum.amount || 0
+  const orderNoList = payoutOrderNos.map(p => p.orderNo)
 
-  // ── 4. Beban Operasional (EXPENSE) per kategori ──────────────────────────
+  let hpp = 0
+  if (orderNoList.length > 0) {
+    // Ambil sku + qty dari Order
+    const orders = await prisma.order.findMany({
+      where: { orderNo: { in: orderNoList } },
+      select: { sku: true, qty: true },
+    })
+
+    // Kumpulkan SKU unik lalu lookup HPP dari MasterProduct
+    const skuSet = [...new Set(orders.map(o => o.sku).filter(Boolean) as string[])]
+    const products = await prisma.masterProduct.findMany({
+      where: { sku: { in: skuSet } },
+      select: { sku: true, hpp: true },
+    })
+    const hppMap = new Map(products.map(p => [p.sku.toLowerCase(), p.hpp]))
+
+    for (const order of orders) {
+      const skuKey = (order.sku ?? '').toLowerCase()
+      const unitHpp = hppMap.get(skuKey) ?? 0
+      hpp += unitHpp * (order.qty ?? 1)
+    }
+  }
+
+  // ── 3. Laba Kotor (Pencairan Bersih - HPP) ──────────────────────────────
+  const labaKotor = pencairanBersih - hpp
+
+  // ── 4. Beban Operasional (EXPENSE) per kategori ─────────────────────────
   const expenses = await prisma.walletLedger.groupBy({
     by: ['category'],
     where: { trxType: 'EXPENSE', trxDate: { gte: fromDate, lte: toDate } },
@@ -91,11 +115,9 @@ export async function GET(request: NextRequest) {
     const penyusutanPerBulan = aset.nilaiPerolehan / (aset.umurEkonomisThn * 12)
     const asetStart = aset.tanggalBeli > fromDate ? aset.tanggalBeli : fromDate
     if (asetStart > toDate) continue
-    
     const bulanSampaiFullyDep = aset.umurEkonomisThn * 12
     const bulanSejakBeli = (fromDate.getTime() - aset.tanggalBeli.getTime()) / msPerMonth
     if (bulanSejakBeli >= bulanSampaiFullyDep) continue
-
     const bulanDalamRange = Math.max(0, (toDate.getTime() - asetStart.getTime()) / msPerMonth)
     const bulanEfektif = Math.min(bulanDalamRange, bulanSampaiFullyDep - Math.max(0, bulanSejakBeli))
     totalBebanPenyusutan += Math.round(penyusutanPerBulan * bulanEfektif)
@@ -106,21 +128,36 @@ export async function GET(request: NextRequest) {
     expenseGroups.push({ group: 'Penyusutan Aset Tetap', amount: totalBebanPenyusutan })
   }
 
-  // ── 6. Hitung Laba ───────────────────────────────────────────────────────
-  const labaBersihOperasional = labaKotor - feePlatform - bebanOperasional
-  const labaBersih = labaBersihOperasional + otherIncome
+  // ── 6. Pendapatan Lain ───────────────────────────────────────────────────
+  const otherIncomes = await prisma.walletLedger.aggregate({
+    where: { trxType: 'OTHER_INCOME', trxDate: { gte: fromDate, lte: toDate } },
+    _sum: { amount: true },
+  })
+  const otherIncome = otherIncomes._sum.amount || 0
+
+  // ── 7. Laba ──────────────────────────────────────────────────────────────
+  const labaBersihOperasional = labaKotor - bebanOperasional
+  const labaBersih            = labaBersihOperasional + otherIncome
 
   return apiSuccess({
-    pendapatanKotor,
+    // Basis utama — cash masuk bersih
+    pencairanBersih,
+    // Info saja — tidak ikut mengurangi laba (sudah ter-net di pencairanBersih)
+    omzetKotor,
+    totalFee,
+    feePlatformDetail: { feeShopee, feeTikTok, feeAms, feeLainnya },
+    // HPP dari order yang dicairkan periode ini
     hpp,
     labaKotor,
-    feePlatform,
-    feePlatformDetail: { feeShopee, feeTikTok, feeAms, feeLainnya },
+    // Beban
     bebanOperasional,
     expenseGroups,
+    // Laba
     labaBersihOperasional,
     otherIncome,
     labaBersih,
+    // Info tambahan
     bebanKerugianTikTok,
+    totalOrdersPaid: orderNoList.length,
   })
 }

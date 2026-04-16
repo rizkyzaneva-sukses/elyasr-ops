@@ -158,70 +158,97 @@ export function LaporanTab() {
 
           {reportType==='pl' && data && (
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-              <h2 className="text-lg font-bold text-white mb-6 text-center">Laporan Laba Rugi<br/><span className="text-sm text-zinc-400 font-normal">{dateFrom} s/d {dateTo}</span></h2>
+              <h2 className="text-lg font-bold text-white mb-1 text-center">Laporan Laba Rugi</h2>
+              <p className="text-sm text-zinc-400 text-center mb-1">{dateFrom} s/d {dateTo}</p>
+              <p className="text-[11px] text-zinc-600 text-center mb-6">Basis kas (cash basis) — berdasarkan tanggal payout cair</p>
               <div className="space-y-4 max-w-3xl mx-auto text-sm">
 
-                {/* Pendapatan Kotor */}
-                <div className="border-b border-zinc-800 pb-3">
-                  <div className="flex justify-between font-semibold text-emerald-400 text-base">
-                    <span>Pendapatan Kotor (Omzet)</span>
-                    <span>{formatRupiah(data.pendapatanKotor,true)}</span>
+                {/* ── Pencairan Bersih (basis utama) ── */}
+                <div className="bg-emerald-900/10 border border-emerald-800/30 rounded-xl p-4 space-y-3">
+                  <div className="flex justify-between font-bold text-emerald-400 text-base">
+                    <div>
+                      <span>Pencairan Bersih (Cash Masuk)</span>
+                      <p className="text-[11px] text-zinc-500 font-normal mt-0.5 flex items-center gap-1"><Info size={10}/>SUM totalIncome dari Payout per tanggal cair · {data.totalOrdersPaid} order</p>
+                    </div>
+                    <span className="shrink-0 ml-4">{formatRupiah(data.pencairanBersih,true)}</span>
                   </div>
-                  <p className="text-[11px] text-zinc-600 mt-0.5 flex items-center gap-1"><Info size={10}/>SUM real_omzet dari tabel Order (harga jual - diskon - 14% platform) per tanggal order</p>
+
+                  {/* Info Omzet Kotor */}
+                  <div className="border-t border-emerald-900/40 pt-2 space-y-1.5">
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-wide">ℹ️ Info (sudah ter-net di pencairan)</p>
+                    <div className="flex justify-between text-xs text-zinc-400 pl-2">
+                      <span>Omzet Kotor (sebelum fee)</span>
+                      <span>{formatRupiah(data.omzetKotor,true)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-zinc-400 pl-2">
+                      <div>
+                        <span>Total Fee Platform</span>
+                        {data.feePlatformDetail && (
+                          <div className="pl-3 space-y-0.5 mt-0.5">
+                            {data.feePlatformDetail.feeShopee > 0 && <div className="flex gap-4 text-[10px] text-zinc-500"><span>Fee Shopee (komisi)</span><span>{formatRupiah(data.feePlatformDetail.feeShopee,true)}</span></div>}
+                            {data.feePlatformDetail.feeTikTok > 0 && <div className="flex gap-4 text-[10px] text-zinc-500"><span>Fee TikTok (komisi)</span><span>{formatRupiah(data.feePlatformDetail.feeTikTok,true)}</span></div>}
+                            {data.feePlatformDetail.feeAms > 0 && <div className="flex gap-4 text-[10px] text-zinc-500"><span>Fee AMS (iklan)</span><span>{formatRupiah(data.feePlatformDetail.feeAms,true)}</span></div>}
+                            {data.feePlatformDetail.feeLainnya > 0 && <div className="flex gap-4 text-[10px] text-zinc-500"><span>Fee Lainnya</span><span>{formatRupiah(data.feePlatformDetail.feeLainnya,true)}</span></div>}
+                          </div>
+                        )}
+                      </div>
+                      <span className="shrink-0 ml-4">({formatRupiah(data.totalFee,true)})</span>
+                    </div>
+                  </div>
                 </div>
 
-                {/* HPP */}
+                {/* ── HPP ── */}
                 <div>
                   <div className="flex justify-between pl-4 text-zinc-300">
-                    <span>Harga Pokok Penjualan (HPP)</span>
-                    <span className="text-red-400">({formatRupiah(data.hpp,true)})</span>
+                    <div>
+                      <span>Harga Pokok Penjualan (HPP)</span>
+                      <p className="text-[11px] text-zinc-600 mt-0.5 flex items-center gap-1"><Info size={10}/>SUM(masterProduk.hpp × qty) dari {data.totalOrdersPaid} order yang dicairkan periode ini</p>
+                    </div>
+                    <span className="text-red-400 shrink-0 ml-4">({formatRupiah(data.hpp,true)})</span>
                   </div>
-                  <p className="text-[11px] text-zinc-600 mt-0.5 pl-4 flex items-center gap-1"><Info size={10}/>SUM hpp dari tabel Order — diisi saat import order berdasarkan HPP di Master Produk</p>
-                  {data.hpp === 0 && (
+                  {data.hpp === 0 && data.totalOrdersPaid > 0 && (
                     <div className="ml-4 mt-2 flex items-center gap-2 bg-amber-900/20 border border-amber-800/40 rounded-lg px-3 py-2">
-                      <span className="text-[11px] text-amber-400">HPP = 0. Mungkin order diimport sebelum HPP diisi di Master Produk.</span>
+                      <span className="text-[11px] text-amber-400">HPP = 0. Pastikan HPP sudah diisi di Master Produk.</span>
                       <button onClick={handleSyncHpp} disabled={syncingHpp}
                         className="flex items-center gap-1 text-[11px] bg-amber-700/40 hover:bg-amber-700/70 disabled:opacity-50 text-amber-300 px-2 py-1 rounded-md transition-colors shrink-0">
                         {syncingHpp ? <RefreshCw size={10} className="animate-spin"/> : <RefreshCw size={10}/>}
-                        Sinkron HPP
+                        Sinkron HPP Order
                       </button>
                     </div>
                   )}
                 </div>
 
-                <div className="flex justify-between font-bold text-white border-y border-zinc-800 py-2"><span>Laba Kotor (Gross Profit)</span><span>{formatRupiah(data.labaKotor,true)}</span></div>
-
-                {/* Fee Platform */}
-                <div className="pt-2">
-                  <div className="flex justify-between">
-                    <span className="font-semibold text-zinc-200">Biaya Penjualan (Fee Platform)</span>
-                    <span className="text-red-400">({formatRupiah(data.feePlatform,true)})</span>
-                  </div>
-                  <p className="text-[11px] text-zinc-600 mt-0.5 flex items-center gap-1"><Info size={10}/>SUM platformFee + amsFee + platformFeeOther dari tabel Payout per tanggal cair</p>
-                  {data.feePlatformDetail && (
-                    <div className="mt-2 space-y-1 pl-4">
-                      {data.feePlatformDetail.feeShopee > 0 && <div className="flex justify-between text-xs text-zinc-400"><span>- Fee Shopee (komisi)</span><span>{formatRupiah(data.feePlatformDetail.feeShopee,true)}</span></div>}
-                      {data.feePlatformDetail.feeTikTok > 0 && <div className="flex justify-between text-xs text-zinc-400"><span>- Fee TikTok (komisi)</span><span>{formatRupiah(data.feePlatformDetail.feeTikTok,true)}</span></div>}
-                      {data.feePlatformDetail.feeAms > 0 && <div className="flex justify-between text-xs text-zinc-400"><span>- Fee AMS (iklan)</span><span>{formatRupiah(data.feePlatformDetail.feeAms,true)}</span></div>}
-                      {data.feePlatformDetail.feeLainnya > 0 && <div className="flex justify-between text-xs text-zinc-400"><span>- Fee Lainnya</span><span>{formatRupiah(data.feePlatformDetail.feeLainnya,true)}</span></div>}
-                    </div>
-                  )}
+                <div className="flex justify-between font-bold text-white border-y border-zinc-800 py-2">
+                  <span>Laba Kotor</span>
+                  <span className={data.labaKotor >= 0 ? 'text-emerald-400' : 'text-red-400'}>{formatRupiah(data.labaKotor,true)}</span>
                 </div>
 
-                {/* Beban Operasional */}
+                {/* ── Beban Operasional ── */}
                 <div className="pb-2">
-                  <div className="flex justify-between font-semibold text-zinc-200"><span>Beban Operasional</span><span className="text-red-400">({formatRupiah(data.bebanOperasional,true)})</span></div>
+                  <div className="flex justify-between font-semibold text-zinc-200">
+                    <span>Beban Operasional</span>
+                    <span className="text-red-400">({formatRupiah(data.bebanOperasional,true)})</span>
+                  </div>
                   {(data.expenseGroups||[]).map((g:any)=>(
                     <div key={g.group} className="flex justify-between pl-8 text-zinc-400 text-xs mt-1"><span>- {g.group}</span><span>{formatRupiah(g.amount,true)}</span></div>
                   ))}
                 </div>
 
-                <div className="flex justify-between pt-4 border-t border-zinc-800 font-bold text-lg text-blue-400"><span>Laba Bersih Operasional</span><span>{formatRupiah(data.labaBersihOperasional,true)}</span></div>
-                <div className="flex justify-between text-zinc-300 pt-2"><span>Pendapatan / Beban Lain-lain</span><span className={data.otherIncome>=0?'text-emerald-400':'text-red-400'}>{data.otherIncome<0?`(${formatRupiah(Math.abs(data.otherIncome),true)})`:formatRupiah(data.otherIncome,true)}</span></div>
-                <div className="flex justify-between py-3 border-y-2 border-zinc-700 font-bold text-xl text-white"><span>Laba Bersih (Net Profit)</span><span className={data.labaBersih>=0?'text-emerald-500':'text-red-500'}>{formatRupiah(data.labaBersih)}</span></div>
+                <div className="flex justify-between pt-4 border-t border-zinc-800 font-bold text-lg text-blue-400">
+                  <span>Laba Bersih Operasional</span>
+                  <span>{formatRupiah(data.labaBersihOperasional,true)}</span>
+                </div>
+                <div className="flex justify-between text-zinc-300 pt-2">
+                  <span>Pendapatan / Beban Lain-lain</span>
+                  <span className={data.otherIncome>=0?'text-emerald-400':'text-red-400'}>{data.otherIncome<0?`(${formatRupiah(Math.abs(data.otherIncome),true)})`:formatRupiah(data.otherIncome,true)}</span>
+                </div>
+                <div className="flex justify-between py-3 border-y-2 border-zinc-700 font-bold text-xl text-white">
+                  <span>Laba Bersih (Net Profit)</span>
+                  <span className={data.labaBersih>=0?'text-emerald-500':'text-red-500'}>{formatRupiah(data.labaBersih)}</span>
+                </div>
 
                 {(data.bebanKerugianTikTok??0)>0 && (
-                  <div className="mt-6 rounded-lg border border-amber-800/40 bg-amber-900/10 p-4">
+                  <div className="mt-4 rounded-lg border border-amber-800/40 bg-amber-900/10 p-4">
                     <p className="text-xs font-semibold text-amber-400 mb-2 uppercase">ℹ️ Beban Kerugian TikTok</p>
                     <div className="flex justify-between text-sm text-amber-200/80"><span>Total order negatif TikTok</span><span className="font-semibold">{formatRupiah(data.bebanKerugianTikTok)}</span></div>
                   </div>
