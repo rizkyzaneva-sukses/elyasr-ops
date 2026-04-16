@@ -18,15 +18,26 @@ export async function DELETE(request: NextRequest) {
     return apiError('Konfirmasi tidak valid. Kirim { confirm: "YES_DELETE_ALL" }', 400)
   }
 
+  // Legacy EXPENSE entries dari retur (format lama sebelum fix)
+  const legacyReturOR = [
+    { note: { startsWith: 'Retur TikTok' } },
+    { note: { startsWith: 'Retur Shopee' } },
+    { note: { startsWith: 'Payout TikTok' } },
+    { note: { startsWith: 'Payout Shopee' } },
+  ]
+
   // Hitung dulu berapa yang akan dihapus
-  const [payoutCount, ledgerCount] = await Promise.all([
+  const [payoutCount, ledgerPayoutCount, ledgerLegacyCount] = await Promise.all([
     prisma.payout.count(),
     prisma.walletLedger.count({ where: { trxType: 'PAYOUT' } }),
+    prisma.walletLedger.count({ where: { trxType: 'EXPENSE', OR: legacyReturOR } }),
   ])
+  const ledgerCount = ledgerPayoutCount + ledgerLegacyCount
 
   // Hapus dalam transaksi
   await prisma.$transaction([
     prisma.walletLedger.deleteMany({ where: { trxType: 'PAYOUT' } }),
+    prisma.walletLedger.deleteMany({ where: { trxType: 'EXPENSE', OR: legacyReturOR } }),
     prisma.payout.deleteMany({}),
     // Reset trxDate orders ke null agar bersih sebelum re-import
     prisma.order.updateMany({ where: { trxDate: { not: null } }, data: { trxDate: null } }),
