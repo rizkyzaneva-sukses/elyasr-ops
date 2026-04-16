@@ -4,7 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
-import { CreditCard, Plus } from 'lucide-react'
+import { useAuth } from '@/components/providers'
+import { CreditCard, Plus, Pencil, X } from 'lucide-react'
 
 const STATUS_COLOR: Record<string,string> = {
   OUTSTANDING:'badge-danger', PARTIAL:'badge-warning', PAID:'badge-success', COLLECTED:'badge-success',
@@ -81,10 +82,71 @@ function AddModal({ type, wallets, onClose }: { type:'utang'|'piutang'; wallets:
   )
 }
 
+function EditModal({ item, entityType, onClose }: { item: any; entityType: 'utang'|'piutang'; onClose: () => void }) {
+  const qc = useQueryClient(); const { toast } = useToast()
+  const currentName = entityType === 'utang' ? item.creditorName : item.debtorName
+  const [name, setName] = useState(currentName || '')
+  const [type, setType] = useState(item.type || '')
+  const [loading, setLoading] = useState(false)
+
+  const typeOptions = entityType === 'utang'
+    ? ['SUNTIKAN_MODAL', 'PINJAMAN_BANK', 'PINJAMAN_PRIBADI', 'LAINNYA']
+    : ['PINJAMAN_KARYAWAN', 'PO_VENDOR_BELUM_DIKIRIM', 'LAINNYA']
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault(); setLoading(true)
+    try {
+      const res = await fetch('/api/utang-piutang', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, entityType, name: name.trim(), type }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      toast({ title: 'Berhasil diperbarui', type: 'success' })
+      qc.invalidateQueries({ queryKey: ['utang-piutang'] }); onClose()
+    } catch (err: any) {
+      toast({ title: err.message || 'Gagal', type: 'error' })
+    } finally { setLoading(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-white">Edit {entityType === 'utang' ? 'Utang' : 'Piutang'}</h2>
+          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300"><X size={18}/></button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1">{entityType === 'utang' ? 'Nama Kreditur' : 'Nama Debitur'} *</label>
+            <input value={name} onChange={e => setName(e.target.value)} required
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none" />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1">Tipe</label>
+            <select value={type} onChange={e => setType(e.target.value)}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none">
+              {typeOptions.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+            </select>
+          </div>
+          <div className="flex gap-2 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg py-2 text-sm">Batal</button>
+            <button type="submit" disabled={loading} className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg py-2 text-sm font-medium">
+              {loading ? 'Menyimpan...' : 'Simpan'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 export function UtangTab() {
   const { toast } = useToast(); const qc = useQueryClient()
+  const { user } = useAuth()
   const [tab, setTab]   = useState<'utang'|'piutang'>('utang')
   const [modal, setModal] = useState<'utang'|'piutang'|null>(null)
+  const [editItem, setEditItem] = useState<any>(null)
 
   const { data: wallets } = useQuery({ queryKey:['wallets'], queryFn:()=>fetch('/api/wallet').then(r=>r.json()).then(d=>d.data??[]) })
   const { data, isLoading } = useQuery({ queryKey:['utang-piutang', tab],
@@ -96,6 +158,7 @@ export function UtangTab() {
   return (
     <>
       {modal && wallets && <AddModal type={modal} wallets={wallets} onClose={() => setModal(null)} />}
+      {editItem && <EditModal item={editItem} entityType={tab} onClose={() => setEditItem(null)} />}
 
       <div className="flex items-center justify-between mb-4">
         <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
@@ -124,12 +187,13 @@ export function UtangTab() {
             <th>Nama</th><th className="w-28">Tipe</th><th className="w-28 text-right">Jumlah</th>
             <th className="w-28 text-right">Terbayar</th><th className="w-28 text-right">Sisa</th>
             <th className="w-24">Jatuh Tempo</th><th className="w-24">Status</th>
+            {user?.userRole === 'OWNER' && <th className="w-16">Aksi</th>}
           </tr></thead>
           <tbody>
             {isLoading ? Array.from({length:4}).map((_,i) => (
-              <tr key={i}>{Array.from({length:7}).map((_,j) => <td key={j}><div className="h-4 bg-zinc-800 rounded animate-pulse"/></td>)}</tr>
+              <tr key={i}>{Array.from({length: user?.userRole==='OWNER'?8:7}).map((_,j) => <td key={j}><div className="h-4 bg-zinc-800 rounded animate-pulse"/></td>)}</tr>
             )) : items.length===0 ? (
-              <tr><td colSpan={7} className="text-center py-10 text-zinc-600">Tidak ada data {tab}</td></tr>
+              <tr><td colSpan={user?.userRole==='OWNER'?8:7} className="text-center py-10 text-zinc-600">Tidak ada data {tab}</td></tr>
             ) : items.map((item:any) => {
               const paid = tab==='utang'?item.amountPaid:item.amountCollected
               const sisa = item.amount - paid
@@ -145,6 +209,14 @@ export function UtangTab() {
                   <td className={`text-right text-xs font-medium ${sisa>0?(tab==='utang'?'text-red-400':'text-yellow-400'):'text-zinc-600'}`}>{sisa>0?formatRupiah(sisa,true):'—'}</td>
                   <td className="text-xs text-zinc-400">{item.dueDate?formatDate(item.dueDate):'—'}</td>
                   <td><span className={STATUS_COLOR[item.status]||'badge-muted'}>{item.status}</span></td>
+                  {user?.userRole === 'OWNER' && (
+                    <td>
+                      <button onClick={() => setEditItem(item)}
+                        className="p-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors">
+                        <Pencil size={12}/>
+                      </button>
+                    </td>
+                  )}
                 </tr>
               )
             })}

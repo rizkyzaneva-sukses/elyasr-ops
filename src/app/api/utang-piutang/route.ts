@@ -112,3 +112,33 @@ export async function POST(request: NextRequest) {
 
   return apiError('entityType harus utang atau piutang')
 }
+
+// PATCH /api/utang-piutang — edit nama dan tipe (OWNER only)
+export async function PATCH(request: NextRequest) {
+  const session = await getSession()
+  if (!session.isLoggedIn) return apiError('Unauthorized', 401)
+  if (!['OWNER'].includes(session.userRole)) return apiError('Hanya Owner yang dapat mengedit', 403)
+
+  const { id, entityType, name, type } = await request.json()
+  if (!id || !entityType) return apiError('id dan entityType wajib diisi')
+
+  if (entityType === 'utang') {
+    const updated = await prisma.utang.update({
+      where: { id },
+      data: {
+        ...(name  && { creditorName: name }),
+        ...(type  && { type }),
+      },
+    })
+    return apiSuccess(updated)
+  } else {
+    const updated = await prisma.piutang.update({
+      where: { id },
+      data: {
+        ...(name  && { debtorName: name }),
+        ...(type  && { type }),
+      },
+    })
+    return apiSuccess(updated)
+  }
+}
