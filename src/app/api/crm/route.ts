@@ -49,9 +49,9 @@ export async function GET(request: NextRequest) {
 
     const buyers: any[] = await prisma.$queryRawUnsafe(`
       SELECT
-        COALESCE(receiver_name, buyer_username, '(Tidak Diketahui)')  AS buyer_key,
-        COALESCE(receiver_name, '(Tidak Diketahui)')                  AS receiver_name,
-        MAX(buyer_username)          AS buyer_username,
+        COALESCE(buyer_username, '(Tidak Diketahui)')  AS buyer_key,
+        MAX(receiver_name)           AS receiver_name,
+        buyer_username,
         MAX(phone)                   AS phone,
         MAX(city)                    AS city,
         MAX(province)                AS province,
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
         MIN(order_created_at)        AS first_order_date
       FROM orders
       WHERE ${whereSQL}
-      GROUP BY receiver_name, buyer_username
+      GROUP BY buyer_username
       ORDER BY freq_orders DESC, total_omzet DESC
       LIMIT $${limitIdx} OFFSET $${offsetIdx}
     `, ...dataParams)
@@ -73,10 +73,10 @@ export async function GET(request: NextRequest) {
     const countResult: any[] = await prisma.$queryRawUnsafe(`
       SELECT COUNT(*) AS cnt
       FROM (
-        SELECT receiver_name, buyer_username
+        SELECT buyer_username
         FROM orders
         WHERE ${whereSQL}
-        GROUP BY receiver_name, buyer_username
+        GROUP BY buyer_username
       ) g
     `, ...countParams)
 
