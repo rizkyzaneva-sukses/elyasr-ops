@@ -4,7 +4,8 @@ import { getSession } from '@/lib/session'
 import { apiSuccess, apiError } from '@/lib/utils'
 
 // PUT /api/sku-mappings/[id] — update mapping
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const session = await getSession()
   if (!session.isLoggedIn) return apiError('Unauthorized', 401)
   if (!['OWNER', 'FINANCE'].includes(session.userRole)) return apiError('Forbidden', 403)
