@@ -55,14 +55,16 @@ export async function GET(request: NextRequest) {
   const totalFee = feeShopee + feeTikTok + feeAms + feeLainnya
 
   // ── 2. HPP — dari Order yang trxDate-nya masuk periode (di-set saat upload payout) ──
-  // trxDate di-set = releasedDate payout ketika orderNo cocok; ini lebih andal dari
-  // string-matching Payout.orderNo → Order.orderNo yang bisa gagal karena format beda.
+  // Order.hpp sudah di-set saat upload order CSV (lookup dari masterProduct saat itu).
+  // Kita TIDAK lookup ulang ke masterProduct karena Order.sku berisi nama SKU marketplace
+  // (mis: "Arslan Black x Grey - S") sedangkan masterProduct.sku berisi kode internal
+  // (mis: ELY01) — keduanya tidak akan pernah cocok.
   const paidOrders = await prisma.order.findMany({
     where: {
       trxDate: { gte: fromDate, lte: toDate },
       sku: { not: null },
     },
-    select: { sku: true, qty: true },
+    select: { sku: true, qty: true, hpp: true },
   })
 
   // Hitung juga totalOrdersPaid dari payout (untuk info hint)
@@ -72,19 +74,8 @@ export async function GET(request: NextRequest) {
 
   let hpp = 0
   const ordersFound = paidOrders.length
-  if (paidOrders.length > 0) {
-    const skuSet = [...new Set(paidOrders.map(o => o.sku as string))]
-    const products = await prisma.masterProduct.findMany({
-      where: { sku: { in: skuSet } },
-      select: { sku: true, hpp: true },
-    })
-    const hppMap = new Map(products.map(p => [p.sku.toLowerCase(), p.hpp]))
-
-    for (const order of paidOrders) {
-      const skuKey = (order.sku ?? '').toLowerCase()
-      const unitHpp = hppMap.get(skuKey) ?? 0
-      hpp += unitHpp * (order.qty ?? 1)
-    }
+  for (const order of paidOrders) {
+    hpp += (order.hpp ?? 0) * (order.qty ?? 1)
   }
 
   // ── 3. Laba Kotor (Pencairan Bersih - HPP) ──────────────────────────────
