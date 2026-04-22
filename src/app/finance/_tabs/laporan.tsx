@@ -251,6 +251,20 @@ export function LaporanTab() {
                   <span className={data.labaBersih>=0?'text-emerald-500':'text-red-500'}>{formatRupiah(data.labaBersih)}</span>
                 </div>
 
+                {/* Info Bayar Vendor — tidak mengurangi laba, hanya informasi */}
+                {(data.totalBayarVendor??0) > 0 && (
+                  <div className="mt-4 rounded-lg border border-blue-800/40 bg-blue-900/10 p-4 space-y-1">
+                    <p className="text-xs font-semibold text-blue-400 mb-2 uppercase">ℹ️ Informasi — Tidak Masuk Laba Rugi</p>
+                    <div className="flex justify-between text-sm text-blue-200/80">
+                      <span>Pembayaran Vendor (Hutang Dagang)</span>
+                      <span className="font-semibold">({formatRupiah(data.totalBayarVendor, true)})</span>
+                    </div>
+                    <p className="text-[10px] text-blue-400/60 leading-relaxed pt-1">
+                      Bayar vendor adalah pelunasan hutang dagang — bukan beban operasional. Dicatat di Arus Kas, bukan P&amp;L.
+                    </p>
+                  </div>
+                )}
+
                 {(data.bebanKerugianTikTok??0)>0 && (
                   <div className="mt-4 rounded-lg border border-amber-800/40 bg-amber-900/10 p-4">
                     <p className="text-xs font-semibold text-amber-400 mb-2 uppercase">ℹ️ Beban Kerugian TikTok</p>

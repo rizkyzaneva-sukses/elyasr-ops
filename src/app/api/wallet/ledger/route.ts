@@ -93,9 +93,9 @@ export async function POST(request: NextRequest) {
   }
 
   // Tentukan tanda amount berdasarkan tipe transaksi
-  // Negatif (keluar wallet): EXPENSE, PRIVE, INVESTASI
-  // Positif (masuk wallet): PAYOUT, OTHER_INCOME, MODAL_MASUK
-  const outTypes = ['EXPENSE', 'PRIVE', 'INVESTASI']
+  // Negatif (keluar wallet): EXPENSE, PRIVE, INVESTASI, BAYAR_UTANG
+  // Positif (masuk wallet): PAYOUT, OTHER_INCOME, MODAL_MASUK, PENGEMBALIAN_MODAL, TERIMA_PIUTANG_ND
+  const outTypes = ['EXPENSE', 'PRIVE', 'INVESTASI', 'BAYAR_UTANG']
   const finalAmount = outTypes.includes(trxType) ? -Math.abs(amount) : Math.abs(amount)
 
   const entry = await prisma.walletLedger.create({
