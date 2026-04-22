@@ -64,12 +64,12 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Debit wallet
+    // Debit wallet — pakai VENDOR_PAYMENT agar tidak masuk beban operasional P&L
     await tx.walletLedger.create({
       data: {
         walletId,
         trxDate: new Date(paymentDate),
-        trxType: 'EXPENSE',
+        trxType: 'VENDOR_PAYMENT',
         category: `Bayar Vendor - ${vendor.namaVendor}`,
         amount: -Math.abs(Number(amount)),
         note: note || null,

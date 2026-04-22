@@ -82,9 +82,15 @@ export async function GET(request: NextRequest) {
   const labaKotor = pencairanBersih - hpp
 
   // ── 4. Beban Operasional (EXPENSE) per kategori ─────────────────────────
+  // Exclude vendor payment: entry lama pakai EXPENSE+category 'Bayar Vendor%',
+  // entry baru pakai trxType VENDOR_PAYMENT. Keduanya jadi info saja di bawah.
   const expenses = await prisma.walletLedger.groupBy({
     by: ['category'],
-    where: { trxType: 'EXPENSE', trxDate: { gte: fromDate, lte: toDate } },
+    where: {
+      trxType: 'EXPENSE',
+      trxDate: { gte: fromDate, lte: toDate },
+      NOT: { category: { startsWith: 'Bayar Vendor' } },
+    },
     _sum: { amount: true },
   })
 
@@ -94,6 +100,19 @@ export async function GET(request: NextRequest) {
     bebanOperasional += amt
     return { group: e.category || 'Lain-lain', amount: amt }
   })
+
+  // ── 4b. Info Bayar Vendor (tidak masuk P&L, informasi saja) ─────────────
+  const vendorPayAgg = await prisma.walletLedger.aggregate({
+    where: {
+      trxDate: { gte: fromDate, lte: toDate },
+      OR: [
+        { trxType: 'VENDOR_PAYMENT' },
+        { trxType: 'EXPENSE', category: { startsWith: 'Bayar Vendor' } },
+      ],
+    },
+    _sum: { amount: true },
+  })
+  const totalBayarVendor = Math.abs(vendorPayAgg._sum.amount ?? 0)
 
   // ── 5. Beban Penyusutan Aset Tetap ───────────────────────────────────────
   const asets = await prisma.asetTetap.findMany({ where: { isActive: true } })
@@ -149,5 +168,6 @@ export async function GET(request: NextRequest) {
     bebanKerugianTikTok,
     totalOrdersPaid: payoutCount,
     ordersFound,
+    totalBayarVendor,   // info saja, tidak mengurangi laba
   })
 }
