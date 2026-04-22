@@ -197,6 +197,7 @@ interface ImportResult {
   updated: number
   skipped: number
   total: number
+  summary?: Record<string, { inserted: number; updated: number; skipped: number; total: number }>
 }
 
 function BackupEntityRow({ entityKey, label, desc, canImport }: {
@@ -210,7 +211,7 @@ function BackupEntityRow({ entityKey, label, desc, canImport }: {
   const [importLoading, setImportLoading] = useState(false)
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [previewCount, setPreviewCount] = useState<number | null>(null)
-  const [pendingData, setPendingData] = useState<any[] | null>(null)
+  const [pendingData, setPendingData] = useState<any>(null)
 
   const handleExport = async () => {
     setExportLoading(true)
@@ -239,7 +240,22 @@ function BackupEntityRow({ entityKey, label, desc, canImport }: {
     try {
       const text = await file.text()
       const parsed = JSON.parse(text)
-      // Support dua format: array langsung, atau {data: [...]} atau {data: {products: [...]}}
+
+      if (entityKey === 'all') {
+        // Format export semua: { exportedAt, exportedBy, data: { products: [], orders: [], ... } }
+        const dataObj = (parsed?.data && typeof parsed.data === 'object' && !Array.isArray(parsed.data))
+          ? parsed.data
+          : (typeof parsed === 'object' && !Array.isArray(parsed) && !parsed.exportedAt ? parsed : null)
+        if (!dataObj) throw new Error('Format tidak valid. Upload file hasil "Export Semua Data" dari sistem ini.')
+        const KEYS = ['products', 'orders', 'vendors', 'wallet_ledger', 'inventory_ledger']
+        const total = KEYS.reduce((s, k) => s + (Array.isArray(dataObj[k]) ? dataObj[k].length : 0), 0)
+        if (total === 0) throw new Error('Tidak ada data yang bisa diimport dalam file ini.')
+        setPreviewCount(total)
+        setPendingData(dataObj)
+        return
+      }
+
+      // Entity tunggal: array langsung atau {data: [...]}
       let rows: any[]
       if (Array.isArray(parsed)) {
         rows = parsed
@@ -328,7 +344,10 @@ function BackupEntityRow({ entityKey, label, desc, canImport }: {
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1.5 bg-amber-900/20 border border-amber-700/40 rounded-lg px-3 py-1.5 text-xs text-amber-300">
                 <AlertCircle size={11}/>
-                {previewCount?.toLocaleString('id-ID')} baris siap diimport
+                {entityKey === 'all'
+                  ? `${previewCount?.toLocaleString('id-ID')} total records (5 entity) siap diimport`
+                  : `${previewCount?.toLocaleString('id-ID')} baris siap diimport`
+                }
               </div>
               <button
                 onClick={handleImport}
@@ -348,17 +367,23 @@ function BackupEntityRow({ entityKey, label, desc, canImport }: {
           )}
 
           {importResult && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1.5 bg-emerald-900/20 border border-emerald-700/40 rounded-lg px-3 py-1.5 text-xs text-emerald-300">
-                <CheckCircle2 size={11}/>
-                +{importResult.inserted} baru · ~{importResult.updated} update · {importResult.skipped} skip
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 bg-emerald-900/20 border border-emerald-700/40 rounded-lg px-3 py-1.5 text-xs text-emerald-300">
+                  <CheckCircle2 size={11}/>
+                  +{importResult.inserted} baru · ~{importResult.updated} update · {importResult.skipped} skip
+                </div>
+                <button onClick={handleCancelImport} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1.5">Reset</button>
               </div>
-              <button
-                onClick={handleCancelImport}
-                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1.5"
-              >
-                Reset
-              </button>
+              {importResult.summary && (
+                <div className="flex flex-wrap gap-1">
+                  {Object.entries(importResult.summary).map(([ent, s]) => s.total > 0 && (
+                    <span key={ent} className="text-[10px] bg-zinc-800 border border-zinc-700 rounded px-2 py-0.5 text-zinc-400">
+                      {ent}: +{s.inserted} ~{s.updated} /{s.skipped}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -369,7 +394,7 @@ function BackupEntityRow({ entityKey, label, desc, canImport }: {
 
 function BackupTab() {
   const entities: { key: string; label: string; desc: string; canImport?: boolean }[] = [
-    { key: 'all', label: 'Semua Data', desc: 'Export lengkap semua entity sekaligus' },
+    { key: 'all', label: 'Semua Data', desc: 'Export & Import lengkap semua entity sekaligus', canImport: true },
     { key: 'products', label: 'Master Produk', desc: 'Data produk & SKU (upsert by SKU)', canImport: true },
     { key: 'orders', label: 'Orders', desc: 'Semua pesanan (upsert by orderNo)', canImport: true },
     { key: 'vendors', label: 'Vendors', desc: 'Data vendor (upsert by vendorCode)', canImport: true },
@@ -385,9 +410,9 @@ function BackupTab() {
       <div className="flex items-center gap-2 bg-blue-900/20 border border-blue-700/40 rounded-lg px-4 py-3">
         <AlertCircle size={14} className="text-blue-400 shrink-0"/>
         <p className="text-xs text-blue-300">
-          <strong>Import</strong> tersedia untuk: Master Produk, Orders, Vendors, Wallet Ledger, Inventory Ledger.
-          File yang diimport harus berformat JSON (hasil export dari sistem ini atau array JSON langsung).
-          <span className="text-blue-400"> Produk, Orders & Vendors menggunakan upsert (update jika sudah ada). Ledger hanya insert (skip duplikat by ID).</span>
+          <strong>Import Semua Data</strong> — upload file hasil Export Semua Data untuk restore semua entity sekaligus.
+          Bisa juga import per-entity satu per satu di bawah.
+          <span className="text-blue-400"> Produk, Orders & Vendors: upsert (update jika ada). Ledger: insert only (skip duplikat).</span>
         </p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
