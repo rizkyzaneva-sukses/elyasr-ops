@@ -69,10 +69,20 @@ function isTikTokCancel(status: string): boolean {
   return TIKTOK_CANCEL_STATUSES.some(s => status.toLowerCase().includes(s))
 }
 
-/** Cek apakah SKU adalah produk Kaos/T-shirt (harga = 0) */
+/**
+ * Cek apakah SKU dikecualikan dari perhitungan omzet (harga = 0).
+ * Produk ini tidak menanggung voucher — bebannya dialihkan ke produk lain.
+ * Contoh: Kaos/T-shirt bonus, Miki Hat / Peci Uas
+ */
 function isKaosSku(sku: string): boolean {
   const lower = sku.toLowerCase()
-  return lower.includes('kaos') || lower.includes('t-shirt') || lower.includes('tshirt')
+  return (
+    lower.includes('kaos') ||
+    lower.includes('t-shirt') ||
+    lower.includes('tshirt') ||
+    lower.includes('peci') ||
+    lower.includes('miki hat')
+  )
 }
 
 /**
@@ -170,7 +180,9 @@ export function parseShopeeOrders(
           expandedItems.push({ sourceRow: row, rowNumber, sku, hargaPerUnit, qty })
         })
       } else {
-        expandedItems.push({ sourceRow: row, rowNumber, sku: rawSku, hargaPerUnit: parseShopeeNum(row['Harga Setelah Diskon']), qty })
+        // Produk dikecualikan (kaos/hat/peci) → harga 0, tidak menanggung voucher
+        const hargaPerUnit = isKaosSku(rawSku) ? 0 : parseShopeeNum(row['Harga Setelah Diskon'])
+        expandedItems.push({ sourceRow: row, rowNumber, sku: rawSku, hargaPerUnit, qty })
       }
     }
 
@@ -184,12 +196,15 @@ export function parseShopeeOrders(
       continue
     }
 
-    // ── Fase 2: Distribusi voucher per unit ke semua expanded items ────
-    const totalQty = expandedItems.reduce((sum, item) => sum + item.qty, 0)
-    const voucherPerUnit = totalQty > 0 ? voucherSeller / totalQty : 0
+    // ── Fase 2: Distribusi voucher — hanya ke item non-excluded ────
+    const nonExcludedQty = expandedItems
+      .filter(item => !isKaosSku(item.sku))
+      .reduce((sum, item) => sum + item.qty, 0)
+    const voucherPerUnit = nonExcludedQty > 0 ? voucherSeller / nonExcludedQty : 0
 
     for (const item of expandedItems) {
-      const basePrice = item.hargaPerUnit - voucherPerUnit
+      const itemVoucher = isKaosSku(item.sku) ? 0 : voucherPerUnit
+      const basePrice = item.hargaPerUnit - itemVoucher
       const fee = basePrice * (shopeeAdminFee / 100)
       const realOmzet = Math.round((basePrice - fee) * item.qty)
       const skuKey = item.sku.toLowerCase()
@@ -290,7 +305,9 @@ export function parseTikTokOrders(
         })
       }
     } else {
-      const realOmzet = Math.round(subtotalAfterDisc * (1 - tiktokAdminFee / 100))
+      // Produk dikecualikan → subtotal dan omzet = 0
+      const effectiveSubtotal = isKaosSku(rawSku) ? 0 : subtotalAfterDisc
+      const realOmzet = Math.round(effectiveSubtotal * (1 - tiktokAdminFee / 100))
       const skuKey = rawSku.toLowerCase()
 
       orders.push({
@@ -302,7 +319,7 @@ export function parseTikTokOrders(
         sku: rawSku || null,
         productName: String(row['Product Name'] || '').trim() || null,
         qty,
-        totalProductPrice: subtotalAfterDisc,
+        totalProductPrice: effectiveSubtotal,
         realOmzet,
         city: String(row['Regency and City'] || '').trim() || null,
         province: String(row['Province'] || '').trim() || null,
