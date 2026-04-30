@@ -6,7 +6,8 @@ import {
   BookOpen, LayoutDashboard, ShoppingCart, Package, Truck,
   Wallet, Users, Shield, ScanLine, ClipboardCheck, Building2,
   CreditCard, BarChart3, TrendingUp, AlertTriangle, FileText,
-  ChevronRight, Database, Store, Search, X, ExternalLink
+  ChevronRight, Database, Store, Search, X, ExternalLink,
+  GitMerge, MessageSquarePlus
 } from 'lucide-react'
 
 interface DocSection {
@@ -90,6 +91,21 @@ const DOC_SECTIONS: DocSection[] = [
     access: ['OWNER', 'FINANCE', 'STAFF'],
   },
   {
+    id: 'external-inventory',
+    title: 'Inventori — External Inventory',
+    icon: Store,
+    color: 'text-yellow-400',
+    path: '/external-inventory',
+    overview: 'Halaman stok read-only untuk user EXTERNAL. Menampilkan produk yang masih tersedia beserta jumlah stok saat ini tanpa membuka modul internal lain.',
+    features: [
+      'Pencarian SKU atau nama produk',
+      'Hanya menampilkan produk dengan stok tersedia',
+      'Tampilan sederhana untuk akses partner/mitra eksternal',
+      'Akses otomatis diarahkan ke halaman ini untuk role EXTERNAL',
+    ],
+    access: ['EXTERNAL'],
+  },
+  {
     id: 'inventory-ledger',
     title: 'Inventori — Global Ledger',
     icon: FileText,
@@ -154,18 +170,37 @@ const DOC_SECTIONS: DocSection[] = [
     access: ['OWNER', 'FINANCE'],
   },
   {
+    id: 'produk-gabungan',
+    title: 'Inventori — Produk Gabungan',
+    icon: GitMerge,
+    color: 'text-yellow-400',
+    path: '/produk-gabungan',
+    overview: 'Database mapping SKU gabungan marketplace ke SKU individual internal. Dipakai saat import order agar bundle atau produk kombinasi bisa dipecah ke SKU database yang benar.',
+    features: [
+      'Tambah dan edit mapping SKU marketplace ke SKU database',
+      'Import massal mapping dari file Excel template',
+      'Preview hasil split SKU berdasarkan tanda +',
+      'Bulk pilih dan hapus mapping yang tidak dipakai',
+      'Dipakai langsung oleh proses upload order Shopee/TikTok',
+    ],
+    access: ['OWNER', 'FINANCE'],
+  },
+  {
     id: 'purchase-orders',
     title: 'Procurement — Purchase Orders',
     icon: FileText,
     color: 'text-orange-400',
-    path: '/purchase-orders',
-    overview: 'Modul pembuatan dan pengelolaan Purchase Order (PO) ke vendor. Melacak penerimaan barang dan status pembayaran per PO.',
+    path: '/procurement?tab=po',
+    overview: 'Modul pembuatan dan pengelolaan Purchase Order (PO) ke vendor. Melacak penerimaan barang, pembayaran, dan dokumen print resmi untuk setiap PO.',
     features: [
       'Buat PO baru dengan pilih vendor, tanggal, dan list item SKU',
+      'Auto split PO berdasarkan kategori item saat diperlukan',
       'Tabel PO dengan status penerimaan dan pembayaran',
       'Lihat detail PO termasuk breakdown item, qty order vs received',
+      'Bayar vendor langsung dari daftar PO',
       'Download CSV detail PO',
-      'Cetak/Print PO (format dokumen resmi)',
+      'Cetak/Print PO dengan layout dokumen resmi dan tabel otomatis 2 kolom saat item banyak',
+      'Finance dapat request delete, OWNER dapat edit/hapus langsung',
       'Filter berdasarkan status PO (Open/Partial/Completed/Cancelled)',
     ],
     access: ['OWNER', 'FINANCE'],
@@ -175,7 +210,7 @@ const DOC_SECTIONS: DocSection[] = [
     title: 'Procurement — Vendor',
     icon: Building2,
     color: 'text-orange-400',
-    path: '/vendors',
+    path: '/procurement?tab=vendor',
     overview: 'Manajemen data vendor/pemasok. Menyimpan informasi kontak, rekening bank, dan riwayat transaksi dengan setiap vendor.',
     features: [
       'Daftar vendor aktif dan nonaktif',
@@ -190,7 +225,7 @@ const DOC_SECTIONS: DocSection[] = [
     title: 'Procurement — Pembayaran Vendor',
     icon: CreditCard,
     color: 'text-orange-400',
-    path: '/vendor-payments',
+    path: '/procurement?tab=payment',
     overview: 'Modul pencatatan pembayaran kepada vendor. Merekam setiap transaksi pelunasan atau cicilan pembayaran PO.',
     features: [
       'Daftar pembayaran ke vendor dengan filter tanggal',
@@ -206,14 +241,14 @@ const DOC_SECTIONS: DocSection[] = [
     title: 'Procurement — Monitoring',
     icon: BarChart3,
     color: 'text-orange-400',
-    path: '/procurement',
-    overview: 'Dashboard monitoring dan analitik procurement. Menyajikan ringkasan performa pembelian, outstanding PO, dan statistik vendor.',
+    path: '/procurement?tab=monitor',
+    overview: 'Tab monitoring di Procurement untuk memantau performa pembelian, outstanding PO, dan statistik vendor dari satu tempat.',
     features: [
       'Ringkasan total PO aktif dan nilai pembelian',
       'Grafik tren pembelian per periode',
       'PO yang sudah jatuh tempo atau overdue',
       'Top vendor berdasarkan volume pembelian',
-      '(Dalam pengembangan — fitur analitik lanjutan)',
+      'Terintegrasi dengan tab Purchase Orders, Vendor, dan Pembayaran Vendor',
     ],
     access: ['OWNER', 'FINANCE'],
   },
@@ -291,7 +326,23 @@ const DOC_SECTIONS: DocSection[] = [
       'Tambah dan edit data pelanggan',
       'Riwayat pesanan per pelanggan',
     ],
-    access: ['OWNER', 'FINANCE', 'STAFF'],
+    access: ['OWNER', 'FINANCE'],
+  },
+  {
+    id: 'suggest-revision',
+    title: 'Suggest Revision',
+    icon: MessageSquarePlus,
+    color: 'text-pink-400',
+    path: '/suggest-revision',
+    overview: 'Papan masukan internal untuk mencatat bug, ide revisi, dan request improvement. Mendukung lampiran screenshot langsung dari clipboard.',
+    features: [
+      'Tambah saran revisi dengan judul dan deskripsi',
+      'Paste screenshot langsung ke form dengan CTRL+V',
+      'Tandai revisi sebagai pending atau completed',
+      'Preview gambar dalam lightbox',
+      'Hapus item revisi yang sudah tidak relevan',
+    ],
+    access: ['OWNER', 'FINANCE', 'STAFF', 'EXTERNAL'],
   },
   {
     id: 'alerts',
@@ -333,8 +384,8 @@ const ROLE_COLORS: Record<string, string> = {
 }
 
 const CATEGORY_GROUPS = [
-  { label: 'Umum', ids: ['dashboard', 'orders', 'scan-order', 'crm', 'alerts'] },
-  { label: 'Inventori', ids: ['inventory', 'inventory-ledger', 'inventory-scan', 'stock-opname', 'master-products'] },
+  { label: 'Umum', ids: ['dashboard', 'orders', 'scan-order', 'crm', 'alerts', 'suggest-revision'] },
+  { label: 'Inventori', ids: ['inventory', 'external-inventory', 'inventory-ledger', 'inventory-scan', 'stock-opname', 'master-products', 'produk-gabungan'] },
   { label: 'Procurement', ids: ['purchase-orders', 'vendors', 'vendor-payments', 'procurement'] },
   { label: 'Keuangan', ids: ['finance', 'payouts', 'utang-piutang', 'reports'] },
   { label: 'Administrasi', ids: ['owner-room'] },
@@ -500,9 +551,9 @@ export default function DocumentationPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
                   { role: 'OWNER', desc: 'Akses penuh ke semua modul termasuk Owner Room, manajemen user, hapus data, dan laporan keuangan.' },
-                  { role: 'FINANCE', desc: 'Akses ke modul keuangan, procurement, inventori, dan laporan. Tidak bisa akses Owner Room.' },
-                  { role: 'STAFF', desc: 'Akses terbatas ke pesanan, scan resi, inventori stok, dan CRM. Tidak bisa lihat data keuangan.' },
-                  { role: 'EXTERNAL', desc: 'Akses sangat terbatas, hanya untuk kebutuhan spesifik seperti mitra atau kurir.' },
+                  { role: 'FINANCE', desc: 'Akses ke procurement, finance room, inventori internal, CRM, alerts, dan laporan. Tidak bisa akses Owner Room.' },
+                  { role: 'STAFF', desc: 'Akses terbatas ke dashboard, pesanan, scan resi, inventori operasional, dan suggest revision.' },
+                  { role: 'EXTERNAL', desc: 'Saat login akan diarahkan ke halaman external inventory read-only, namun tetap bisa membuka suggest revision bila dibutuhkan.' },
                 ].map(({ role, desc }) => (
                   <div key={role} className="flex items-start gap-3">
                     <span className={`text-xs font-bold px-2 py-1 rounded border shrink-0 ${ROLE_COLORS[role]}`}>{role}</span>
@@ -515,7 +566,7 @@ export default function DocumentationPage() {
 
           {/* Version info */}
           <div className="text-center py-4 border-t border-zinc-800">
-            <p className="text-xs text-zinc-600">ELYASR Management System • Dokumentasi diperbarui April 2026</p>
+            <p className="text-xs text-zinc-600">ELYASR Management System • Dokumentasi diselaraskan April 2026</p>
           </div>
         </div>
       )}

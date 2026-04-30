@@ -1,6 +1,6 @@
-# 🚀 Panduan Deploy Zaneva Operations ke EasyPanel
+# 🚀 Panduan Deploy ELYASR Management System ke EasyPanel
 
-Dokumen ini menjelaskan langkah-langkah lengkap untuk men-deploy aplikasi **Zaneva Operations** ke [EasyPanel](https://easypanel.io/) menggunakan Docker.
+Dokumen ini menjelaskan langkah-langkah lengkap untuk men-deploy aplikasi **ELYASR Management System** ke [EasyPanel](https://easypanel.io/) menggunakan Docker.
 
 ---
 
@@ -19,8 +19,8 @@ Sebelum memulai, pastikan Anda sudah memiliki:
 
 ```
 EasyPanel
-├── Service: zaneva-db       → PostgreSQL 16 (database)
-└── Service: zaneva-app      → Next.js App (port 3000)
+├── Service: elyasr-db       → PostgreSQL 16 (database)
+└── Service: elyasr-app      → Next.js App (port 3000)
 ```
 
 ---
@@ -48,16 +48,16 @@ git push origin main
 
 | Field       | Nilai                    |
 |-------------|--------------------------|
-| Service Name | `zaneva-db`             |
+| Service Name | `elyasr-db`             |
 | Image        | `postgres:16-alpine`    |
-| Database     | `zaneva_ops`            |
-| Username     | `zaneva_user`           |
+| Database     | `elyasr_ops`            |
+| Username     | `elyasr_user`           |
 | Password     | *(buat password kuat)*  |
 
 5. Klik **"Create"** dan tunggu hingga service running ✅
 
 > **Catat** internal connection string-nya, biasanya:
-> `postgresql://zaneva_user:PASSWORD@zaneva-db:5432/zaneva_ops`
+> `postgresql://elyasr_user:PASSWORD@elyasr-db:5432/elyasr_ops`
 
 ---
 
@@ -68,43 +68,39 @@ git push origin main
 
 | Field        | Nilai                    |
 |--------------|--------------------------|
-| Service Name | `zaneva-app`            |
+| Service Name | `elyasr-app`            |
 | Build Method | **Dockerfile**          |
 | Port         | `3000`                  |
 
 3. Di bagian **Source**, pilih:
    - **GitHub** (connect repo Anda)
    - Atau **Git** → masukkan URL repository
-   - Branch: `main`
+   - Branch: `master`
 
 ---
 
 ## 🔐 Langkah 4 — Konfigurasi Environment Variables
 
-Di service `zaneva-app`, buka tab **"Environment"** dan tambahkan variabel berikut:
+Di service `elyasr-app`, buka tab **"Environment"** dan tambahkan variabel berikut:
 
 ```env
-# Database — gunakan internal hostname dari service zaneva-db
-DATABASE_URL=postgresql://zaneva_user:PASSWORD_ANDA@zaneva-db:5432/zaneva_ops
+# Database — gunakan internal hostname dari service elyasr-db
+DATABASE_URL=postgresql://elyasr_user:PASSWORD_ANDA@elyasr-db:5432/elyasr_ops
 
 # Session Secret — wajib minimal 32 karakter acak
 # Generate dengan: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 SESSION_SECRET=ganti_dengan_random_string_minimal_32_karakter
 
 # Nama Aplikasi
-NEXT_PUBLIC_APP_NAME=Zaneva Business Operation
-
-# URL Publik aplikasi Anda (gunakan domain/subdomain yang Anda atur)
-NEXT_PUBLIC_APP_URL=https://zaneva.domain-anda.com
+NEXT_PUBLIC_APP_NAME=ELYASR Business Operation
 
 # Mode
 NODE_ENV=production
 ```
 
 > ⚠️ **PENTING:**
-> - `DATABASE_URL` menggunakan **internal hostname** EasyPanel (nama service `zaneva-db`), bukan IP publik.
+> - `DATABASE_URL` menggunakan **internal hostname** EasyPanel (nama service `elyasr-db`), bukan IP publik.
 > - `SESSION_SECRET` harus unik dan minimal 32 karakter. **Jangan gunakan nilai default!**
-> - `NEXT_PUBLIC_APP_URL` harus sesuai dengan domain publik yang Anda gunakan.
 
 ### Cara Generate SESSION_SECRET
 
@@ -120,12 +116,12 @@ Salin outputnya dan gunakan sebagai nilai `SESSION_SECRET`.
 
 ## 🔧 Langkah 5 — Konfigurasi Build Arguments
 
-Di service `zaneva-app`, buka tab **"Build"** → bagian **"Build Arguments"** dan tambahkan:
+Di service `elyasr-app`, buka tab **"Build"** → bagian **"Build Arguments"** dan tambahkan:
 
 ```
-DATABASE_URL=postgresql://zaneva_user:PASSWORD_ANDA@zaneva-db:5432/zaneva_ops
+DATABASE_URL=postgresql://elyasr_user:PASSWORD_ANDA@elyasr-db:5432/elyasr_ops
 SESSION_SECRET=random_secret_32_chars_minimum
-NEXT_PUBLIC_APP_NAME=Zaneva Business Operation
+NEXT_PUBLIC_APP_NAME=ELYASR Business Operation
 ```
 
 > Ini diperlukan karena `Dockerfile` menggunakan `ARG` untuk proses build (`prisma generate` & `next build`).
@@ -136,7 +132,7 @@ NEXT_PUBLIC_APP_NAME=Zaneva Business Operation
 
 1. Di service `zaneva-app`, buka tab **"Domains"**
 2. Klik **"Add Domain"**
-3. Masukkan domain/subdomain Anda, contoh: `zaneva.domain-anda.com`
+3. Masukkan domain/subdomain Anda, contoh: `elyasr.domain-anda.com`
 4. Aktifkan **HTTPS / Let's Encrypt** (centang enable SSL)
 5. Pastikan DNS domain sudah mengarah ke IP server EasyPanel
 
@@ -144,7 +140,7 @@ NEXT_PUBLIC_APP_NAME=Zaneva Business Operation
 
 ## 🚢 Langkah 7 — Deploy!
 
-1. Klik tombol **"Deploy"** di service `zaneva-app`
+1. Klik tombol **"Deploy"** di service `elyasr-app`
 2. Pantau log build di tab **"Logs"**
 3. Proses build memakan waktu **3–7 menit** (pertama kali)
 
@@ -153,7 +149,7 @@ NEXT_PUBLIC_APP_NAME=Zaneva Business Operation
 ```
 Stage 1: Install dependencies (npm ci)
 Stage 2: Build aplikasi (prisma generate + next build)
-Stage 3: Jalankan server (prisma db push + node server.js)
+Stage 3: Jalankan server standalone (prisma db push + node server.js)
 ```
 
 ---
@@ -163,14 +159,14 @@ Stage 3: Jalankan server (prisma db push + node server.js)
 Setelah deploy berhasil, akses aplikasi di browser:
 
 ```
-https://zaneva.domain-anda.com
+https://elyasr.domain-anda.com
 ```
 
 ### Login Default
 
 Cek apakah seed database sudah berjalan. Jika perlu seed manual:
 
-1. Buka tab **"Console"** di service `zaneva-app`
+1. Buka tab **"Console"** di service `elyasr-app`
 2. Jalankan:
    ```bash
    node node_modules/prisma/build/index.js db seed
@@ -186,7 +182,7 @@ Setiap kali ada perubahan code:
 # Push ke GitHub
 git add .
 git commit -m "update fitur X"
-git push origin main
+git push origin master
 ```
 
 Lalu di EasyPanel:
@@ -204,7 +200,7 @@ Pastikan **Build Arguments** sudah diisi dengan benar, terutama `DATABASE_URL`.
 
 ### ❌ Aplikasi tidak bisa connect ke database
 
-- Pastikan nama internal hostname di `DATABASE_URL` sama persis dengan nama service database (contoh: `zaneva-db`)
+- Pastikan nama internal hostname di `DATABASE_URL` sama persis dengan nama service database (contoh: `elyasr-db`)
 - Cek apakah service database sedang running
 
 ### ❌ Error "No space left on device"
@@ -231,10 +227,9 @@ Pastikan **Build Arguments** sudah diisi dengan benar, terutama `DATABASE_URL`.
 
 | Variable               | Wajib | Contoh Nilai                                              |
 |------------------------|-------|-----------------------------------------------------------|
-| `DATABASE_URL`         | ✅    | `postgresql://zaneva_user:pass@zaneva-db:5432/zaneva_ops` |
+| `DATABASE_URL`         | ✅    | `postgresql://elyasr_user:pass@elyasr-db:5432/elyasr_ops` |
 | `SESSION_SECRET`       | ✅    | `a3f8...` (32+ karakter hex)                              |
-| `NEXT_PUBLIC_APP_NAME` | ✅    | `Zaneva Business Operation`                               |
-| `NEXT_PUBLIC_APP_URL`  | ✅    | `https://zaneva.domain-anda.com`                          |
+| `NEXT_PUBLIC_APP_NAME` | ✅    | `ELYASR Business Operation`                               |
 | `NODE_ENV`             | ✅    | `production`                                              |
 
 ---
@@ -247,4 +242,4 @@ Pastikan **Build Arguments** sudah diisi dengan benar, terutama `DATABASE_URL`.
 
 ---
 
-*Dokumen ini dibuat untuk project **Zaneva Operations** — versi April 2026*
+*Dokumen ini dibuat untuk project **ELYASR Management System** — versi April 2026*

@@ -1,4 +1,4 @@
-# ELYASR Business Operation System
+# ELYASR Management System
 
 Sistem manajemen operasional bisnis e-commerce multi-platform.
 
@@ -14,14 +14,14 @@ Sistem manajemen operasional bisnis e-commerce multi-platform.
 
 ### 1. Clone & Install
 ```bash
-git clone https://github.com/YOUR_USERNAME/elyasr-ops.git
+git clone https://github.com/rizkyzaneva-sukses/elyasr-ops.git
 cd elyasr-ops
 npm install
 ```
 
 ### 2. Environment
 ```bash
-cp .env.example .env
+copy .env.example .env
 # Edit .env — isi DATABASE_URL dan SESSION_SECRET
 ```
 
@@ -61,8 +61,8 @@ npm run dev
 git init
 git add .
 git commit -m "initial commit"
-git remote add origin https://github.com/YOUR_USERNAME/elyasr-ops.git
-git push -u origin main
+git remote add origin https://github.com/rizkyzaneva-sukses/elyasr-ops.git
+git push -u origin master
 ```
 
 ### Step 3 — Buat App di EasyPanel
@@ -104,9 +104,9 @@ npm run db:seed
 | Role | Akses |
 |------|-------|
 | OWNER | Full access semua fitur |
-| FINANCE | Semua kecuali Owner Room |
-| STAFF | Dashboard (terbatas), Orders, Scan, CRM |
-| EXTERNAL | Hanya halaman stok read-only |
+| FINANCE | Procurement, Finance Room, Inventori internal, CRM, Alerts, Laporan |
+| STAFF | Dashboard (terbatas), Orders, Scan Resi, Inventori operasional, Suggest Revision |
+| EXTERNAL | External Inventory (read-only) |
 
 ---
 
@@ -147,10 +147,15 @@ elyasr-ops/
 │   │   ├── dashboard/     # Dashboard
 │   │   ├── orders/        # Pesanan
 │   │   ├── inventory/     # Stok overview
+│   │   ├── external-inventory/ # Stok read-only untuk EXTERNAL
 │   │   ├── inventory-scan/# Scan IN/OUT
+│   │   ├── procurement/   # Tab PO, vendor, payment, monitoring
 │   │   ├── scan-order/    # Scan resi kirim
 │   │   ├── finance/       # Wallet & ledger
 │   │   ├── master-products/# CRUD produk
+│   │   ├── produk-gabungan/# Mapping SKU gabungan marketplace
+│   │   ├── suggest-revision/# Board masukan & revisi
+│   │   ├── documentation/ # Dokumentasi sistem
 │   │   └── login/         # Halaman login
 │   ├── components/
 │   │   ├── layout/        # Sidebar, AppLayout
@@ -183,8 +188,12 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 - ✅ Barcode/SKU scan dengan beep feedback
 - ✅ Real-time SOH calculation
 - ✅ Procurement & Purchase Orders
+- ✅ Print PO resmi dengan layout tabel adaptif
 - ✅ Wallet & financial ledger
 - ✅ Stock opname
+- ✅ Mapping produk gabungan dari marketplace ke SKU internal
+- ✅ Suggest Revision dengan paste screenshot
+- ✅ External inventory read-only untuk role EXTERNAL
 - ✅ Role-based access control (4 roles)
 - ✅ Audit trail semua aksi penting
 - ✅ Dark mode UI
