@@ -431,23 +431,147 @@ function DetailPOModal({ po, onClose, onDownload, onPrint }: { po: any; onClose:
   )
 }
 
+const PRINT_TWO_COLUMN_THRESHOLD = 18
+
+function getPrintableItemColumns(items: any[]) {
+  if (items.length <= PRINT_TWO_COLUMN_THRESHOLD) return [items]
+  const midpoint = Math.ceil(items.length / 2)
+  return [items.slice(0, midpoint), items.slice(midpoint)]
+}
+
+function PrintablePOContent({ po }: { po: any }) {
+  const items = po.items || []
+  const itemColumns = getPrintableItemColumns(items)
+  const printedAt = new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(new Date())
+
+  return (
+    <div className="po-print-sheet mx-auto w-full max-w-[794px] bg-white text-black shadow-sm">
+      <div className="border border-zinc-300 px-6 py-4 sm:px-8 sm:py-6">
+        <div className="mb-4 flex items-center justify-between text-[10px] text-zinc-600">
+          <span>{printedAt}</span>
+          <span className="font-medium tracking-wide">ELYASR Business Operation</span>
+        </div>
+
+        <h1 className="mb-5 text-center text-2xl font-bold uppercase tracking-[0.2em]">Purchase Order</h1>
+
+        <div className="mb-4 grid grid-cols-2 gap-6 text-[11px] leading-5">
+          <div>
+            <p><span className="font-bold">No. PO:</span> {po.poNumber}</p>
+            <p><span className="font-bold">Tanggal PO:</span> {formatDate(po.poDate)}</p>
+            <p><span className="font-bold">Estimasi Tiba:</span> {po.expectedDate ? formatDate(po.expectedDate) : '-'}</p>
+          </div>
+          <div className="text-right">
+            <p className="font-bold">Kepada Vendor:</p>
+            <p>{po.vendorName}</p>
+            {po.vendor?.kontak && <p>{po.vendor.kontak}</p>}
+          </div>
+        </div>
+
+        <div className={`mb-4 grid gap-3 ${itemColumns.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          {itemColumns.map((columnItems, columnIndex) => {
+            const startNumber = columnIndex === 0 ? 0 : itemColumns[0].length
+            return (
+              <div key={`column-${columnIndex}`} className="po-table-block">
+                <table className="w-full table-fixed border-collapse border border-zinc-800 text-[10px] leading-tight">
+                  <thead>
+                    <tr className="bg-zinc-100">
+                      <th className="w-9 border border-zinc-800 px-1.5 py-1 text-left font-bold">No</th>
+                      <th className="w-20 border border-zinc-800 px-1.5 py-1 text-left font-bold">SKU</th>
+                      <th className="border border-zinc-800 px-1.5 py-1 text-left font-bold">Nama Produk</th>
+                      <th className="w-14 border border-zinc-800 px-1.5 py-1 text-center font-bold">Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {columnItems.map((item: any, itemIndex: number) => (
+                      <tr key={item.id ?? `${item.sku}-${columnIndex}-${itemIndex}`}>
+                        <td className="border border-zinc-300 px-1.5 py-1 align-top">{startNumber + itemIndex + 1}</td>
+                        <td className="border border-zinc-300 px-1.5 py-1 align-top font-mono">{item.sku}</td>
+                        <td className="border border-zinc-300 px-1.5 py-1">{item.productName}</td>
+                        <td className="border border-zinc-300 px-1.5 py-1 text-center font-bold">{item.qtyOrder}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="po-notes-block mb-6">
+          <p className="mb-1 text-[11px] font-bold">Catatan:</p>
+          <div className="min-h-[48px] border border-zinc-300 px-3 py-2 text-[10px] leading-4">
+            {po.note || '-'}
+          </div>
+        </div>
+
+        <div className="po-signature-block grid grid-cols-2 gap-10 px-8 pt-2 text-center text-[11px]">
+          <div>
+            <p className="mb-12 font-bold">Vendor</p>
+            <div className="border-t border-black" />
+          </div>
+          <div>
+            <p className="mb-12 font-bold">Purchasing</p>
+            <div className="border-t border-black" />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PrintPOModal({ po, onClose }: { po: any; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
       <style>{`
+        @page { size: A4 portrait; margin: 10mm; }
         @media print {
+          html, body { background: white !important; }
           body * { visibility: hidden; }
           #printable-po, #printable-po * { visibility: visible; }
-          #printable-po { 
-            position: absolute; left: 0; top: 0; width: 100%; 
-            background: white !important; color: black !important; 
-            padding: 30px; font-family: sans-serif;
+          #printable-po {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: white !important;
+            color: black !important;
+            overflow: visible !important;
+          }
+          .po-print-modal {
+            width: 100% !important;
+            max-width: none !important;
+            max-height: none !important;
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            overflow: visible !important;
+          }
+          .po-print-scroll {
+            overflow: visible !important;
+            padding: 0 !important;
+            background: white !important;
+          }
+          .po-print-sheet {
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+          }
+          .po-table-block,
+          .po-notes-block,
+          .po-signature-block {
+            break-inside: avoid;
+            page-break-inside: avoid;
           }
           .no-print { display: none !important; }
         }
       `}</style>
       
-      <div className="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden relative">
+      <div className="po-print-modal bg-white rounded-xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden relative">
         <div className="flex items-center justify-between px-6 py-4 border-b bg-zinc-50 border-zinc-200 no-print">
           <h2 className="text-base font-bold text-zinc-800">Print Purchase Order</h2>
           <div className="flex gap-2">
@@ -460,60 +584,8 @@ function PrintPOModal({ po, onClose }: { po: any; onClose: () => void }) {
           </div>
         </div>
         
-        <div className="flex-1 overflow-auto p-8 bg-white text-zinc-900" id="printable-po">
-          <h1 className="text-2xl font-bold text-center mb-8 uppercase tracking-widest text-black">Purchase Order</h1>
-          
-          <div className="flex justify-between mb-8">
-            <div className="space-y-1">
-              <p className="text-sm"><span className="font-bold">No. PO:</span> {po.poNumber}</p>
-              <p className="text-sm"><span className="font-bold">Tanggal PO:</span> {formatDate(po.poDate)}</p>
-              <p className="text-sm"><span className="font-bold">Ekspektasi Kedatangan:</span> {po.expectedDate ? formatDate(po.expectedDate) : '-'}</p>
-            </div>
-            <div className="space-y-1 text-right">
-              <p className="text-sm font-bold">Kepada Vendor:</p>
-              <p className="text-sm">{po.vendorName}</p>
-              {po.vendor && <p className="text-sm">{po.vendor.kontak || '-'}</p>}
-            </div>
-          </div>
-
-          <table className="w-full mb-8 border-collapse border border-zinc-800">
-            <thead>
-              <tr className="bg-zinc-100 uppercase p-2 border-b border-zinc-800">
-                <th className="text-left py-2 px-3 text-xs font-bold w-12 border-r border-zinc-800">No</th>
-                <th className="text-left py-2 px-3 text-xs font-bold w-32 border-r border-zinc-800">SKU</th>
-                <th className="text-left py-2 px-3 text-xs font-bold border-r border-zinc-800">Nama Produk</th>
-                <th className="text-center py-2 px-3 text-xs font-bold w-24">Qty Order</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(po.items || []).map((item: any, idx: number) => (
-                <tr key={item.id} className="border-b border-zinc-300">
-                  <td className="py-2 px-3 text-sm border-r border-zinc-300">{idx + 1}</td>
-                  <td className="py-2 px-3 text-sm font-mono border-r border-zinc-300">{item.sku}</td>
-                  <td className="py-2 px-3 text-sm border-r border-zinc-300">{item.productName}</td>
-                  <td className="py-2 px-3 text-sm text-center font-bold">{item.qtyOrder}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div className="mb-12">
-            <p className="text-sm font-bold mb-2">Catatan:</p>
-            <div className="border border-zinc-300 rounded p-4 text-sm min-h-[60px]">
-              {po.note || '-'}
-            </div>
-          </div>
-
-          <div className="flex justify-between px-16 mt-16">
-            <div className="text-center">
-              <p className="text-sm mb-20 font-bold">Vendor</p>
-              <div className="w-32 border-t border-black mx-auto"></div>
-            </div>
-            <div className="text-center">
-              <p className="text-sm mb-20 font-bold">Purchasing</p>
-              <div className="w-32 border-t border-black mx-auto"></div>
-            </div>
-          </div>
+        <div className="po-print-scroll flex-1 overflow-auto bg-zinc-100 p-4 sm:p-6" id="printable-po">
+          <PrintablePOContent po={po} />
         </div>
       </div>
     </div>
