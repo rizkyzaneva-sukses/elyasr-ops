@@ -12,33 +12,40 @@ export async function GET(request: NextRequest) {
   const dateFrom = searchParams.get('dateFrom') || ''
   const dateTo = searchParams.get('dateTo') || ''
   const type = searchParams.get('type') || 'summary'
+  const fromDate = dateFrom ? new Date(dateFrom) : null
+  const toDate = dateTo ? new Date(dateTo) : null
+  if (toDate) toDate.setHours(23, 59, 59, 999)
 
-  const dateFilter = dateFrom && dateTo ? {
-    orderCreatedAt: { gte: dateFrom, lte: dateTo + ' 23:59:59' }
+  const payoutDateFilter = fromDate && toDate ? {
+    payout: {
+      releasedDate: { gte: fromDate, lte: toDate }
+    }
   } : {}
 
   if (type === 'summary') {
-    const [omzetData, payoutData, expenseData, topSkus] = await Promise.all([
-      // Omzet per platform
-      prisma.order.groupBy({
-        by: ['platform'],
+    const [paidOrders, payoutData, expenseData] = await Promise.all([
+      prisma.order.findMany({
         where: {
-          ...dateFilter,
+          ...payoutDateFilter,
           NOT: [
             { status: { contains: 'batal' } },
             { status: { contains: 'Cancel' } },
             { status: { contains: 'Dibatalkan' } },
           ],
         },
-        _sum: { realOmzet: true, hpp: true, qty: true },
-        _count: { id: true },
+        select: {
+          platform: true,
+          sku: true,
+          qty: true,
+          hpp: true,
+          realOmzet: true,
+        },
       }),
-
       // Payout summary
       prisma.payout.aggregate({
-        where: dateFrom ? {
-          releasedDate: { gte: new Date(dateFrom), lte: new Date(dateTo + 'T23:59:59') }
-        } : {},
+        where: fromDate && toDate
+          ? { releasedDate: { gte: fromDate, lte: toDate } }
+          : {},
         _sum: { totalIncome: true, omzet: true, platformFee: true, amsFee: true },
         _count: { id: true },
       }),
@@ -47,33 +54,49 @@ export async function GET(request: NextRequest) {
       prisma.walletLedger.aggregate({
         where: {
           trxType: 'EXPENSE',
-          ...(dateFrom && {
-            trxDate: { gte: new Date(dateFrom), lte: new Date(dateTo + 'T23:59:59') }
+          ...(fromDate && toDate && {
+            trxDate: { gte: fromDate, lte: toDate }
           }),
         },
         _sum: { amount: true },
         _count: { id: true },
       }),
-
-      // Top SKU by omzet
-      prisma.order.groupBy({
-        by: ['sku'],
-        where: {
-          ...dateFilter,
-          sku: { not: null },
-          NOT: [
-            { status: { contains: 'batal' } },
-            { status: { contains: 'Cancel' } },
-          ],
-        },
-        _sum: { realOmzet: true, qty: true },
-        orderBy: { _sum: { realOmzet: 'desc' } },
-        take: 10,
-      }),
     ])
 
-    const totalOmzet = omzetData.reduce((s, p) => s + (p._sum.realOmzet ?? 0), 0)
-    const totalHpp = omzetData.reduce((s, p) => s + (p._sum.hpp ?? 0), 0)
+    const platformMap = new Map<string, { omzet: number; hpp: number; qty: number; orders: number }>()
+    const skuMap = new Map<string, { omzet: number; qty: number }>()
+
+    for (const order of paidOrders) {
+      const platformKey = order.platform || 'Unknown'
+      const qty = order.qty ?? 0
+      const orderHpp = (order.hpp ?? 0) * qty
+
+      const platformAgg = platformMap.get(platformKey) ?? { omzet: 0, hpp: 0, qty: 0, orders: 0 }
+      platformAgg.omzet += order.realOmzet ?? 0
+      platformAgg.hpp += orderHpp
+      platformAgg.qty += qty
+      platformAgg.orders += 1
+      platformMap.set(platformKey, platformAgg)
+
+      if (order.sku) {
+        const skuAgg = skuMap.get(order.sku) ?? { omzet: 0, qty: 0 }
+        skuAgg.omzet += order.realOmzet ?? 0
+        skuAgg.qty += qty
+        skuMap.set(order.sku, skuAgg)
+      }
+    }
+
+    const omzetData = Array.from(platformMap.entries())
+      .map(([platform, value]) => ({ platform, ...value }))
+      .sort((a, b) => b.omzet - a.omzet)
+
+    const topSkus = Array.from(skuMap.entries())
+      .map(([sku, value]) => ({ sku, ...value }))
+      .sort((a, b) => b.omzet - a.omzet)
+      .slice(0, 10)
+
+    const totalOmzet = omzetData.reduce((sum, item) => sum + item.omzet, 0)
+    const totalHpp = omzetData.reduce((sum, item) => sum + item.hpp, 0)
     const totalExpense = Math.abs(expenseData._sum.amount ?? 0)
 
     return apiSuccess({
@@ -81,13 +104,13 @@ export async function GET(request: NextRequest) {
         total: totalOmzet,
         byPlatform: omzetData.map(p => ({
           platform: p.platform,
-          omzet: p._sum.realOmzet ?? 0,
-          hpp: p._sum.hpp ?? 0,
-          qty: p._sum.qty ?? 0,
-          orders: p._count.id,
-          grossProfit: (p._sum.realOmzet ?? 0) - (p._sum.hpp ?? 0),
-          margin: p._sum.realOmzet
-            ? (((p._sum.realOmzet ?? 0) - (p._sum.hpp ?? 0)) / (p._sum.realOmzet ?? 1) * 100).toFixed(1)
+          omzet: p.omzet,
+          hpp: p.hpp,
+          qty: p.qty,
+          orders: p.orders,
+          grossProfit: p.omzet - p.hpp,
+          margin: p.omzet
+            ? (((p.omzet - p.hpp) / p.omzet) * 100).toFixed(1)
             : '0',
         })),
       },
@@ -108,8 +131,8 @@ export async function GET(request: NextRequest) {
       netCashflow: (payoutData._sum.totalIncome ?? 0) - totalExpense,
       topSkus: topSkus.map(s => ({
         sku: s.sku,
-        omzet: s._sum.realOmzet ?? 0,
-        qty: s._sum.qty ?? 0,
+        omzet: s.omzet,
+        qty: s.qty,
       })),
     })
   }
@@ -118,17 +141,18 @@ export async function GET(request: NextRequest) {
   if (type === 'monthly') {
     const monthly = await prisma.$queryRaw<any[]>`
       SELECT
-        TO_CHAR(TO_DATE(SUBSTRING(order_created_at, 1, 10), 'YYYY-MM-DD'), 'YYYY-MM') AS month,
+        TO_CHAR(trx_date, 'YYYY-MM') AS month,
         platform,
         COUNT(*) AS order_count,
         SUM(real_omzet) AS omzet,
-        SUM(hpp) AS hpp
+        SUM(hpp * qty) AS hpp
       FROM orders
-      WHERE status NOT ILIKE '%batal%'
+      WHERE trx_date IS NOT NULL
+        AND status NOT ILIKE '%batal%'
         AND status NOT ILIKE '%cancel%'
         AND status NOT ILIKE '%dibatalkan%'
-        ${dateFrom ? prisma.$queryRaw`AND order_created_at >= ${dateFrom}` : prisma.$queryRaw``}
-        ${dateTo ? prisma.$queryRaw`AND order_created_at <= ${dateTo + ' 23:59:59'}` : prisma.$queryRaw``}
+        ${fromDate ? prisma.$queryRaw`AND trx_date >= ${fromDate}` : prisma.$queryRaw``}
+        ${toDate ? prisma.$queryRaw`AND trx_date <= ${toDate}` : prisma.$queryRaw``}
       GROUP BY month, platform
       ORDER BY month DESC, platform
     `
