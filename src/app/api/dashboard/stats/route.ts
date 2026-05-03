@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     topProvinces,
     topCities,
     omzetByPlatform,
-  ] = await Promise.all([
+  ] = await Promise.all([  // omzetByPlatform sekarang raw SQL (hpp*qty)
 
     // Count orders per status group — gunakan trx_date untuk filter
     gteDate && lteDate
@@ -137,38 +137,71 @@ export async function GET(request: NextRequest) {
       WHERE soh <= rop
     `,
 
-    // Top 5 provinsi order dalam range
-    prisma.order.groupBy({
-      by: ['province'],
-      where: { ...dateFilter, province: { not: null } },
-      _count: { id: true },
-      orderBy: { _count: { id: 'desc' } },
-      take: 5,
-    }),
+    // Semua provinsi order dalam range (tanpa limit)
+    gteDate && lteDate
+      ? prisma.$queryRaw<{ province: string; cnt: bigint }[]>`
+          SELECT province, COUNT(*) AS cnt
+          FROM orders
+          WHERE province IS NOT NULL AND province != ''
+            AND trx_date >= ${gteDate} AND trx_date <= ${lteDate}
+          GROUP BY province
+          ORDER BY cnt DESC
+        `
+      : prisma.$queryRaw<{ province: string; cnt: bigint }[]>`
+          SELECT province, COUNT(*) AS cnt
+          FROM orders
+          WHERE province IS NOT NULL AND province != ''
+          GROUP BY province
+          ORDER BY cnt DESC
+        `,
 
-    // Top 5 kota order dalam range
-    prisma.order.groupBy({
-      by: ['city'],
-      where: { ...dateFilter, city: { not: null } },
-      _count: { id: true },
-      orderBy: { _count: { id: 'desc' } },
-      take: 5,
-    }),
+    // Semua kota order dalam range (tanpa limit)
+    gteDate && lteDate
+      ? prisma.$queryRaw<{ city: string; cnt: bigint }[]>`
+          SELECT city, COUNT(*) AS cnt
+          FROM orders
+          WHERE city IS NOT NULL AND city != ''
+            AND trx_date >= ${gteDate} AND trx_date <= ${lteDate}
+          GROUP BY city
+          ORDER BY cnt DESC
+        `
+      : prisma.$queryRaw<{ city: string; cnt: bigint }[]>`
+          SELECT city, COUNT(*) AS cnt
+          FROM orders
+          WHERE city IS NOT NULL AND city != ''
+          GROUP BY city
+          ORDER BY cnt DESC
+        `,
 
-    // Omzet per platform dalam range
-    prisma.order.groupBy({
-      by: ['platform'],
-      where: {
-        ...dateFilter,
-        NOT: [
-          { status: { contains: 'batal' } },
-          { status: { contains: 'Cancel' } },
-          { status: { contains: 'Dibatalkan' } },
-        ],
-      },
-      _sum: { realOmzet: true, hpp: true },
-      _count: { id: true },
-    }),
+    // Omzet per platform — HPP dihitung hpp * qty (benar!)
+    gteDate && lteDate
+      ? prisma.$queryRaw<{ platform: string; cnt: bigint; total_omzet: bigint; total_hpp: bigint }[]>`
+          SELECT
+            COALESCE(platform, 'Unknown') AS platform,
+            COUNT(*) AS cnt,
+            COALESCE(SUM(real_omzet), 0) AS total_omzet,
+            COALESCE(SUM(hpp * qty), 0) AS total_hpp
+          FROM orders
+          WHERE trx_date >= ${gteDate} AND trx_date <= ${lteDate}
+            AND status NOT ILIKE '%batal%'
+            AND status NOT ILIKE '%cancel%'
+            AND status NOT ILIKE '%dibatalkan%'
+          GROUP BY platform
+          ORDER BY total_omzet DESC
+        `
+      : prisma.$queryRaw<{ platform: string; cnt: bigint; total_omzet: bigint; total_hpp: bigint }[]>`
+          SELECT
+            COALESCE(platform, 'Unknown') AS platform,
+            COUNT(*) AS cnt,
+            COALESCE(SUM(real_omzet), 0) AS total_omzet,
+            COALESCE(SUM(hpp * qty), 0) AS total_hpp
+          FROM orders
+          WHERE status NOT ILIKE '%batal%'
+            AND status NOT ILIKE '%cancel%'
+            AND status NOT ILIKE '%dibatalkan%'
+          GROUP BY platform
+          ORDER BY total_omzet DESC
+        `,
   ])
 
   // ── Format hasil ───────────────────────────────────
@@ -201,15 +234,15 @@ export async function GET(request: NextRequest) {
       total: Object.values(statsMap).reduce((s: number, v: any) => s + v.count, 0),
     },
     omzet: {
-      byPlatform: omzetByPlatform.map(p => ({
+      byPlatform: (omzetByPlatform as any[]).map(p => ({
         platform: p.platform,
-        realOmzet: p._sum.realOmzet ?? 0,
-        hpp: p._sum.hpp ?? 0,
-        count: p._count.id,
-        grossProfit: (p._sum.realOmzet ?? 0) - (p._sum.hpp ?? 0),
+        realOmzet: Number(p.total_omzet),
+        hpp: Number(p.total_hpp),
+        count: Number(p.cnt),
+        grossProfit: Number(p.total_omzet) - Number(p.total_hpp),
       })),
-      total: omzetByPlatform.reduce((s, p) => s + (p._sum.realOmzet ?? 0), 0),
-      totalHpp: omzetByPlatform.reduce((s, p) => s + (p._sum.hpp ?? 0), 0),
+      total: (omzetByPlatform as any[]).reduce((s, p) => s + Number(p.total_omzet), 0),
+      totalHpp: (omzetByPlatform as any[]).reduce((s, p) => s + Number(p.total_hpp), 0),
     },
     aging,
     wallet: {
@@ -229,13 +262,13 @@ export async function GET(request: NextRequest) {
       lowStockCount: Number((lowStockCount as any[])[0]?.cnt ?? 0),
     },
     geo: {
-      topProvinces: topProvinces.map(p => ({
+      topProvinces: (topProvinces as any[]).map(p => ({
         province: p.province,
-        count: p._count.id,
+        count: Number(p.cnt),
       })),
-      topCities: topCities.map(c => ({
+      topCities: (topCities as any[]).map(c => ({
         city: c.city,
-        count: c._count.id,
+        count: Number(c.cnt),
       })),
     },
   })

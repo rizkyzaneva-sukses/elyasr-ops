@@ -350,7 +350,7 @@ export default function DashboardPage() {
             ) : (data?.geo?.topProvinces ?? []).length === 0 ? (
               <p className="text-xs text-zinc-600">Belum ada data</p>
             ) : (
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 max-h-[200px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
                 {(data?.geo?.topProvinces ?? []).map((p: any, i: number) => (
                   <div key={p.province} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -371,7 +371,7 @@ export default function DashboardPage() {
             ) : (data?.geo?.topCities ?? []).length === 0 ? (
               <p className="text-xs text-zinc-600">Belum ada data</p>
             ) : (
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 max-h-[200px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
                 {(data?.geo?.topCities ?? []).map((c: any, i: number) => (
                   <div key={c.city} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
