@@ -26,8 +26,8 @@ export async function GET(request: NextRequest) {
   if (dateParam) {
     targetDate = new Date(dateParam + 'T00:00:00+07:00')
   } else {
+    // Default: hari ini WIB (laporan jam 17:30 untuk data hari berjalan)
     targetDate = new Date(nowWIB)
-    targetDate.setDate(targetDate.getDate() - 1)
   }
 
   const targetStr = targetDate.toISOString().slice(0, 10)
