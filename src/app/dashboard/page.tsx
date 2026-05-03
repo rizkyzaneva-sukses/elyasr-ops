@@ -2,12 +2,12 @@
 
 import { AppLayout } from '@/components/layout/app-layout'
 import { useAuth, usePermission } from '@/components/providers'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { useState } from 'react'
 import {
   TrendingUp, Package, ShoppingCart, AlertTriangle,
-  Wallet, Clock, ArrowUpRight, RefreshCw, Calendar
+  Wallet, Clock, ArrowUpRight, RefreshCw, Calendar, Loader2
 } from 'lucide-react'
 
 // ── Date helpers ───────────────────────────────────────
@@ -134,6 +134,21 @@ export default function DashboardPage() {
 
   const totalAgingBacklog = data?.aging?.reduce((s: number, a: any) => s + a.count, 0) ?? 0
 
+  // Backfill HPP manually
+  const { mutate: doBackfill, isPending: isBackfilling } = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/orders/backfill-hpp', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Gagal sinkron HPP')
+      return json
+    },
+    onSuccess: (res) => {
+      alert(`Berhasil sinkron ${res.updated} order.`)
+      refetch()
+    },
+    onError: (err: any) => alert(err.message),
+  })
+
   // Quick range presets
   const setRange = (preset: string) => {
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
@@ -237,7 +252,14 @@ export default function DashboardPage() {
                 <p className="text-zinc-600 text-[10px] mt-0.5">omzet - HPP</p>
                 {/* Warning jika HPP = 0 (kemungkinan belum di-backfill) */}
                 {data && (data?.omzet?.totalHpp ?? 0) === 0 && (data?.omzet?.total ?? 0) > 0 && (
-                  <p className="text-[10px] text-yellow-500 mt-1">⚠️ HPP = 0, cek backfill</p>
+                  <button
+                    onClick={() => doBackfill()}
+                    disabled={isBackfilling}
+                    className="mt-1.5 flex items-center gap-1.5 text-[10px] text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 px-2 py-1 rounded transition-colors disabled:opacity-50"
+                  >
+                    {isBackfilling ? <Loader2 size={10} className="animate-spin" /> : '⚠️'}
+                    {isBackfilling ? 'Menyinkronkan HPP...' : 'HPP = 0, Klik untuk Sinkron HPP'}
+                  </button>
                 )}
               </div>
               <div className="p-2 rounded-lg border shrink-0 text-blue-400 bg-blue-900/20 border-blue-800/40">
