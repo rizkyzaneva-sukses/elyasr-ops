@@ -178,7 +178,7 @@ export async function GET(request: NextRequest) {
     platforms,
     stokKritis: Number((stokKritis as any[])[0]?.cnt ?? 0),
     aging: {
-      total: Object.values(agingMap).reduce((s, v) => s + v, 0),
+      total: (Object.values(agingMap) as number[]).reduce((s, v) => s + v, 0),
       over48: agingOver48,
       detail: agingMap,
     },
