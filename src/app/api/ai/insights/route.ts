@@ -115,7 +115,7 @@ async function collectPerformanceData() {
   const gp         = totalOmzet - totalHpp
   const margin     = totalOmzet > 0 ? ((gp / totalOmzet) * 100).toFixed(1) : '0'
   const agingMap   = Object.fromEntries((agingBacklog as any[]).map((r: any) => [r.bucket, Number(r.cnt)]))
-  const agingTotal = Object.values(agingMap).reduce((s, v) => s + v, 0)
+  const agingTotal = (Object.values(agingMap) as number[]).reduce((s, v) => s + v, 0)
 
   return {
     nowWIB: nowWIB.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'long' }),
