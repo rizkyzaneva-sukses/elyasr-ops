@@ -850,3 +850,21 @@ model AppSetting {
 
   @@map("app_settings")
 }
+
+// ─────────────────────────────────────────────
+// AI Insights (cache hasil analisis Gemini)
+// ─────────────────────────────────────────────
+model AiInsight {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now()) @map("created_at")
+  generatedBy   String?  @map("generated_by")
+
+  period        String   // e.g. "2026-05" or "2026-05-03"
+  periodType    String   @default("monthly") @map("period_type") // "daily" | "monthly"
+  content       String   // full AI text output
+  modelUsed     String   @default("gemini-1.5-flash") @map("model_used")
+  dataSnapshot  Json?    @map("data_snapshot") // raw numbers used for generation
+
+  @@index([periodType, createdAt])
+  @@map("ai_insights")
+}

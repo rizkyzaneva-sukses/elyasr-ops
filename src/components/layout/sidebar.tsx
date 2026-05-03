@@ -9,7 +9,7 @@ import {
   Package, ScanLine, ClipboardCheck, Building2, Wallet,
   Users, BookOpen, Database, Shield, Download, AlertTriangle,
   Store, TrendingUp, FileText, LogOut, ChevronDown, ChevronRight,
-  Truck, X, Menu, MessageSquarePlus, GitMerge
+  Truck, X, Menu, MessageSquarePlus, GitMerge, Sparkles
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -31,6 +31,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/finance',     label: 'Finance Room', icon: Wallet,  roles: ['OWNER', 'FINANCE'] },
   { href: '/crm', label: 'CRM', icon: Users, roles: ['OWNER', 'FINANCE'] },
   { href: '/alerts', label: 'Alerts', icon: AlertTriangle, roles: ['OWNER', 'FINANCE'] },
+  { href: '/ai-insights', label: 'AI Insights', icon: Sparkles, roles: ['OWNER'] },
   {
     href: '/owner-room',
     label: 'Owner Room',
