@@ -146,7 +146,7 @@ async function collectPerformanceData() {
   }
 }
 
-// ── Build prompt untuk Gemini ──
+// ── Build prompt untuk AI ──
 function buildPrompt(data: ReturnType<typeof collectPerformanceData> extends Promise<infer T> ? T : never) {
   const platformLines = data.byPlatform.map(p =>
     `  - ${p.platform}: ${p.count} order, Omzet ${fmt(p.omzet)}, GP ${fmt(p.gp)} (margin ${p.margin}%)`
@@ -209,33 +209,37 @@ export async function POST(request: NextRequest) {
   if (!session.isLoggedIn) return apiError('Unauthorized', 401)
   if (session.userRole !== 'OWNER') return apiError('Hanya Owner yang bisa generate AI Insights', 403)
 
-  const geminiKey = process.env.GEMINI_API_KEY
-  if (!geminiKey) return apiError('GEMINI_API_KEY belum di-set di environment', 500)
+  const apiKey = process.env.SUMOPOD_API_KEY
+  if (!apiKey) return apiError('SUMOPOD_API_KEY belum di-set di environment', 500)
+
+  const MODEL = 'gpt-4o-mini'
 
   try {
     const data = await collectPerformanceData()
     const prompt = buildPrompt(data)
 
-    // Call Gemini API
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 1500 },
-        }),
-      }
-    )
+    // Call SumoPod API (OpenAI-compatible)
+    const aiRes = await fetch('https://ai.sumopod.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 1500,
+        temperature: 0.7,
+      }),
+    })
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text()
-      return apiError(`Gemini API error: ${errText}`, 500)
+    if (!aiRes.ok) {
+      const errText = await aiRes.text()
+      return apiError(`SumoPod API error: ${errText}`, 500)
     }
 
-    const geminiJson = await geminiRes.json()
-    const content = geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text ?? 'Tidak ada respons dari AI.'
+    const aiJson = await aiRes.json()
+    const content = aiJson?.choices?.[0]?.message?.content ?? 'Tidak ada respons dari AI.'
 
     // Simpan ke DB
     const nowWIB  = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
@@ -245,7 +249,7 @@ export async function POST(request: NextRequest) {
         period,
         periodType: 'monthly',
         content,
-        modelUsed: 'gemini-1.5-flash',
+        modelUsed: MODEL,
         generatedBy: session.username,
         dataSnapshot: data as any,
       },
