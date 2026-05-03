@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
     payoutStats,
     lowStockCount,
     topProvinces,
+    topCities,
     omzetByPlatform,
   ] = await Promise.all([
 
@@ -145,6 +146,15 @@ export async function GET(request: NextRequest) {
       take: 5,
     }),
 
+    // Top 5 kota order dalam range
+    prisma.order.groupBy({
+      by: ['city'],
+      where: { ...dateFilter, city: { not: null } },
+      _count: { id: true },
+      orderBy: { _count: { id: 'desc' } },
+      take: 5,
+    }),
+
     // Omzet per platform dalam range
     prisma.order.groupBy({
       by: ['platform'],
@@ -222,6 +232,10 @@ export async function GET(request: NextRequest) {
       topProvinces: topProvinces.map(p => ({
         province: p.province,
         count: p._count.id,
+      })),
+      topCities: topCities.map(c => ({
+        city: c.city,
+        count: c._count.id,
       })),
     },
   })

@@ -363,6 +363,27 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+
+          <div className="stat-card">
+            <p className="text-sm font-medium text-zinc-300 mb-3">Top Kota</p>
+            {isLoading ? (
+              <div className="space-y-1">{[1,2,3,4,5].map(i => <div key={i} className="h-4 bg-zinc-800 rounded animate-pulse" />)}</div>
+            ) : (data?.geo?.topCities ?? []).length === 0 ? (
+              <p className="text-xs text-zinc-600">Belum ada data</p>
+            ) : (
+              <div className="space-y-1.5">
+                {(data?.geo?.topCities ?? []).map((c: any, i: number) => (
+                  <div key={c.city} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-zinc-700 w-4">{i + 1}</span>
+                      <span className="text-xs text-zinc-400 truncate">{c.city}</span>
+                    </div>
+                    <span className="text-xs font-medium text-zinc-300">{c.count}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </AppLayout>
