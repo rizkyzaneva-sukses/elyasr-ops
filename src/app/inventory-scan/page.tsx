@@ -606,11 +606,31 @@ export default function InventoryScanPage() {
 
       setCommitted(true)
       beep(1)
-      toast({ title: `${items.length} SKU berhasil di-commit ke ledger`, type: 'success' })
+
+      // Toast utama
+      const bs = commitData.data?.bebanSample
+      if (bs) {
+        // Endorsement: tampilkan ringkasan beban sample
+        const nominal = bs.totalAmount > 0
+          ? ` — Beban Sample Rp${bs.totalAmount.toLocaleString('id-ID')} dibukukan ke Finance`
+          : ''
+        toast({
+          title: `${items.length} SKU Endorsement di-commit${nominal}`,
+          type: 'success',
+        })
+        if (bs.warning) {
+          setTimeout(() => toast({ title: `⚠️ ${bs.warning}`, type: 'error' }), 800)
+        }
+      } else {
+        toast({ title: `${items.length} SKU berhasil di-commit ke ledger`, type: 'success' })
+      }
+
       setTimeout(() => {
         setItems([])
         setCommitted(false)
         qc.invalidateQueries({ queryKey: ['inventory'] })
+        qc.invalidateQueries({ queryKey: ['wallets'] })
+        qc.invalidateQueries({ queryKey: ['wallet-ledger'] })
       }, 2000)
     } catch (err: any) {
       toast({ title: err.message || 'Commit gagal', type: 'error' })
