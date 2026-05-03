@@ -103,7 +103,13 @@ export default function AiInsightsPage() {
   const { mutate: generate, isPending: isGenerating } = useMutation({
     mutationFn: async () => {
       const res = await fetch('/api/ai/insights', { method: 'POST' })
-      const json = await res.json()
+      let json;
+      try {
+        json = await res.json()
+      } catch (e) {
+        const text = await res.text().catch(() => '')
+        throw new Error(`Server Error (${res.status}): Terjadi kesalahan sistem. (Response: ${text.slice(0, 50)})`)
+      }
       if (!res.ok) throw new Error(json.error || 'Gagal generate')
       return json.data
     },

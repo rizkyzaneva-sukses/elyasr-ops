@@ -138,7 +138,7 @@ async function collectPerformanceData() {
     topProvinces: (topProvinces as any[]).map(p => ({ province: p.province, count: Number(p.cnt) })),
     payoutBulanIni: {
       count: payoutStats._count.id,
-      totalCair: payoutStats._sum.totalIncome ?? 0,
+      totalCair: Number(payoutStats._sum.totalIncome ?? 0),
     },
     dailyTrend: (dailyTrend as any[]).map(d => ({
       day: d.day, count: Number(d.cnt), omzet: Number(d.omzet),
@@ -238,7 +238,13 @@ export async function POST(request: NextRequest) {
       return apiError(`SumoPod API error: ${errText}`, 500)
     }
 
-    const aiJson = await aiRes.json()
+    const aiText = await aiRes.text()
+    let aiJson;
+    try {
+      aiJson = JSON.parse(aiText)
+    } catch (e: any) {
+      return apiError(`SumoPod API mengembalikan format bukan JSON. Status: ${aiRes.status}. Text: ${aiText.substring(0, 100)}...`, 500)
+    }
     const content = aiJson?.choices?.[0]?.message?.content ?? 'Tidak ada respons dari AI.'
 
     // Simpan ke DB
