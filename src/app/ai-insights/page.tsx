@@ -178,9 +178,11 @@ export default function AiInsightsPage() {
               </button>
               <button
                 onClick={() => generate()}
-                className="flex-1 py-2 rounded-lg bg-purple-700 hover:bg-purple-600 text-white text-sm font-medium transition-colors"
+                disabled={isGenerating}
+                className="flex-1 py-2 rounded-lg bg-purple-700 hover:bg-purple-600 disabled:opacity-50 text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
               >
-                Ya, Analisis
+                {isGenerating ? <Loader2 size={14} className="animate-spin" /> : null}
+                {isGenerating ? 'Memproses...' : 'Ya, Analisis'}
               </button>
             </div>
           </div>
