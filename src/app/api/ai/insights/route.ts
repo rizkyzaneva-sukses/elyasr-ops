@@ -66,7 +66,7 @@ async function collectPerformanceData() {
 
     // Stok kritis
     prisma.$queryRaw<{ cnt: bigint; skus: string }[]>`
-      SELECT COUNT(*) AS cnt, STRING_AGG(sku, ', ' ORDER BY sku LIMIT 10) AS skus
+      SELECT COUNT(*) AS cnt, STRING_AGG(sku, ', ') AS skus
       FROM (
         SELECT p.sku,
           p.stok_awal
@@ -212,7 +212,7 @@ export async function POST(request: NextRequest) {
   const apiKey = process.env.SUMOPOD_API_KEY
   if (!apiKey) return apiError('SUMOPOD_API_KEY belum di-set di environment', 500)
 
-  const MODEL = 'gpt-4o-mini'
+  const MODEL = 'MiniMax-M2.7-highspeed'
 
   try {
     const data = await collectPerformanceData()
