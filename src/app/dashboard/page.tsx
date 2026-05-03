@@ -140,6 +140,10 @@ export default function DashboardPage() {
     const today = now.toISOString().slice(0, 10)
     if (preset === 'today') {
       setDateFrom(today); setDateTo(today)
+    } else if (preset === 'yesterday') {
+      const yday = new Date(now); yday.setDate(yday.getDate() - 1)
+      const y = yday.toISOString().slice(0, 10)
+      setDateFrom(y); setDateTo(y)
     } else if (preset === 'week') {
       const mon = new Date(now); mon.setDate(now.getDate() - now.getDay() + 1)
       setDateFrom(mon.toISOString().slice(0, 10)); setDateTo(today)
@@ -186,11 +190,12 @@ export default function DashboardPage() {
             className="bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
           />
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-1 flex-wrap">
           {[
-            { key: 'today', label: 'Hari ini' },
-            { key: 'week', label: 'Minggu ini' },
-            { key: 'month', label: 'Bulan ini' },
+            { key: 'today',     label: 'Hari ini' },
+            { key: 'yesterday', label: 'Kemarin' },
+            { key: 'week',      label: 'Minggu ini' },
+            { key: 'month',     label: 'Bulan ini' },
             { key: 'lastmonth', label: 'Bulan lalu' },
           ].map(p => (
             <button
@@ -210,29 +215,40 @@ export default function DashboardPage() {
         <StatCard
           label="Real Omzet"
           value={formatRupiah(data?.omzet?.total ?? 0, true)}
-          sub={`${data?.orders?.terkirim ?? 0} order terkirim`}
+          sub={`${(data?.orders?.terkirim ?? 0) + (data?.orders?.perluDikirim ?? 0)} order (non-batal)`}
           icon={TrendingUp}
           color="emerald"
         />
         <StatCard
           label="Perlu Dikirim"
-          value={String(totalAgingBacklog)}
+          value={String(data?.orders?.perluDikirim ?? 0)}
           sub="order pending kirim"
           icon={Clock}
           color="yellow"
         />
         {!isStaffOnly ? (
-          <StatCard
-            label="Gross Profit"
-            value={formatRupiah((data?.omzet?.total ?? 0) - (data?.omzet?.totalHpp ?? 0), true)}
-            sub="omzet - HPP"
-            icon={ArrowUpRight}
-            color="blue"
-          />
+          <div className="stat-card relative">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-zinc-500 text-xs mb-1">Gross Profit</p>
+                <p className="text-xl font-bold text-white truncate">
+                  {formatRupiah((data?.omzet?.total ?? 0) - (data?.omzet?.totalHpp ?? 0), true)}
+                </p>
+                <p className="text-zinc-600 text-[10px] mt-0.5">omzet - HPP</p>
+                {/* Warning jika HPP = 0 (kemungkinan belum di-backfill) */}
+                {data && (data?.omzet?.totalHpp ?? 0) === 0 && (data?.omzet?.total ?? 0) > 0 && (
+                  <p className="text-[10px] text-yellow-500 mt-1">⚠️ HPP = 0, cek backfill</p>
+                )}
+              </div>
+              <div className="p-2 rounded-lg border shrink-0 text-blue-400 bg-blue-900/20 border-blue-800/40">
+                <ArrowUpRight size={16} />
+              </div>
+            </div>
+          </div>
         ) : (
           <StatCard
             label="Total Order"
-            value={String((data?.orders?.terkirim ?? 0) + totalAgingBacklog)}
+            value={String((data?.orders?.terkirim ?? 0) + (data?.orders?.perluDikirim ?? 0))}
             sub="terkirim + pending"
             icon={ShoppingCart}
             color="blue"
