@@ -212,7 +212,7 @@ export async function POST(request: NextRequest) {
   const apiKey = process.env.SUMOPOD_API_KEY
   if (!apiKey) return apiError('SUMOPOD_API_KEY belum di-set di environment', 500)
 
-  const MODEL = 'MiniMax-M2.7-highspeed'
+  const MODEL = 'gpt-4o-mini'
 
   try {
     const data = await collectPerformanceData()
