@@ -21,13 +21,10 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $vars.ELYASR_APP_URL }}/api/report/daily",
+        "url": "https://operation-ops.jva2rz.easypanel.host/api/report/daily",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": []
-        },
+        "sendQuery": false,
         "options": {}
       },
       "credentials": {
@@ -44,7 +41,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Format angka ke Rupiah\nfunction fmt(n) {\n  return new Intl.NumberFormat('id-ID', {\n    style: 'currency',\n    currency: 'IDR',\n    maximumFractionDigits: 0\n  }).format(n);\n}\n\n// Format perubahan vs hari sebelumnya\nfunction fmtDiff(val, pct) {\n  if (val === null || val === undefined) return '—';\n  const arrow = val >= 0 ? '↑' : '↓';\n  const sign  = val >= 0 ? '+' : '';\n  const pctStr = pct !== null ? ` (${sign}${pct}%)` : '';\n  return `${arrow} ${sign}${fmt(Math.abs(val))}${pctStr}`;\n}\n\nconst d = $input.item.json.data;\nconst s = d.summary;\nconst c = d.comparison;\n\n// Baris platform\nconst platformLines = d.platforms\n  .map(p => `├ ${p.platform.padEnd(8)} : ${fmt(p.omzet)} (${p.count} order)`)\n  .join('\\n');\n\n// Aging backlog\nconst aging = d.aging;\nconst agingStr = Object.entries(aging.detail || {})\n  .map(([k, v]) => `├ ${k}: ${v}`)\n  .join('\\n');\n\n// Tanggal dalam format Indonesia\nconst tgl = new Date(d.date + 'T00:00:00+07:00').toLocaleDateString('id-ID', {\n  weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'\n});\n\nconst margin = s.omzet > 0 ? ((s.grossProfit / s.omzet) * 100).toFixed(1) : '0';\n\n// Build pesan Telegram\nconst msg = [\n  `📊 *LAPORAN HARIAN ELYASR*`,\n  `${tgl} — 07.00 WIB`,\n  ``,\n  `💰 *OMZET & PROFIT*`,\n  `├ Real Omzet    : ${fmt(s.omzet)}`,\n  `├ HPP Total     : ${fmt(s.hpp)}`,\n  `└ Gross Profit  : ${fmt(s.grossProfit)} *(${margin}%)*`,\n  ``,\n  `📦 *ORDER*`,\n  `├ Total Masuk   : ${s.totalOrder} order`,\n  `├ Terkirim      : ${s.terkirim} order`,\n  `├ Pending Kirim : ${s.perluKirim} order`,\n  `└ Dibatalkan    : ${s.batal} order`,\n  ``,\n  `🏪 *PER PLATFORM*`,\n  platformLines,\n  ``,\n  `⏰ *AGING BACKLOG (semua pending)*`,\n  agingStr || `Tidak ada`,\n  ``,\n  `🔥 *STOK KRITIS*: ${d.stokKritis} SKU perlu restock`,\n  ``,\n  `📈 *VS KEMARIN*`,\n  `├ Omzet  : ${fmtDiff(c.omzetDiff, c.omzetDiffPct)}`,\n  `└ Order  : ${c.orderCountDiff >= 0 ? '↑' : '↓'} ${Math.abs(c.orderCountDiff)} order`,\n].join('\\n');\n\nreturn [{ json: { message: msg } }];"
+        "jsCode": "// Format angka ke Rupiah\nfunction fmt(n) {\n  return new Intl.NumberFormat('id-ID', {\n    style: 'currency',\n    currency: 'IDR',\n    maximumFractionDigits: 0\n  }).format(n);\n}\n\nfunction fmtDiff(val, pct) {\n  if (val === null || val === undefined) return '—';\n  const arrow = val >= 0 ? '↑' : '↓';\n  const sign  = val >= 0 ? '+' : '';\n  const pctStr = pct !== null ? ` (${sign}${pct}%)` : '';\n  return `${arrow} ${sign}${fmt(Math.abs(val))}${pctStr}`;\n}\n\nconst d = $input.item.json.data;\nconst s = d.summary;\nconst c = d.comparison;\n\nconst platformLines = d.platforms\n  .map(p => `├ ${p.platform.padEnd(8)} : ${fmt(p.omzet)} (${p.count} order)`)\n  .join('\\n');\n\nconst aging = d.aging;\nconst agingStr = Object.entries(aging.detail || {})\n  .map(([k, v]) => `├ ${k}: ${v}`)\n  .join('\\n');\n\nconst tgl = new Date(d.date + 'T00:00:00+07:00').toLocaleDateString('id-ID', {\n  weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'\n});\n\nconst margin = s.omzet > 0 ? ((s.grossProfit / s.omzet) * 100).toFixed(1) : '0';\n\nconst msg = [\n  `📊 *LAPORAN HARIAN ELYASR*`,\n  `${tgl} — 07.00 WIB`,\n  ``,\n  `💰 *OMZET & PROFIT*`,\n  `├ Real Omzet    : ${fmt(s.omzet)}`,\n  `├ HPP Total     : ${fmt(s.hpp)}`,\n  `└ Gross Profit  : ${fmt(s.grossProfit)} *(${margin}%)*`,\n  ``,\n  `📦 *ORDER*`,\n  `├ Total Masuk   : ${s.totalOrder} order`,\n  `├ Terkirim      : ${s.terkirim} order`,\n  `├ Pending Kirim : ${s.perluKirim} order`,\n  `└ Dibatalkan    : ${s.batal} order`,\n  ``,\n  `🏪 *PER PLATFORM*`,\n  platformLines,\n  ``,\n  `⏰ *AGING BACKLOG*`,\n  agingStr || `Tidak ada`,\n  ``,\n  `🔥 *STOK KRITIS*: ${d.stokKritis} SKU perlu restock`,\n  ``,\n  `📈 *VS KEMARIN*`,\n  `├ Omzet  : ${fmtDiff(c.omzetDiff, c.omzetDiffPct)}`,\n  `└ Order  : ${c.orderCountDiff >= 0 ? '↑' : '↓'} ${Math.abs(c.orderCountDiff)} order`,\n].join('\\n');\n\nreturn [{ json: { message: msg } }];"
       },
       "id": "format-message",
       "name": "Format Pesan Telegram",
@@ -54,7 +51,7 @@
     },
     {
       "parameters": {
-        "chatId": "={{ $vars.TELEGRAM_CHAT_ID }}",
+        "chatId": "GANTI_DENGAN_CHAT_ID_TELEGRAM_KAMU",
         "text": "={{ $json.message }}",
         "additionalFields": {
           "parse_mode": "Markdown"
@@ -84,12 +81,7 @@
       "main": [[{ "node": "Kirim ke Telegram", "type": "main", "index": 0 }]]
     }
   },
-  "settings": {
-    "executionOrder": "v1"
-  },
+  "settings": { "executionOrder": "v1" },
   "staticData": null,
-  "tags": ["elyasr", "report", "telegram"],
-  "meta": {
-    "instanceId": "elyasr-ops"
-  }
+  "tags": ["elyasr", "report", "telegram"]
 }
