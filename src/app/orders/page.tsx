@@ -285,6 +285,9 @@ export default function OrdersPage() {
         toast({ title: json.data.message, type: 'success' })
         qc.invalidateQueries({ queryKey: ['orders'] })
         setShowPreview(false)
+
+        // Auto backfill HPP di background setelah import berhasil
+        fetch('/api/orders/backfill-hpp', { method: 'POST' }).catch(() => {})
       } else {
         toast({ title: json.error || 'Import gagal', type: 'error' })
       }
