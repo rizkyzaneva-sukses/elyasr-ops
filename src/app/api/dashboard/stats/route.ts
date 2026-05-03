@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
     topProvinces,
     topCities,
     omzetByPlatform,
+    marketingCosts,
   ] = await Promise.all([  // omzetByPlatform sekarang raw SQL (hpp*qty)
 
     // Count orders per status group — gunakan trx_date untuk filter
@@ -202,6 +203,36 @@ export async function GET(request: NextRequest) {
           GROUP BY platform
           ORDER BY total_omzet DESC
         `,
+
+    // Marketing Costs (Ads & Sample)
+    gteDate && lteDate
+      ? prisma.$queryRaw<{ category: string; amount: bigint }[]>`
+          SELECT category, SUM(ABS(amount)) as amount
+          FROM wallet_ledger
+          WHERE trx_date >= ${gteDate} AND trx_date <= ${lteDate}
+            AND trx_type = 'EXPENSE'
+            AND category IS NOT NULL
+            AND (
+              category ILIKE '%iklan%'
+              OR category ILIKE '%ads%'
+              OR category ILIKE '%sample%'
+              OR category ILIKE '%ongkir sample%'
+            )
+          GROUP BY category
+        `
+      : prisma.$queryRaw<{ category: string; amount: bigint }[]>`
+          SELECT category, SUM(ABS(amount)) as amount
+          FROM wallet_ledger
+          WHERE trx_type = 'EXPENSE'
+            AND category IS NOT NULL
+            AND (
+              category ILIKE '%iklan%'
+              OR category ILIKE '%ads%'
+              OR category ILIKE '%sample%'
+              OR category ILIKE '%ongkir sample%'
+            )
+          GROUP BY category
+        `,
   ])
 
   // ── Format hasil ───────────────────────────────────
@@ -234,15 +265,34 @@ export async function GET(request: NextRequest) {
       total: Object.values(statsMap).reduce((s: number, v: any) => s + v.count, 0),
     },
     omzet: {
-      byPlatform: (omzetByPlatform as any[]).map(p => ({
-        platform: p.platform,
-        realOmzet: Number(p.total_omzet),
-        hpp: Number(p.total_hpp),
-        count: Number(p.cnt),
-        grossProfit: Number(p.total_omzet) - Number(p.total_hpp),
-      })),
+      byPlatform: (omzetByPlatform as any[]).map(p => {
+        // Calculate ROAS for this platform
+        const platformName = (p.platform || '').toLowerCase()
+        const adSpend = (marketingCosts as any[]).reduce((sum, cost) => {
+          const cat = (cost.category || '').toLowerCase()
+          // Only add costs that match this platform's name
+          if (cat.includes(platformName)) {
+            return sum + Number(cost.amount)
+          }
+          return sum
+        }, 0)
+
+        const omzet = Number(p.total_omzet)
+        const hpp = Number(p.total_hpp)
+
+        return {
+          platform: p.platform,
+          realOmzet: omzet,
+          hpp: hpp,
+          count: Number(p.cnt),
+          grossProfit: omzet - hpp,
+          adSpend,
+          roas: adSpend > 0 ? (omzet / adSpend).toFixed(1) : '0',
+        }
+      }),
       total: (omzetByPlatform as any[]).reduce((s, p) => s + Number(p.total_omzet), 0),
       totalHpp: (omzetByPlatform as any[]).reduce((s, p) => s + Number(p.total_hpp), 0),
+      totalAdSpend: (marketingCosts as any[]).reduce((s, c) => s + Number(c.amount), 0),
     },
     aging,
     wallet: {

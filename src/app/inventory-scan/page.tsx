@@ -7,11 +7,12 @@ import { useToast } from '@/components/ui/toaster'
 import { ScanLine, Plus, Minus, CheckCircle, Trash2, Upload, Search, X, AlertCircle } from 'lucide-react'
 import Papa from 'papaparse'
 
-type TabKey = 'masuk' | 'keluar' | 'retur' | 'retur_pembelian'
+type TabKey = 'masuk' | 'keluar' | 'endorsement' | 'retur' | 'retur_pembelian'
 
-const SCAN_TABS: { key: TabKey; label: string; direction: 'IN' | 'OUT'; reason: string }[] = [
+const SCAN_TABS: { key: TabKey; label: string; direction: 'IN' | 'OUT'; reason: string; badge?: string }[] = [
   { key: 'masuk',   label: 'Scan Masuk',   direction: 'IN',  reason: 'PURCHASE' },
   { key: 'keluar',  label: 'Scan Keluar',  direction: 'OUT', reason: 'SALES' },
+  { key: 'endorsement', label: 'Endorsement', direction: 'OUT', reason: 'MARKETING', badge: 'Beban Sample' },
   { key: 'retur',   label: 'Scan Retur',   direction: 'IN',  reason: 'RETURN_SALES' },
   { key: 'retur_pembelian', label: 'Retur Pembelian', direction: 'OUT', reason: 'RETURN_PURCHASE' }
 ]
@@ -628,6 +629,8 @@ export default function InventoryScanPage() {
     setTimeout(() => skuRef.current?.focus(), 100)
   }
 
+  const isEndorsement = activeTab === 'endorsement'
+
   useEffect(() => { skuRef.current?.focus() }, [])
 
   const totalItems = items.reduce((s, i) => s + i.qty, 0)
@@ -642,18 +645,23 @@ export default function InventoryScanPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 mb-6 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit flex-wrap">
         {SCAN_TABS.map(t => (
           <button
             key={t.key}
             onClick={() => switchTab(t.key)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeTab === t.key
-                ? 'bg-emerald-700 text-white'
+                ? t.key === 'endorsement' ? 'bg-orange-700 text-white' : 'bg-emerald-700 text-white'
                 : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
             {t.label}
+            {t.badge && (
+              <span className="ml-1.5 text-[9px] bg-orange-500/20 text-orange-300 border border-orange-600/40 px-1 py-0.5 rounded">
+                {t.badge}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -665,10 +673,19 @@ export default function InventoryScanPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Input panel */}
           <div className="space-y-4">
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-              <p className="text-sm font-medium text-zinc-400 mb-3">
-                {tab.direction === 'IN' ? '📥' : '📤'} {tab.label}
-              </p>
+            <div className={`bg-zinc-900 border rounded-xl p-5 ${
+              isEndorsement ? 'border-orange-800/60' : 'border-zinc-800'
+            }`}>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-medium text-zinc-400">
+                  {tab.direction === 'IN' ? '📥' : isEndorsement ? '🎁' : '📤'} {tab.label}
+                </p>
+                {isEndorsement && (
+                  <span className="text-[10px] bg-orange-900/30 text-orange-300 border border-orange-700/50 px-2 py-1 rounded-lg">
+                    ⚡ Stok keluar → Beban Sample
+                  </span>
+                )}
+              </div>
 
               {/* Pilihan Form Input */}
               {activeTab === 'retur_pembelian' ? (

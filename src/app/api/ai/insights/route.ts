@@ -9,20 +9,34 @@ function fmt(n: number) {
 }
 
 // ── Kumpulkan data performa untuk dikirim ke Gemini ──
-async function collectPerformanceData() {
+async function collectPerformanceData(periodType: 'monthly' | 'weekly' = 'monthly') {
   const nowWIB = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
 
-  // 30 hari terakhir
-  const last30Start = new Date(nowWIB)
-  last30Start.setDate(last30Start.getDate() - 30)
-  const gte30 = new Date(last30Start.toISOString().slice(0, 10) + 'T00:00:00+07:00')
-  const lte30 = new Date(nowWIB.toISOString().slice(0, 10) + 'T23:59:59+07:00')
+  let gteDate: Date;
+  let lteDate = new Date(nowWIB.toISOString().slice(0, 10) + 'T23:59:59+07:00');
+  let periodLabel = '30 Hari Terakhir';
+
+  if (periodType === 'weekly') {
+    // Mingguan (Senin - saat ini)
+    const day = nowWIB.getDay();
+    const diff = nowWIB.getDate() - day + (day === 0 ? -6 : 1); // Senin
+    const monday = new Date(nowWIB.setDate(diff));
+    gteDate = new Date(monday.toISOString().slice(0, 10) + 'T00:00:00+07:00');
+    periodLabel = 'Minggu Ini (Senin - Sekarang)';
+    // Reset nowWIB back
+    nowWIB.setTime(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }) as any ? new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' })).getTime() : 0);
+  } else {
+    // 30 hari terakhir
+    const last30Start = new Date(nowWIB);
+    last30Start.setDate(last30Start.getDate() - 30);
+    gteDate = new Date(last30Start.toISOString().slice(0, 10) + 'T00:00:00+07:00');
+  }
 
   // Bulan ini
   const monthStart = new Date(nowWIB.getFullYear(), nowWIB.getMonth(), 1)
   const gteMonth   = new Date(monthStart.toISOString().slice(0, 10) + 'T00:00:00+07:00')
 
-  const [omzet30, omzetByPlatform, agingBacklog, stokKritis, topProvinces, payoutStats, dailyTrend] = await Promise.all([
+  const [omzetStats, omzetByPlatform, agingBacklog, stokKritis, topProvinces, payoutStats, dailyTrend, marketingCosts] = await Promise.all([
 
     // Omzet & GP 30 hari
     prisma.$queryRaw<{ total_omzet: bigint; total_hpp: bigint; cnt: bigint }[]>`
@@ -31,7 +45,7 @@ async function collectPerformanceData() {
         COALESCE(SUM(hpp * qty), 0) AS total_hpp,
         COUNT(*) AS cnt
       FROM orders
-      WHERE trx_date >= ${gte30} AND trx_date <= ${lte30}
+      WHERE trx_date >= ${gteDate} AND trx_date <= ${lteDate}
         AND status NOT ILIKE '%batal%' AND status NOT ILIKE '%cancel%' AND status NOT ILIKE '%dibatalkan%'
     `,
 
@@ -43,7 +57,7 @@ async function collectPerformanceData() {
         COALESCE(SUM(real_omzet), 0) AS total_omzet,
         COALESCE(SUM(hpp * qty), 0) AS total_hpp
       FROM orders
-      WHERE trx_date >= ${gte30} AND trx_date <= ${lte30}
+      WHERE trx_date >= ${gteDate} AND trx_date <= ${lteDate}
         AND status NOT ILIKE '%batal%' AND status NOT ILIKE '%cancel%' AND status NOT ILIKE '%dibatalkan%'
       GROUP BY platform ORDER BY total_omzet DESC
     `,
@@ -84,7 +98,7 @@ async function collectPerformanceData() {
     prisma.$queryRaw<{ province: string; cnt: bigint }[]>`
       SELECT province, COUNT(*) AS cnt
       FROM orders
-      WHERE province IS NOT NULL AND trx_date >= ${gte30} AND trx_date <= ${lte30}
+      WHERE province IS NOT NULL AND trx_date >= ${gteDate} AND trx_date <= ${lteDate}
       GROUP BY province ORDER BY cnt DESC LIMIT 5
     `,
 
@@ -106,33 +120,66 @@ async function collectPerformanceData() {
         AND status NOT ILIKE '%batal%' AND status NOT ILIKE '%cancel%' AND status NOT ILIKE '%dibatalkan%'
       GROUP BY day ORDER BY day
     `,
+
+    // Marketing Costs (Ads & Sample)
+    prisma.$queryRaw<{ category: string; amount: bigint }[]>`
+      SELECT category, SUM(ABS(amount)) as amount
+      FROM wallet_ledger
+      WHERE trx_date >= ${gteDate} AND trx_date <= ${lteDate}
+        AND trx_type = 'EXPENSE'
+        AND category IS NOT NULL
+        AND (
+          category ILIKE '%iklan%'
+          OR category ILIKE '%ads%'
+          OR category ILIKE '%sample%'
+          OR category ILIKE '%ongkir sample%'
+        )
+      GROUP BY category
+    `,
   ])
 
-  const o30 = (omzet30 as any[])[0]
-  const totalOmzet = Number(o30?.total_omzet ?? 0)
-  const totalHpp   = Number(o30?.total_hpp ?? 0)
-  const totalOrder = Number(o30?.cnt ?? 0)
+  const oStats = (omzetStats as any[])[0]
+  const totalOmzet = Number(oStats?.total_omzet ?? 0)
+  const totalHpp   = Number(oStats?.total_hpp ?? 0)
+  const totalOrder = Number(oStats?.cnt ?? 0)
   const gp         = totalOmzet - totalHpp
   const margin     = totalOmzet > 0 ? ((gp / totalOmzet) * 100).toFixed(1) : '0'
   const agingMap   = Object.fromEntries((agingBacklog as any[]).map((r: any) => [r.bucket, Number(r.cnt)]))
   const agingTotal = (Object.values(agingMap) as number[]).reduce((s, v) => s + v, 0)
+  const durationDays = periodType === 'weekly' ? Math.max(1, (lteDate.getTime() - gteDate.getTime()) / (1000 * 3600 * 24)) : 30;
 
   return {
     nowWIB: nowWIB.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'long' }),
-    omzet30: totalOmzet,
-    hpp30: totalHpp,
-    gp30: gp,
-    margin30: margin,
-    orderCount30: totalOrder,
-    avgOrderPerDay: totalOrder > 0 ? (totalOrder / 30).toFixed(1) : '0',
-    byPlatform: (omzetByPlatform as any[]).map(p => ({
-      platform: p.platform,
-      count: Number(p.cnt),
-      omzet: Number(p.total_omzet),
-      gp: Number(p.total_omzet) - Number(p.total_hpp),
-      margin: Number(p.total_omzet) > 0
-        ? (((Number(p.total_omzet) - Number(p.total_hpp)) / Number(p.total_omzet)) * 100).toFixed(1) : '0',
-    })),
+    periodLabel,
+    omzetTotal: totalOmzet,
+    hppTotal: totalHpp,
+    gpTotal: gp,
+    marginTotal: margin,
+    orderCountTotal: totalOrder,
+    avgOrderPerDay: totalOrder > 0 ? (totalOrder / durationDays).toFixed(1) : '0',
+    byPlatform: (omzetByPlatform as any[]).map(p => {
+      const platformName = (p.platform || '').toLowerCase()
+      const adSpend = (marketingCosts as any[]).reduce((sum, cost) => {
+        const cat = (cost.category || '').toLowerCase()
+        if (cat.includes(platformName)) {
+          return sum + Number(cost.amount)
+        }
+        return sum
+      }, 0)
+      const omzet = Number(p.total_omzet)
+      const hpp = Number(p.total_hpp)
+      const roas = adSpend > 0 ? (omzet / adSpend).toFixed(1) : '0'
+
+      return {
+        platform: p.platform,
+        count: Number(p.cnt),
+        omzet: omzet,
+        gp: omzet - hpp,
+        margin: omzet > 0 ? (((omzet - hpp) / omzet) * 100).toFixed(1) : '0',
+        adSpend,
+        roas
+      }
+    }),
     agingBacklog: { total: agingTotal, ...agingMap },
     stokKritis: Number((stokKritis as any[])[0]?.cnt ?? 0),
     topProvinces: (topProvinces as any[]).map(p => ({ province: p.province, count: Number(p.cnt) })),
@@ -149,7 +196,7 @@ async function collectPerformanceData() {
 // ── Build prompt untuk AI ──
 function buildPrompt(data: ReturnType<typeof collectPerformanceData> extends Promise<infer T> ? T : never) {
   const platformLines = data.byPlatform.map(p =>
-    `  - ${p.platform}: ${p.count} order, Omzet ${fmt(p.omzet)}, GP ${fmt(p.gp)} (margin ${p.margin}%)`
+    `  - ${p.platform}: ${p.count} order, Omzet ${fmt(p.omzet)}, GP ${fmt(p.gp)} (margin ${p.margin}%)${p.adSpend > 0 ? `, Ad Spend ${fmt(p.adSpend)}, ROAS: ${p.roas}x` : ''}`
   ).join('\n')
 
   const provinceLines = data.topProvinces.map((p, i) =>
@@ -163,14 +210,14 @@ function buildPrompt(data: ReturnType<typeof collectPerformanceData> extends Pro
   return `Kamu adalah analis bisnis senior yang memahami e-commerce Indonesia.
 Berikut data performa toko Elyasr per ${data.nowWIB}:
 
-## DATA 30 HARI TERAKHIR
-- Total Omzet    : ${fmt(data.omzet30)}
-- Total HPP      : ${fmt(data.hpp30)}
-- Gross Profit   : ${fmt(data.gp30)} (margin ${data.margin30}%)
-- Total Order    : ${data.orderCount30} order
+## DATA PERIODE: ${data.periodLabel}
+- Total Omzet    : ${fmt(data.omzetTotal)}
+- Total HPP      : ${fmt(data.hppTotal)}
+- Gross Profit   : ${fmt(data.gpTotal)} (margin ${data.marginTotal}%)
+- Total Order    : ${data.orderCountTotal} order
 - Rata-rata/hari : ${data.avgOrderPerDay} order/hari
 
-## PER PLATFORM
+## PER PLATFORM (Omzet & ROAS)
 ${platformLines}
 
 ## AGING BACKLOG (order belum dikirim saat ini)
@@ -195,9 +242,9 @@ ${dailyLines}
 ---
 Berdasarkan data di atas, buatlah laporan analisis bisnis yang:
 1. Dimulai dengan RINGKASAN EKSEKUTIF (2-3 kalimat padat tentang kondisi bisnis saat ini)
-2. Lanjutkan dengan bagian ⚠️ PERHATIAN & RISIKO (poin-poin yang perlu segera ditangani, max 5 poin)
-3. Lanjutkan dengan bagian ✅ REKOMENDASI AKSI (saran konkret dan actionable, max 5 poin, urutkan dari yang paling mendesak)
-4. Akhiri dengan bagian 💡 PELUANG & INSIGHT (hal menarik dari data yang bisa dimanfaatkan)
+2. Lanjutkan dengan bagian ⚠️ PERHATIAN & RISIKO (poin-poin yang perlu segera ditangani, perhatikan jika ada budget leakage/kebocoran pada ROAS ads, max 5 poin)
+3. Lanjutkan dengan bagian ✅ REKOMENDASI AKSI (saran konkret dan actionable untuk operasional dan efisiensi marketing, max 5 poin, urutkan dari yang paling mendesak)
+4. Akhiri dengan bagian 💡 PELUANG & INSIGHT (hal menarik dari data yang bisa dimanfaatkan, misal platform dengan efisiensi ROAS terbaik)
 
 Format output: gunakan emoji, poin-poin jelas, bahasa Indonesia yang natural tapi profesional.
 Jangan terlalu panjang — Owner ingin baca cepat di handphone.`
@@ -215,7 +262,8 @@ export async function POST(request: NextRequest) {
   const MODEL = 'gpt-4o-mini'
 
   try {
-    const data = await collectPerformanceData()
+    const periodType = (request.nextUrl.searchParams.get('type') || 'monthly') as 'monthly' | 'weekly'
+    const data = await collectPerformanceData(periodType)
     const prompt = buildPrompt(data)
 
     // Call SumoPod API (OpenAI-compatible)
@@ -253,7 +301,7 @@ export async function POST(request: NextRequest) {
     const insight = await prisma.aiInsight.create({
       data: {
         period,
-        periodType: 'monthly',
+        periodType,
         content,
         modelUsed: MODEL,
         generatedBy: session.username,

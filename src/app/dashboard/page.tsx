@@ -92,9 +92,16 @@ function PlatformBreakdown({ data, showGp = true }: { data: any[]; showGp?: bool
             <div className="text-right">
               <p className="text-xs font-medium text-white">{formatRupiah(p.realOmzet, true)}</p>
               {showGp && (
-                <p className="text-[10px] text-emerald-600">
-                  GP: {formatRupiah(p.grossProfit, true)}
-                </p>
+                <div className="flex flex-col items-end">
+                  <p className="text-[10px] text-emerald-600">
+                    GP: {formatRupiah(p.grossProfit, true)}
+                  </p>
+                  {p.adSpend > 0 && (
+                    <p className="text-[10px] text-orange-400">
+                      Ads: {formatRupiah(p.adSpend, true)} (ROAS: {p.roas})
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           </div>

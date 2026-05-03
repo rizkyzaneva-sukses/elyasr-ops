@@ -30,11 +30,13 @@ const DOC_SECTIONS: DocSection[] = [
     path: '/dashboard',
     overview: 'Halaman utama yang menyajikan ringkasan performa operasional bisnis secara real-time. Menampilkan KPI kunci, grafik penjualan, status stok, dan notifikasi penting.',
     features: [
-      'Kartu KPI: Total Pesanan, Pendapatan, Stok Rendah, dan Outstanding Piutang hari ini',
-      'Grafik tren pesanan dan penjualan dalam periode tertentu',
-      'Ringkasan status pesanan (Pending, Proses, Selesai, Dibatalkan)',
-      'Daftar produk dengan stok kritis atau habis',
-      'Notifikasi alerts aktif yang memerlukan perhatian',
+      'Kartu KPI: Total Omzet, Gross Profit, Stok Kritis, dan Backlog real-time',
+      'ROAS per platform (Shopee/TikTok) — otomatis dihitung dari pengeluaran Iklan & Biaya Ongkir Sample',
+      'Breakdown omzet dan GP per platform beserta indikator Ad Spend',
+      'Aging Backlog: visual order pending per kelompok waktu (0-12, 12-24, 24-48, >48 jam)',
+      'Saldo Wallet dan daftar payout terkini',
+      'Top Provinsi dan Top Kota berdasarkan jumlah order',
+      'Filter rentang tanggal fleksibel (Hari ini, Kemarin, Minggu ini, Bulan ini, Bulan lalu)',
     ],
     access: ['OWNER', 'FINANCE', 'STAFF'],
   },
@@ -127,13 +129,15 @@ const DOC_SECTIONS: DocSection[] = [
     icon: ScanLine,
     color: 'text-yellow-400',
     path: '/inventory-scan',
-    overview: 'Modul pencatatan mutasi stok secara cepat melalui scan barcode SKU. Digunakan untuk penerimaan barang masuk atau pengeluaran barang dari gudang.',
+    overview: 'Modul pencatatan mutasi stok secara cepat melalui scan barcode SKU. Digunakan untuk penerimaan barang masuk, pengeluaran barang dari gudang, maupun pencatatan barang keluar untuk endorsement (Beban Sample).',
     features: [
-      'Scan atau input manual SKU produk',
-      'Pilih arah mutasi: IN (masuk) atau OUT (keluar)',
-      'Input kuantitas dan catatan',
-      'Konfirmasi sebelum submit perubahan stok',
-      'Riwayat scan batch dalam sesi aktif',
+      'Tab Scan Masuk — catat penerimaan barang dari supplier (reason: PURCHASE)',
+      'Tab Scan Keluar — catat barang keluar karena penjualan (reason: SALES)',
+      'Tab Endorsement — catat barang keluar untuk keperluan endorsement/KOL, dicatat sebagai Beban Sample (reason: MARKETING)',
+      'Tab Scan Retur — retur penjualan berdasarkan scan No. Resi',
+      'Tab Retur Pembelian — retur barang ke supplier',
+      'Upload CSV batch (format: PRODUK, QTY)',
+      'Commit batch: semua item dikunci ke inventory ledger sekaligus',
     ],
     access: ['OWNER', 'FINANCE', 'STAFF'],
   },
@@ -261,9 +265,10 @@ const DOC_SECTIONS: DocSection[] = [
     overview: 'Buku besar keuangan operasional. Mencatat semua transaksi pemasukan dan pengeluaran kas/bank perusahaan dengan kategori yang dapat dikustom.',
     features: [
       'Saldo wallet (kas/bank) real-time',
-      'Tambah transaksi Debit (masuk) dan Kredit (keluar)',
-      'Kategori transaksi yang dapat dicari dan dipilih dari dropdown',
-      'Filter ledger berdasarkan tanggal, tipe, dan kategori',
+      'Tambah transaksi Beban/Pendapatan/Transfer/Modal dengan berbagai tipe',
+      'Kategori transaksi dapat dicari dan dipilih dari dropdown (dapat ditambah custom)',
+      'Kategori pemasaran yang dikenali sistem ROAS: Iklan Shopee, Iklan TikTok, Biaya Ongkir Sample, dll.',
+      'Filter ledger berdasarkan tipe transaksi dan wallet',
       'Export data ledger ke CSV',
     ],
     access: ['OWNER', 'FINANCE'],
@@ -566,7 +571,7 @@ export default function DocumentationPage() {
 
           {/* Version info */}
           <div className="text-center py-4 border-t border-zinc-800">
-            <p className="text-xs text-zinc-600">ELYASR Management System • Dokumentasi diselaraskan April 2026</p>
+            <p className="text-xs text-zinc-600">ELYASR Management System • Dokumentasi diselaraskan Mei 2026</p>
           </div>
         </div>
       )}

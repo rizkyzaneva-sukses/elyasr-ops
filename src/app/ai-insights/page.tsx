@@ -85,7 +85,7 @@ export default function AiInsightsPage() {
   const { user } = useAuth()
   const qc = useQueryClient()
   const [showData, setShowData] = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
+  const [showConfirm, setShowConfirm] = useState<'monthly' | 'weekly' | null>(null)
 
   // Ambil insight terakhir
   const { data: insightRes, isLoading } = useQuery({
@@ -101,8 +101,8 @@ export default function AiInsightsPage() {
 
   // Generate baru
   const { mutate: generate, isPending: isGenerating } = useMutation({
-    mutationFn: async () => {
-      const res = await fetch('/api/ai/insights', { method: 'POST' })
+    mutationFn: async (type: 'monthly' | 'weekly') => {
+      const res = await fetch(`/api/ai/insights?type=${type}`, { method: 'POST' })
       let json;
       try {
         json = await res.json()
@@ -115,11 +115,11 @@ export default function AiInsightsPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['ai-insights'] })
-      setShowConfirm(false)
+      setShowConfirm(null)
     },
     onError: (err: any) => {
       alert(err.message)
-      setShowConfirm(false)
+      setShowConfirm(null)
     },
   })
 
@@ -149,16 +149,28 @@ export default function AiInsightsPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowConfirm(true)}
-          disabled={isGenerating}
-          className="flex items-center gap-2 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 disabled:opacity-50 text-white rounded-xl px-4 py-2.5 text-sm font-medium transition-all shadow-lg shadow-purple-900/30"
-        >
-          {isGenerating
-            ? <><Loader2 size={14} className="animate-spin" /> Menganalisis...</>
-            : <><Sparkles size={14} /> Analisis Sekarang</>
-          }
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowConfirm('weekly')}
+            disabled={isGenerating}
+            className="flex items-center gap-2 bg-gradient-to-r from-blue-700 to-cyan-700 hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 text-white rounded-xl px-4 py-2.5 text-sm font-medium transition-all shadow-lg shadow-blue-900/30"
+          >
+            {isGenerating && showConfirm === 'weekly'
+              ? <><Loader2 size={14} className="animate-spin" /> ...</>
+              : <><Sparkles size={14} /> Review Mingguan</>
+            }
+          </button>
+          <button
+            onClick={() => setShowConfirm('monthly')}
+            disabled={isGenerating}
+            className="flex items-center gap-2 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 disabled:opacity-50 text-white rounded-xl px-4 py-2.5 text-sm font-medium transition-all shadow-lg shadow-purple-900/30"
+          >
+            {isGenerating && showConfirm === 'monthly'
+              ? <><Loader2 size={14} className="animate-spin" /> ...</>
+              : <><Sparkles size={14} /> Review Bulanan</>
+            }
+          </button>
+        </div>
       </div>
 
       {/* Confirm dialog */}
@@ -169,21 +181,21 @@ export default function AiInsightsPage() {
               <div className="p-2 rounded-lg bg-purple-900/30 border border-purple-800/50">
                 <Zap size={16} className="text-purple-400" />
               </div>
-              <h3 className="text-base font-semibold text-white">Generate AI Insights?</h3>
+              <h3 className="text-base font-semibold text-white">Generate Review {showConfirm === 'weekly' ? 'Mingguan' : 'Bulanan'}?</h3>
             </div>
             <p className="text-sm text-zinc-400 mb-4">
-              Ini akan menggunakan SumoPod API untuk menganalisis data 30 hari terakhir.
+              Ini akan menggunakan SumoPod API untuk menganalisis data {showConfirm === 'weekly' ? 'minggu ini' : '30 hari terakhir'}.
               Proses memakan waktu ~5-10 detik.
             </p>
             <div className="flex gap-2">
               <button
-                onClick={() => setShowConfirm(false)}
+                onClick={() => setShowConfirm(null)}
                 className="flex-1 py-2 rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 text-sm transition-colors"
               >
                 Batal
               </button>
               <button
-                onClick={() => generate()}
+                onClick={() => generate(showConfirm)}
                 disabled={isGenerating}
                 className="flex-1 py-2 rounded-lg bg-purple-700 hover:bg-purple-600 disabled:opacity-50 text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
               >
@@ -246,15 +258,15 @@ export default function AiInsightsPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
                   <DataCard
                     icon={TrendingUp}
-                    label="Omzet 30 Hari"
-                    value={formatRupiah(snapshot.omzet30 ?? 0, true)}
-                    sub={`GP: ${formatRupiah(snapshot.gp30 ?? 0, true)}`}
+                    label={`Omzet ${snapshot.periodLabel || '30 Hari'}`}
+                    value={formatRupiah(snapshot.omzetTotal ?? snapshot.omzet30 ?? 0, true)}
+                    sub={`GP: ${formatRupiah(snapshot.gpTotal ?? snapshot.gp30 ?? 0, true)}`}
                     color="emerald"
                   />
                   <DataCard
                     icon={BarChart3}
                     label="Total Order"
-                    value={`${snapshot.orderCount30 ?? 0} order`}
+                    value={`${snapshot.orderCountTotal ?? snapshot.orderCount30 ?? 0} order`}
                     sub={`~${snapshot.avgOrderPerDay ?? 0}/hari`}
                     color="blue"
                   />
