@@ -10,11 +10,12 @@ import { useToast } from '@/components/ui/toaster'
 import { ScanLine, Plus, Minus, CheckCircle, Trash2, Upload, Search, X, AlertCircle, Camera, CameraOff } from 'lucide-react'
 import Papa from 'papaparse'
 
-type TabKey = 'masuk' | 'keluar' | 'retur' | 'retur_pembelian'
+type TabKey = 'masuk' | 'keluar' | 'endorsement' | 'retur' | 'retur_pembelian'
 
-const SCAN_TABS: { key: TabKey; label: string; direction: 'IN' | 'OUT'; reason: string }[] = [
+const SCAN_TABS: { key: TabKey; label: string; direction: 'IN' | 'OUT'; reason: string; badge?: string }[] = [
   { key: 'masuk',           label: 'Scan Masuk',      direction: 'IN',  reason: 'PURCHASE' },
   { key: 'keluar',          label: 'Scan Keluar',     direction: 'OUT', reason: 'SALES' },
+  { key: 'endorsement',     label: 'Endorsement',     direction: 'OUT', reason: 'MARKETING', badge: 'Beban Sample' },
   { key: 'retur',           label: 'Scan Retur',      direction: 'IN',  reason: 'RETURN_SALES' },
   { key: 'retur_pembelian', label: 'Retur Pembelian', direction: 'OUT', reason: 'RETURN_PURCHASE' },
 ]
@@ -568,8 +569,30 @@ export function ScanTab() {
       const commitData = await commitRes.json()
       if (!commitRes.ok) throw new Error(commitData.error)
       setCommitted(true); beep(1)
-      toast({ title: `${items.length} SKU berhasil di-commit ke ledger`, type: 'success' })
-      setTimeout(() => { setItems([]); setCommitted(false); qc.invalidateQueries({ queryKey: ['inventory'] }) }, 2000)
+      
+      const bs = commitData.data?.bebanSample
+      if (bs) {
+        const nominal = bs.totalAmount > 0
+          ? ` — Beban Sample Rp${bs.totalAmount.toLocaleString('id-ID')} dibukukan ke Finance`
+          : ''
+        toast({
+          title: `${items.length} SKU Endorsement di-commit${nominal}`,
+          type: 'success',
+        })
+        if (bs.warning) {
+          setTimeout(() => toast({ title: `⚠️ ${bs.warning}`, type: 'error' }), 800)
+        }
+      } else {
+        toast({ title: `${items.length} SKU berhasil di-commit ke ledger`, type: 'success' })
+      }
+
+      setTimeout(() => { 
+        setItems([]); 
+        setCommitted(false); 
+        qc.invalidateQueries({ queryKey: ['inventory'] })
+        qc.invalidateQueries({ queryKey: ['wallets'] })
+        qc.invalidateQueries({ queryKey: ['wallet-ledger'] })
+      }, 2000)
     } catch (err: any) { toast({ title: err.message || 'Commit gagal', type: 'error' }); beep(3) }
     finally { setCommitting(false) }
   }
@@ -580,17 +603,28 @@ export function ScanTab() {
     setTimeout(() => skuRef.current?.focus(), 100)
   }
 
+  const isEndorsement = activeTab === 'endorsement'
+
   useEffect(() => { skuRef.current?.focus() }, [])
   const totalItems = items.reduce((s, i) => s + i.qty, 0)
 
   return (
     <>
       {/* Sub-tabs */}
-      <div className="flex gap-1 mb-6 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 mb-6 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit flex-wrap">
         {SCAN_TABS.map(t => (
           <button key={t.key} onClick={() => switchTab(t.key)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === t.key ? 'bg-emerald-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}>
+            className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === t.key
+                ? t.key === 'endorsement' ? 'bg-orange-700 text-white' : 'bg-emerald-700 text-white'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}>
             {t.label}
+            {t.badge && (
+              <span className="ml-1.5 text-[9px] bg-orange-500/20 text-orange-300 border border-orange-600/40 px-1 py-0.5 rounded">
+                {t.badge}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -600,8 +634,19 @@ export function ScanTab() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-4">
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-              <p className="text-sm font-medium text-zinc-400 mb-3">{tab.direction === 'IN' ? '📥' : '📤'} {tab.label}</p>
+            <div className={`bg-zinc-900 border rounded-xl p-5 ${
+              isEndorsement ? 'border-orange-800/60' : 'border-zinc-800'
+            }`}>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-medium text-zinc-400">
+                  {tab.direction === 'IN' ? '📥' : isEndorsement ? '🎁' : '📤'} {tab.label}
+                </p>
+                {isEndorsement && (
+                  <span className="text-[10px] bg-orange-900/30 text-orange-300 border border-orange-700/50 px-2 py-1 rounded-lg">
+                    ⚡ Stok keluar → Beban Sample
+                  </span>
+                )}
+              </div>
 
               {activeTab === 'retur_pembelian' ? (
                 <form onSubmit={handleSkuSubmit} className="space-y-3 mb-3">
