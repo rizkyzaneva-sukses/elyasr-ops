@@ -2,6 +2,8 @@
 
 Sistem manajemen operasional bisnis e-commerce multi-platform.
 
+<!-- last updated: 2026-05-25 -->
+
 ## Stack
 - **Frontend/Backend**: Next.js 15 (App Router)
 - **Database**: PostgreSQL + Prisma ORM
