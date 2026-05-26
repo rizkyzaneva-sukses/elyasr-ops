@@ -21,8 +21,9 @@ export default function RootLayout({
     <html lang="id" suppressHydrationWarning>
       <body className={`${inter.className} bg-zinc-950 text-zinc-100 antialiased`}>
         <Providers>
-          {children}
-          <Toaster />
+          <Toaster>
+            {children}
+          </Toaster>
         </Providers>
       </body>
     </html>

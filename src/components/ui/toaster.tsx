@@ -19,7 +19,7 @@ interface ToastContextType {
 const ToastContext = createContext<ToastContextType>({ toast: () => {} })
 export const useToast = () => useContext(ToastContext)
 
-export function Toaster() {
+export function Toaster({ children }: { children?: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
 
   const toast = useCallback((opts: Omit<Toast, 'id'>) => {
@@ -40,6 +40,7 @@ export function Toaster() {
 
   return (
     <ToastContext.Provider value={{ toast }}>
+      {children}
       <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
         {toasts.map(t => (
           <div

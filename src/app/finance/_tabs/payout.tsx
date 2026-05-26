@@ -73,6 +73,62 @@ function getPreset(preset: 'this_month' | 'last_month' | 'all') {
   }
 }
 
+function getWorkbookSheet(wb: XLSX.WorkBook, names: string[]) {
+  return names.map(name => wb.Sheets[name]).find(Boolean)
+}
+
+function normalizeDateText(value: unknown): string {
+  if (!value) return ''
+  if (value instanceof Date && !isNaN(value.getTime())) return value.toISOString().slice(0, 10)
+
+  const s = String(value).trim()
+  const ymd = s.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/)
+  if (ymd) return `${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}`
+
+  const dmy = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/)
+  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`
+
+  const d = new Date(s.replace(/\//g, '-'))
+  return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10)
+}
+
+function extractPeriodFromSheet(ws: XLSX.WorkSheet | undefined) {
+  if (!ws) return { periodeFrom: '', periodeTo: '' }
+  const data = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' }) as unknown[][]
+
+  for (const row of data) {
+    const periodIdx = row.findIndex(cell => String(cell).trim().toLowerCase() === 'periode')
+    if (periodIdx === -1) continue
+
+    const periodValue = row.slice(periodIdx + 1).find(cell => String(cell).trim())
+    const match = String(periodValue ?? '').match(/(\d{1,4}[/-]\d{1,2}[/-]\d{1,4}).*?(\d{1,4}[/-]\d{1,2}[/-]\d{1,4})/)
+    if (match) {
+      return {
+        periodeFrom: normalizeDateText(match[1]),
+        periodeTo: normalizeDateText(match[2]),
+      }
+    }
+  }
+
+  return { periodeFrom: '', periodeTo: '' }
+}
+
+function extractPeriodFromRows(rows: Record<string, unknown>[]) {
+  const dates = rows
+    .map(row => normalizeDateText(
+      row['Order settled time'] ||
+      row['Waktu penyelesaian pesanan'] ||
+      row['Waktu pembayaran pesanan']
+    ))
+    .filter(Boolean)
+    .sort()
+
+  return {
+    periodeFrom: dates[0] ?? '',
+    periodeTo: dates[dates.length - 1] ?? '',
+  }
+}
+
 // ─── Sub-component: Platform breakdown row ────────────
 function BreakdownRow({ shopeeVal, tiktokVal }: { shopeeVal: number; tiktokVal: number }) {
   return (
@@ -277,39 +333,28 @@ export function PayoutTab() {
         })
         rows = parsed.data.map(normalizeRow)
 
-        const times: Date[] = []
-        for (const row of rows) {
-          const raw = String(row['Order settled time'] || '').trim()
-          if (raw) {
-            const d = new Date(raw.replace(/\//g, '-'))
-            if (!isNaN(d.getTime())) times.push(d)
-          }
-        }
-        if (times.length > 0) {
-          const minD = new Date(Math.min(...times.map(d => d.getTime())))
-          const maxD = new Date(Math.max(...times.map(d => d.getTime())))
-          periodeFrom = minD.toISOString().slice(0, 10)
-          periodeTo   = maxD.toISOString().slice(0, 10)
-        }
+        const period = extractPeriodFromRows(rows)
+        periodeFrom = period.periodeFrom
+        periodeTo   = period.periodeTo
       } else {
         const buffer = await file.arrayBuffer()
         const wb     = XLSX.read(buffer, { type: 'array' })
 
-        const wsRep = wb.Sheets['Reports']
-        if (wsRep) {
-          const repData = XLSX.utils.sheet_to_json<unknown[]>(wsRep, { header: 1, defval: '' }) as unknown[][]
-          const periodeStr = String((repData[1] as unknown[])[1] ?? '')
-          const parts = periodeStr.split('-')
-          if (parts.length >= 2) {
-            periodeFrom = parts[0].trim().replace(/\//g, '-')
-            periodeTo   = parts[1].trim().replace(/\//g, '-')
-          }
-        }
+        const wsRep = getWorkbookSheet(wb, ['Reports', 'Report', 'Laporan'])
+        const period = extractPeriodFromSheet(wsRep)
+        periodeFrom = period.periodeFrom
+        periodeTo   = period.periodeTo
 
-        const ws = wb.Sheets['Order details']
-        if (!ws) throw new Error('Sheet "Order details" tidak ditemukan')
+        const ws = getWorkbookSheet(wb, ['Order details', 'Order Details', 'Detail pesanan', 'Detail Pesanan'])
+        if (!ws) throw new Error('Sheet detail pesanan TikTok tidak ditemukan')
         const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: 0 })
         rows = rawRows.map(normalizeRow)
+
+        if (!periodeFrom || !periodeTo) {
+          const fallbackPeriod = extractPeriodFromRows(rows)
+          periodeFrom = periodeFrom || fallbackPeriod.periodeFrom
+          periodeTo   = periodeTo || fallbackPeriod.periodeTo
+        }
       }
 
       const payload = {

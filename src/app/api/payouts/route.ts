@@ -16,6 +16,73 @@ function n(v: unknown): number {
   return isNaN(x) ? 0 : x
 }
 
+function firstValue(row: Record<string, unknown>, cols: string[]): unknown {
+  for (const col of cols) {
+    if (row[col] !== undefined && row[col] !== null && row[col] !== '') return row[col]
+  }
+  return undefined
+}
+
+function firstNumber(row: Record<string, unknown>, cols: string[]): number {
+  return n(firstValue(row, cols))
+}
+
+function parseDateValue(value: unknown): Date | null {
+  if (!value) return null
+  if (value instanceof Date && !isNaN(value.getTime())) return value
+
+  const raw = String(value).trim()
+  const ymd = raw.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/)
+  if (ymd) {
+    const d = new Date(`${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}`)
+    return isNaN(d.getTime()) ? null : d
+  }
+
+  const dmy = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/)
+  if (dmy) {
+    const d = new Date(`${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`)
+    return isNaN(d.getTime()) ? null : d
+  }
+
+  const d = new Date(raw.replace(/\//g, '-'))
+  return isNaN(d.getTime()) ? null : d
+}
+
+const TIKTOK_ORDER_ID_COLS = [
+  'Order/adjustment ID',
+  'ID Pesanan/Penyesuaian',
+  'ID pesanan/penyesuaian',
+]
+
+const TIKTOK_TYPE_COLS = ['Type', 'Jenis', 'Tipe', 'Jenis transaksi']
+
+const TIKTOK_DATE_COLS = [
+  'Order settled time',
+  'Waktu penyelesaian pesanan',
+  'Waktu pembayaran pesanan',
+]
+
+const TIKTOK_SETTLEMENT_COLS = [
+  'Total settlement amount',
+  'Total Settlement Amount',
+  'Settlement Amount',
+  'Jumlah penyelesaian pembayaran',
+  'Jumlah Penyelesaian Pembayaran',
+  'Jumlah penyelesaian',
+  'Total Penyelesaian',
+  'Jumlah Penyelesaian',
+  'Seller Settlement Amount',
+  'Jumlah Penyelesaian Penjual',
+]
+
+const TIKTOK_OMZET_COLS = [
+  'Total Revenue',
+  'Total Pendapatan',
+  'Total pendapatan',
+  'Seller Revenue',
+  'Pendapatan Penjual',
+]
+
 // ─────────────────────────────────────────────
 // Shopee Income formula
 // ─────────────────────────────────────────────
@@ -72,38 +139,31 @@ interface TikTokCalc {
 
 function calcTikTok(row: Record<string, unknown>): TikTokCalc {
   // Omzet / Revenue — berbagai format ekspor TikTok
-  const omzet =
-    n(row['Total Revenue']) ||
-    n(row['Total Pendapatan']) ||
-    n(row['Total pendapatan']) ||
-    n(row['Seller Revenue']) ||
-    n(row['Pendapatan Penjual']) ||
-    0
+  const omzet = firstNumber(row, TIKTOK_OMZET_COLS)
 
-  const biayaPlatform =
-    n(row['Platform commission fee'] || row['Biaya komisi platform'] || 0) +
-    n(row['Order processing fee']    || row['Biaya pemrosesan pesanan'] || 0) +
-    n(row['Dynamic commission']      || row['Komisi dinamis'] || 0) +
-    n(row['Shipping cost']           || row['Biaya pengiriman'] || 0) +
-    n(row['Transaction fee']         || row['Biaya transaksi'] || 0) +
-    n(row['Seller Transaction Fee']  || row['Biaya Transaksi Penjual'] || 0)
+  const totalFee = firstNumber(row, ['Total Fee', 'Total Fees', 'Total Biaya'])
+  const biayaPlatform = totalFee || (
+    firstNumber(row, ['Platform commission fee', 'Biaya komisi platform']) +
+    firstNumber(row, ['Order processing fee', 'Biaya pemrosesan pesanan']) +
+    firstNumber(row, ['Dynamic commission', 'Komisi dinamis']) +
+    firstNumber(row, ['Shipping cost', 'Biaya pengiriman', 'Ongkir']) +
+    firstNumber(row, ['Transaction fee', 'Biaya transaksi', 'Biaya Pembayaran']) +
+    firstNumber(row, ['Seller Transaction Fee', 'Biaya Transaksi Penjual']) +
+    firstNumber(row, ['Biaya layanan pre-order']) +
+    firstNumber(row, ['Biaya layanan Mall']) +
+    firstNumber(row, ['Credit card installment - Handling fee']) +
+    firstNumber(row, ['Ongkir yang ditalangi penyedia jasa logistik']) +
+    firstNumber(row, ['Ongkir penggantian (ditanggung pembeli)']) +
+    firstNumber(row, ['Ongkir penukaran (ditanggung pembeli)'])
+  )
 
   const biayaAms =
-    n(row['Affiliate Commission']          || row['Komisi afiliasi'] || 0) +
-    n(row['Affiliate Shop Ads commission'] || row['Komisi Iklan Toko Afiliasi'] || 0)
+    firstNumber(row, ['Affiliate Commission', 'Komisi afiliasi']) +
+    firstNumber(row, ['Affiliate Shop Ads commission', 'Komisi Iklan Toko Afiliasi'])
 
   // Settlement amount — ini yang harus jadi totalIncome
   // TikTok punya banyak varian nama kolom tergantung versi export
-  const yangDiterima =
-    n(row['Total settlement amount'])  ||
-    n(row['Total Settlement Amount'])  ||
-    n(row['Settlement Amount'])        ||
-    n(row['Jumlah penyelesaian'])      ||
-    n(row['Total Penyelesaian'])       ||
-    n(row['Jumlah Penyelesaian'])      ||
-    n(row['Seller Settlement Amount']) ||
-    n(row['Jumlah Penyelesaian Penjual']) ||
-    0
+  const yangDiterima = firstNumber(row, TIKTOK_SETTLEMENT_COLS)
 
   return { omzet, biayaPlatform, biayaAms, yangDiterima }
 }
@@ -293,11 +353,11 @@ export async function POST(request: NextRequest) {
   
   if (source === 'tiktok_income') {
     filteredRows = mappedRows.filter((r: any) => {
-      const typeStr = String(r['Type'] || r['Jenis'] || r['Tipe'] || '').trim()
+      const typeStr = String(firstValue(r, TIKTOK_TYPE_COLS) || '').trim().toLowerCase()
       // If TikTok data has NO type column at all, accept all rows
-      if (!('Type' in r) && !('Jenis' in r) && !('Tipe' in r)) return true
+      if (!TIKTOK_TYPE_COLS.some(col => col in r)) return true
       // Accept Order/Pesanan rows only — skip Refund/Adjustment/Return rows
-      return typeStr === 'Order' || typeStr === 'Pesanan'
+      return typeStr === 'order' || typeStr === 'pesanan'
     })
   } else {
     filteredRows = mappedRows
@@ -313,11 +373,8 @@ export async function POST(request: NextRequest) {
   if (source === 'tiktok_income' && (!periodeFrom || !periodeTo)) {
     const times: number[] = []
     for (const row of filteredRows) {
-      const raw = String((row as Record<string, unknown>)['Order settled time'] || (row as Record<string, unknown>)['Waktu penyelesaian pesanan'] || '').trim()
-      if (raw) {
-        const d = new Date(raw.replace(/\//g, '-'))
-        if (!isNaN(d.getTime())) times.push(d.getTime())
-      }
+      const d = parseDateValue(firstValue(row as Record<string, unknown>, TIKTOK_DATE_COLS))
+      if (d) times.push(d.getTime())
     }
     if (times.length > 0) {
       periodeFrom = new Date(Math.min(...times)).toISOString().slice(0, 10)
@@ -346,10 +403,8 @@ export async function POST(request: NextRequest) {
   let detectedOmzetRaw: unknown = undefined
   if (source === 'tiktok_income' && filteredRows.length > 0) {
     const sampleRow = filteredRows[0] as Record<string, unknown>
-    const settlementCols = ['Total settlement amount','Total Settlement Amount','Settlement Amount','Jumlah penyelesaian','Total Penyelesaian','Jumlah Penyelesaian','Seller Settlement Amount','Jumlah Penyelesaian Penjual']
-    const omzetCols = ['Total Revenue','Total Pendapatan','Total pendapatan','Seller Revenue','Pendapatan Penjual']
-    detectedSettlementCol = settlementCols.find(c => sampleRow[c] !== undefined) ?? '(tidak ditemukan)'
-    detectedOmzetCol = omzetCols.find(c => sampleRow[c] !== undefined) ?? '(tidak ditemukan)'
+    detectedSettlementCol = TIKTOK_SETTLEMENT_COLS.find(c => sampleRow[c] !== undefined) ?? '(tidak ditemukan)'
+    detectedOmzetCol = TIKTOK_OMZET_COLS.find(c => sampleRow[c] !== undefined) ?? '(tidak ditemukan)'
     if (detectedSettlementCol !== '(tidak ditemukan)') detectedSettlementRaw = sampleRow[detectedSettlementCol]
     if (detectedOmzetCol !== '(tidak ditemukan)') detectedOmzetRaw = sampleRow[detectedOmzetCol]
   }
@@ -357,7 +412,7 @@ export async function POST(request: NextRequest) {
   // Collect all orderNos for bulk duplicate check
   const allOrderNos = filteredRows.map(r => {
     if (source === 'shopee_income') return String(r['No. Pesanan'] ?? '').trim()
-    return String(r['Order/adjustment ID'] || r['ID Pesanan/Penyesuaian'] || r['ID pesanan/penyesuaian'] || '').trim()
+    return String(firstValue(r, TIKTOK_ORDER_ID_COLS) || '').trim()
   }).filter(Boolean)
 
   const existingPayouts = await prisma.payout.findMany({
@@ -378,6 +433,7 @@ export async function POST(request: NextRequest) {
   const allLedgerInserts: any[] = []
   // Map orderNo → releasedDate, to patch orders.trx_date after insert
   const orderDateUpdates: { orderNo: string; releasedDate: Date }[] = []
+  const seenOrderNos = new Set<string>()
 
   // Process rows
   for (const row of filteredRows) {
@@ -389,6 +445,12 @@ export async function POST(request: NextRequest) {
         invalidRows.push({ rowNumber: lineNum, value: '-', reason: 'Tidak ada No. Pesanan' })
         continue
       }
+      if (existingSet.has(orderNo) || seenOrderNos.has(orderNo)) {
+        duplikatCount++
+        detailDuplikat.push(orderNo)
+        continue
+      }
+      seenOrderNos.add(orderNo)
 
       const calc = calcShopee(row)
       if (isNaN(calc.yangDiterima) || isNaN(calc.omzet)) {
@@ -402,8 +464,7 @@ export async function POST(request: NextRequest) {
         bebanCount++
         totalBeban += settlement
         detailBeban.push({ orderNo, amount: settlement })
-        const rawDateNeg = String(row['Tanggal Dana Dilepaskan'] ?? '').trim()
-        const releasedDateNeg = rawDateNeg && !isNaN(new Date(rawDateNeg).getTime()) ? new Date(rawDateNeg) : (periodeFrom ? new Date(periodeFrom) : new Date())
+        const releasedDateNeg = parseDateValue(row['Tanggal Dana Dilepaskan']) ?? (periodeFrom ? new Date(periodeFrom) : new Date())
         // Shopee minus: masuk sebagai PAYOUT negatif (sama seperti TikTok) supaya mengurangi total pencairan
         allPayoutInserts.push({
           orderNo,
@@ -433,18 +494,13 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      if (existingSet.has(orderNo)) {
-        duplikatCount++
-        detailDuplikat.push(orderNo)
-        continue
-      }
-
-      const rawDate = String(row['Tanggal Dana Dilepaskan'] ?? '').trim()
-      const releasedDate = rawDate ? new Date(rawDate) : new Date()
-      if (isNaN(releasedDate.getTime())) {
+      const rawDate = row['Tanggal Dana Dilepaskan']
+      const parsedReleasedDate = parseDateValue(rawDate)
+      if (rawDate && !parsedReleasedDate) {
         invalidRows.push({ rowNumber: lineNum, value: orderNo, reason: 'Format Tanggal Dana Dilepaskan tidak valid' })
         continue
       }
+      const releasedDate = parsedReleasedDate ?? new Date()
 
       allPayoutInserts.push({
         orderNo,
@@ -480,11 +536,17 @@ export async function POST(request: NextRequest) {
 
     } else {
       // TikTok
-      const orderNo = String(row['Order/adjustment ID'] || row['ID Pesanan/Penyesuaian'] || row['ID pesanan/penyesuaian'] || '').trim()
+      const orderNo = String(firstValue(row, TIKTOK_ORDER_ID_COLS) || '').trim()
       if (!orderNo) {
         invalidRows.push({ rowNumber: lineNum, value: '-', reason: 'Tidak ada ID Pesanan' })
         continue
       }
+      if (existingSet.has(orderNo) || seenOrderNos.has(orderNo)) {
+        duplikatCount++
+        detailDuplikat.push(orderNo)
+        continue
+      }
+      seenOrderNos.add(orderNo)
 
       const calc = calcTikTok(row)
       if (isNaN(calc.yangDiterima) || isNaN(calc.omzet)) {
@@ -505,12 +567,11 @@ export async function POST(request: NextRequest) {
         bebanCount++
         totalBeban += settlement
         detailBeban.push({ orderNo, amount: settlement })
-        const rawSettledDate = String(row['Order settled time'] || row['Waktu penyelesaian pesanan'] || '').trim()
-        const trxDate = rawSettledDate ? new Date(rawSettledDate.replace(/\//g, '-')) : new Date()
+        const trxDate = parseDateValue(firstValue(row, TIKTOK_DATE_COLS)) ?? new Date()
         // Tetap masuk sebagai PAYOUT (nilai negatif) supaya mengurangi total pencairan
         allPayoutInserts.push({
           orderNo,
-          releasedDate: isNaN(trxDate.getTime()) ? new Date() : trxDate,
+          releasedDate: trxDate,
           platform,
           omzet:            0,
           platformFee:      0,
@@ -525,7 +586,7 @@ export async function POST(request: NextRequest) {
         })
         allLedgerInserts.push({
           walletId,
-          trxDate: isNaN(trxDate.getTime()) ? new Date() : trxDate,
+          trxDate,
           trxType:  'PAYOUT',
           category: ledgerCat,
           amount:   Math.round(settlement), // negatif → mengurangi saldo
@@ -536,18 +597,13 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      if (existingSet.has(orderNo)) {
-        duplikatCount++
-        detailDuplikat.push(orderNo)
-        continue
-      }
-
-      const rawSettledDate = String(row['Order settled time'] || row['Waktu penyelesaian pesanan'] || '').trim()
-      const releasedDate = rawSettledDate ? new Date(rawSettledDate.replace(/\//g, '-')) : new Date()
-      if (rawSettledDate && isNaN(releasedDate.getTime())) {
+      const rawSettledDate = firstValue(row, TIKTOK_DATE_COLS)
+      const parsedReleasedDate = parseDateValue(rawSettledDate)
+      if (rawSettledDate && !parsedReleasedDate) {
         invalidRows.push({ rowNumber: lineNum, value: orderNo, reason: 'Waktu penyelesaian pesanan tidak valid' })
         continue
       }
+      const releasedDate = parsedReleasedDate ?? new Date()
 
       allPayoutInserts.push({
         orderNo,
