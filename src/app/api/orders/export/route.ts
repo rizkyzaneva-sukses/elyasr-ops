@@ -2,6 +2,41 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 
+function normalizeStatus(status: string | null | undefined): string {
+  return String(status ?? '').trim().toLowerCase()
+}
+
+function statusWhere(status: string) {
+  const s = normalizeStatus(status)
+  if (s.includes('retur') || s.includes('return') || s.includes('dikembalikan')) {
+    return {
+      OR: [
+        { status: { contains: 'retur', mode: 'insensitive' as const } },
+        { status: { contains: 'return', mode: 'insensitive' as const } },
+        { status: { contains: 'dikembalikan', mode: 'insensitive' as const } },
+      ],
+    }
+  }
+  if (s.includes('batal') || s.includes('cancel')) {
+    return {
+      OR: [
+        { status: { contains: 'batal', mode: 'insensitive' as const } },
+        { status: { contains: 'cancel', mode: 'insensitive' as const } },
+        { status: { contains: 'dibatalkan', mode: 'insensitive' as const } },
+      ],
+    }
+  }
+  if (s.startsWith('terkirim') || s.startsWith('shipped')) {
+    return {
+      OR: [
+        { status: { startsWith: 'terkirim', mode: 'insensitive' as const } },
+        { status: { startsWith: 'shipped', mode: 'insensitive' as const } },
+      ],
+    }
+  }
+  return { status }
+}
+
 // GET /api/orders/export
 // Query: mode=order_date|payout_date, dateFrom, dateTo, platform, status
 export async function GET(request: NextRequest) {
@@ -19,6 +54,7 @@ export async function GET(request: NextRequest) {
   const dateTo   = searchParams.get('dateTo') || ''
   const platform = searchParams.get('platform') || ''
   const status   = searchParams.get('status') || ''
+  const statusClause = status ? statusWhere(status) : {}
 
   let orders: any[] = []
 
@@ -34,7 +70,7 @@ export async function GET(request: NextRequest) {
           ...(Object.keys(dateFilter).length ? { releasedDate: dateFilter } : {}),
         },
         ...(platform && { platform }),
-        ...(status   && { status   }),
+        ...statusClause,
       },
       include: { payout: { select: { releasedDate: true, totalIncome: true } } },
       orderBy: { payout: { releasedDate: 'asc' } },
@@ -50,7 +86,7 @@ export async function GET(request: NextRequest) {
       where.trxDate = f
     }
     if (platform) where.platform = platform
-    if (status)   where.status   = status
+    if (status)   Object.assign(where, statusClause)
 
     orders = await prisma.order.findMany({
       where,
@@ -64,7 +100,7 @@ export async function GET(request: NextRequest) {
       if (dateFrom) fw.orderCreatedAt = { gte: dateFrom }
       if (dateTo)   fw.orderCreatedAt = { ...fw.orderCreatedAt, lte: dateTo + ' 23:59:59' }
       if (platform) fw.platform = platform
-      if (status)   fw.status   = status
+      if (status)   Object.assign(fw, statusClause)
 
       orders = await prisma.order.findMany({
         where: fw,

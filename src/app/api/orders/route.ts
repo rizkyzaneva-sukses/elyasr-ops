@@ -49,16 +49,28 @@ export async function GET(request: NextRequest) {
   if (statusGroup === 'perlu_dikirim') {
     statusFilter = {
       AND: [
-        { status: { not: { startsWith: 'TERKIRIM' } } },
-        { NOT: { OR: [
-          { status: { contains: 'Batal' } },
-          { status: { contains: 'Cancel' } },
-          { status: { contains: 'Dibatalkan' } },
-        ]}},
+        {
+          NOT: {
+            OR: [
+              { status: { contains: 'terkirim', mode: 'insensitive' } },
+              { status: { contains: 'shipped', mode: 'insensitive' } },
+              { status: { contains: 'batal', mode: 'insensitive' } },
+              { status: { contains: 'cancel', mode: 'insensitive' } },
+              { status: { contains: 'retur', mode: 'insensitive' } },
+              { status: { contains: 'return', mode: 'insensitive' } },
+              { status: { contains: 'dikembalikan', mode: 'insensitive' } },
+            ],
+          },
+        },
       ],
     }
   } else if (statusGroup === 'terkirim') {
-    statusFilter = { status: { startsWith: 'TERKIRIM' } }
+    statusFilter = {
+      OR: [
+        { status: { startsWith: 'TERKIRIM', mode: 'insensitive' } },
+        { status: { startsWith: 'SHIPPED', mode: 'insensitive' } },
+      ],
+    }
   } else if (statusGroup === 'dicairkan') {
     // Cek order_no ada di tabel payouts (tidak bergantung pada orderId link)
     const payoutOrderNos = await prisma.payout.findMany({
@@ -69,13 +81,19 @@ export async function GET(request: NextRequest) {
 
     statusFilter = { orderNo: { in: payoutOrderNos } }
   } else if (statusGroup === 'retur') {
-    statusFilter = { status: 'RETUR' }
+    statusFilter = {
+      OR: [
+        { status: { contains: 'retur', mode: 'insensitive' } },
+        { status: { contains: 'return', mode: 'insensitive' } },
+        { status: { contains: 'dikembalikan', mode: 'insensitive' } },
+      ],
+    }
   } else if (statusGroup === 'batal') {
     statusFilter = {
       OR: [
-        { status: { contains: 'Batal' } },
-        { status: { contains: 'Cancel' } },
-        { status: { contains: 'Dibatalkan' } },
+        { status: { contains: 'batal', mode: 'insensitive' } },
+        { status: { contains: 'cancel', mode: 'insensitive' } },
+        { status: { contains: 'dibatalkan', mode: 'insensitive' } },
       ],
     }
   }
