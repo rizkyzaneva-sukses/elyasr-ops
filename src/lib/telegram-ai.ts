@@ -24,9 +24,12 @@ import {
 // ─────────────────────────────────────────────
 // Config
 // ─────────────────────────────────────────────
-const ADYE_BASE_URL = process.env.ADYE_BASE_URL || 'https://adye.dev/v1'
-const ADYE_MODEL = process.env.ADYE_MODEL || 'claude-sonnet-4.6'
+const ADYE_BASE_URL = process.env.ADYE_BASE_URL || 'https://antigravity.u9uhfo.easypanel.host/v1'
+const ADYE_MODEL = process.env.ADYE_MODEL || 'claude-sonnet-4-6'
 const ADYE_API_KEY = process.env.ADYE_API_KEY || ''
+const SUMOPOD_BASE_URL = 'https://ai.sumopod.com/v1'
+const SUMOPOD_MODEL = 'gpt-4o-mini'
+const SUMOPOD_API_KEY = process.env.SUMOPOD_API_KEY || ''
 
 // Timeout untuk API call (30 detik)
 const API_TIMEOUT_MS = 30_000
@@ -460,6 +463,75 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
     }
 }
 
+type ProviderConfig = {
+    name: string
+    baseUrl: string
+    apiKey: string
+    model: string
+}
+
+async function callProvider(
+    provider: ProviderConfig,
+    messages: Message[],
+): Promise<{ data: any; elapsedMs: number }> {
+    const startedAt = Date.now()
+    const response = await fetchWithTimeout(`${provider.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${provider.apiKey}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            model: provider.model,
+            messages,
+            tools: TOOLS,
+            tool_choice: 'auto',
+            max_tokens: 2000,
+        }),
+    }, API_TIMEOUT_MS)
+
+    if (!response.ok) {
+        const body = await response.text()
+        const err = new Error(`HTTP ${response.status}: ${body.slice(0, 500)}`)
+        ;(err as any).status = response.status
+        throw err
+    }
+
+    const text = await response.text()
+    let data: any
+    try {
+        data = JSON.parse(text)
+    } catch {
+        throw new Error(`Respons ${provider.name} tidak valid (bukan JSON)`)
+    }
+
+    return { data, elapsedMs: Date.now() - startedAt }
+}
+
+function buildProviders(): ProviderConfig[] {
+    const providers: ProviderConfig[] = []
+
+    if (ADYE_API_KEY) {
+        providers.push({
+            name: 'Adye',
+            baseUrl: ADYE_BASE_URL,
+            apiKey: ADYE_API_KEY,
+            model: ADYE_MODEL,
+        })
+    }
+
+    if (SUMOPOD_API_KEY) {
+        providers.push({
+            name: 'SumoPod',
+            baseUrl: SUMOPOD_BASE_URL,
+            apiKey: SUMOPOD_API_KEY,
+            model: SUMOPOD_MODEL,
+        })
+    }
+
+    return providers
+}
+
 // ─────────────────────────────────────────────
 // Main: Process user message dengan AI + tool loop
 // ─────────────────────────────────────────────
@@ -472,130 +544,96 @@ type Message = {
 }
 
 export async function processWithAI(userMessage: string): Promise<string> {
-    if (!ADYE_API_KEY) {
-        console.error('[telegram-ai] ADYE_API_KEY belum dikonfigurasi')
+    const providers = buildProviders()
+    if (providers.length === 0) {
+        console.error('[telegram-ai] AI provider belum dikonfigurasi')
         return '❌ AI belum dikonfigurasi (ADYE_API_KEY kosong). Hubungi admin.'
     }
 
-    console.log(`[telegram-ai] Processing: "${userMessage.slice(0, 80)}" | model=${ADYE_MODEL} | url=${ADYE_BASE_URL}`)
+    console.log(`[telegram-ai] Processing: "${userMessage.slice(0, 80)}" | providers=${providers.map(p => `${p.name}:${p.model}`).join(', ')}`)
 
-    const messages: Message[] = [
+    const baseMessages: Message[] = [
         { role: 'system', content: getSystemPrompt() },
         { role: 'user', content: userMessage },
     ]
+    const providerErrors: string[] = []
 
-    // Token usage tracker — accumulate across iterations
-    let totalIn = 0
-    let totalOut = 0
-    const t0 = Date.now()
+    for (const provider of providers) {
+        const messages: Message[] = [...baseMessages]
+        let totalIn = 0
+        let totalOut = 0
+        const t0 = Date.now()
 
-    // Agentic loop — max 5 iterasi untuk menghindari infinite loop
-    for (let iter = 0; iter < 5; iter++) {
-        let res: Response
         try {
-            res = await fetchWithTimeout(`${ADYE_BASE_URL}/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${ADYE_API_KEY}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    model: ADYE_MODEL,
-                    messages,
-                    tools: TOOLS,
-                    tool_choice: 'auto',
-                    max_tokens: 2000,
-                }),
-            }, API_TIMEOUT_MS)
+            for (let iter = 0; iter < 5; iter++) {
+                let data: any
+                try {
+                    const result = await callProvider(provider, messages)
+                    data = result.data
+                } catch (err: any) {
+                    if (err?.name === 'AbortError') {
+                        console.error(`[telegram-ai] ${provider.name} timeout after`, API_TIMEOUT_MS, 'ms')
+                        throw new Error('AI timeout — server terlalu lama merespons. Coba lagi nanti.')
+                    }
+                    console.error(`[telegram-ai] ${provider.name} fetch error:`, err)
+                    throw new Error(`Gagal menghubungi AI (${provider.name}): ${err.message}`)
+                }
+
+                const choice = data.choices?.[0]
+                if (!choice) {
+                    console.error(`[telegram-ai] ${provider.name} no choices:`, JSON.stringify(data).slice(0, 300))
+                    throw new Error('Respons AI tidak valid (no choices). Coba lagi nanti.')
+                }
+
+                if (data.usage) {
+                    totalIn += data.usage.prompt_tokens || 0
+                    totalOut += data.usage.completion_tokens || 0
+                }
+
+                console.log(`[telegram-ai] ${provider.name} iter ${iter}: finish_reason=${choice.finish_reason}, tool_calls=${!!choice.message?.tool_calls?.length}, tokens=${data.usage?.prompt_tokens || '?'}+${data.usage?.completion_tokens || '?'}`)
+
+                if (choice.message?.tool_calls?.length) {
+                    const assistantMsg = choice.message
+                    messages.push(assistantMsg)
+
+                    for (const tc of assistantMsg.tool_calls) {
+                        let args: Record<string, any> = {}
+                        try { args = JSON.parse(tc.function?.arguments || '{}') } catch { }
+
+                        console.log(`[telegram-ai] ${provider.name} calling tool: ${tc.function?.name}`, JSON.stringify(args))
+                        const toolResult = await executeTool(tc.function?.name, args)
+
+                        messages.push({
+                            role: 'tool',
+                            tool_call_id: tc.id,
+                            content: toolResult,
+                        })
+                    }
+                    continue
+                }
+
+                const elapsed = Date.now() - t0
+                console.log(`[telegram-ai] ${provider.name} DONE in ${elapsed}ms | total tokens: in=${totalIn}, out=${totalOut}, sum=${totalIn + totalOut}`)
+
+                if (choice.message?.content) {
+                    return choice.message.content
+                }
+
+                if (choice.finish_reason === 'stop' || choice.finish_reason === 'end_turn') {
+                    return choice.message?.content || '(AI tidak memberikan respons teks)'
+                }
+
+                console.warn('[telegram-ai] Unexpected state:', JSON.stringify(choice).slice(0, 300))
+                throw new Error('AI tidak dapat menyelesaikan permintaan.')
+            }
         } catch (err: any) {
-            if (err.name === 'AbortError') {
-                console.error('[telegram-ai] API timeout after', API_TIMEOUT_MS, 'ms')
-                return '⏱️ AI timeout — server terlalu lama merespons. Coba lagi nanti.'
-            }
-            console.error('[telegram-ai] Fetch error:', err)
-            return `❌ Gagal menghubungi AI: ${err.message}`
-        }
-
-        if (!res.ok) {
-            const body = await res.text()
-            console.error(`[telegram-ai] Adye API error ${res.status}:`, body.slice(0, 500))
-
-            if (res.status === 401) {
-                return '❌ API key tidak valid. Hubungi admin.'
-            }
-            if (res.status === 429) {
-                return '⏳ Rate limit tercapai. Coba lagi dalam beberapa detik.'
-            }
-            if (res.status === 404) {
-                return `❌ Model "${ADYE_MODEL}" tidak ditemukan di API. Hubungi admin untuk cek konfigurasi.`
-            }
-            return `❌ Error dari AI (HTTP ${res.status}). Coba lagi nanti.`
-        }
-
-        let data: any
-        try {
-            data = await res.json()
-        } catch (err) {
-            console.error('[telegram-ai] Failed to parse JSON response:', err)
-            return '❌ Respons AI tidak valid (bukan JSON). Coba lagi nanti.'
-        }
-
-        const choice = data.choices?.[0]
-
-        if (!choice) {
-            console.error('[telegram-ai] No choices in response:', JSON.stringify(data).slice(0, 300))
-            return '❌ Respons AI tidak valid (no choices). Coba lagi nanti.'
-        }
-
-        // Akumulasi token usage (jika API ngembaliin field usage)
-        if (data.usage) {
-            totalIn += data.usage.prompt_tokens || 0
-            totalOut += data.usage.completion_tokens || 0
-        }
-
-        console.log(`[telegram-ai] Iter ${iter}: finish_reason=${choice.finish_reason}, tool_calls=${!!choice.message?.tool_calls?.length}, tokens=${data.usage?.prompt_tokens || '?'}+${data.usage?.completion_tokens || '?'}`)
-
-        // AI mau panggil tool — cek ini DULU sebelum cek finish_reason
-        if (choice.message?.tool_calls?.length) {
-            const assistantMsg = choice.message
-            messages.push(assistantMsg)
-
-            // Eksekusi semua tool calls
-            for (const tc of assistantMsg.tool_calls) {
-                let args: Record<string, any> = {}
-                try { args = JSON.parse(tc.function?.arguments || '{}') } catch { }
-
-                console.log(`[telegram-ai] Calling tool: ${tc.function?.name}`, JSON.stringify(args))
-                const toolResult = await executeTool(tc.function?.name, args)
-
-                messages.push({
-                    role: 'tool',
-                    tool_call_id: tc.id,
-                    content: toolResult,
-                })
-            }
-            // Lanjut ke iterasi berikutnya — AI akan proses hasil tool
+            const msg = err?.message || 'Unknown error'
+            providerErrors.push(`${provider.name}: ${msg}`)
+            console.error(`[telegram-ai] Provider ${provider.name} gagal:`, msg)
             continue
         }
-
-        // AI selesai — kembalikan respons teks
-        const elapsed = Date.now() - t0
-        console.log(`[telegram-ai] DONE in ${elapsed}ms | total tokens: in=${totalIn}, out=${totalOut}, sum=${totalIn + totalOut}`)
-
-        if (choice.message?.content) {
-            return choice.message.content
-        }
-
-        // Jika finish_reason = stop tapi content kosong
-        if (choice.finish_reason === 'stop' || choice.finish_reason === 'end_turn') {
-            return choice.message?.content || '(AI tidak memberikan respons teks)'
-        }
-
-        // Fallback
-        console.warn('[telegram-ai] Unexpected state:', JSON.stringify(choice).slice(0, 300))
-        break
     }
 
-    console.log(`[telegram-ai] LOOP EXIT | total tokens: in=${totalIn}, out=${totalOut}`)
-    return '⚠️ AI tidak dapat menyelesaikan permintaan. Coba pertanyaan yang lebih spesifik.'
+    console.log(`[telegram-ai] Semua provider gagal: ${providerErrors.join(' | ')}`)
+    return '⚠️ AI sedang bermasalah saat ini. Coba lagi sebentar lagi, atau gunakan command cepat seperti /omzet, /stok, dan /laporan.'
 }

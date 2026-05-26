@@ -449,7 +449,7 @@ export async function GET() {
             botToken: hasToken ? '✅ configured' : '❌ missing',
             adyeApiKey: hasAdyeKey ? '✅ configured' : '❌ missing',
             adyeModel: process.env.ADYE_MODEL || 'claude-sonnet-4-6',
-            adyeBaseUrl: process.env.ADYE_BASE_URL || 'https://adye.dev/v1',
+            adyeBaseUrl: process.env.ADYE_BASE_URL || 'https://antigravity.u9uhfo.easypanel.host/v1',
             ownerChatIds: ownerIds.length > 0 ? `✅ ${ownerIds.length} ID(s)` : '❌ none',
         },
         timestamp: new Date().toISOString(),

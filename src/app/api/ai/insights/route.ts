@@ -256,18 +256,19 @@ export async function POST(request: NextRequest) {
   if (!session.isLoggedIn) return apiError('Unauthorized', 401)
   if (session.userRole !== 'OWNER') return apiError('Hanya Owner yang bisa generate AI Insights', 403)
 
-  const apiKey = process.env.SUMOPOD_API_KEY
-  if (!apiKey) return apiError('SUMOPOD_API_KEY belum di-set di environment', 500)
+  const apiKey = process.env.ADYE_API_KEY
+  if (!apiKey) return apiError('ADYE_API_KEY belum di-set di environment', 500)
 
-  const MODEL = 'gpt-4o-mini'
+  const BASE_URL = process.env.ADYE_BASE_URL || 'https://antigravity.u9uhfo.easypanel.host/v1'
+  const MODEL = process.env.ADYE_MODEL || 'claude-sonnet-4-6'
 
   try {
     const periodType = (request.nextUrl.searchParams.get('type') || 'monthly') as 'monthly' | 'weekly'
     const data = await collectPerformanceData(periodType)
     const prompt = buildPrompt(data)
 
-    // Call SumoPod API (OpenAI-compatible)
-    const aiRes = await fetch('https://ai.sumopod.com/v1/chat/completions', {
+    // Call AI API (OpenAI-compatible)
+    const aiRes = await fetch(`${BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -283,7 +284,7 @@ export async function POST(request: NextRequest) {
 
     if (!aiRes.ok) {
       const errText = await aiRes.text()
-      return apiError(`SumoPod API error: ${errText}`, 500)
+      return apiError(`AI API error: ${errText}`, 500)
     }
 
     const aiText = await aiRes.text()
@@ -291,7 +292,7 @@ export async function POST(request: NextRequest) {
     try {
       aiJson = JSON.parse(aiText)
     } catch (e: any) {
-      return apiError(`SumoPod API mengembalikan format bukan JSON. Status: ${aiRes.status}. Text: ${aiText.substring(0, 100)}...`, 500)
+      return apiError(`AI API mengembalikan format bukan JSON. Status: ${aiRes.status}. Text: ${aiText.substring(0, 100)}...`, 500)
     }
     const content = aiJson?.choices?.[0]?.message?.content ?? 'Tidak ada respons dari AI.'
 
