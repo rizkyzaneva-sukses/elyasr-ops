@@ -1,6 +1,6 @@
 /**
- * Telegram AI Assistant — menggunakan Adye API (OpenAI-compatible)
- * dengan Claude Sonnet dan tool calling untuk query data bisnis.
+ * Telegram AI Assistant — menggunakan Adye API (OpenAI-compatible) sebagai primary
+ * dan SumoPod sebagai backup. Auto-failover jika provider pertama down.
  */
 
 import {
@@ -22,18 +22,18 @@ import {
 } from '@/lib/bot-tools'
 
 // ─────────────────────────────────────────────
-// Config
+// Config — Primary: Adye | Backup: SumoPod
 // ─────────────────────────────────────────────
 const ADYE_BASE_URL = process.env.ADYE_BASE_URL || 'https://antigravity.u9uhfo.easypanel.host/v1'
 const ADYE_MODEL = process.env.ADYE_MODEL || 'claude-sonnet-4-6'
 const ADYE_API_KEY = process.env.ADYE_API_KEY || ''
-const SUMOPOD_BASE_URL = 'https://ai.sumopod.com/v1'
-const SUMOPOD_MODEL = 'gpt-4o-mini'
+
+const SUMOPOD_BASE_URL = process.env.SUMOPOD_BASE_URL || 'https://ai.sumopod.com/v1'
+const SUMOPOD_MODEL = process.env.SUMOPOD_MODEL || 'gpt-4o-mini'
 const SUMOPOD_API_KEY = process.env.SUMOPOD_API_KEY || ''
 
 // Timeout untuk API call (30 detik)
 const API_TIMEOUT_MS = 30_000
-
 // ─────────────────────────────────────────────
 // System prompt — di-generate fresh setiap call agar tanggal selalu akurat
 // ─────────────────────────────────────────────
@@ -547,7 +547,7 @@ export async function processWithAI(userMessage: string): Promise<string> {
     const providers = buildProviders()
     if (providers.length === 0) {
         console.error('[telegram-ai] AI provider belum dikonfigurasi')
-        return '❌ AI belum dikonfigurasi (ADYE_API_KEY kosong). Hubungi admin.'
+        return '❌ AI belum dikonfigurasi (ADYE_API_KEY & SUMOPOD_API_KEY kosong). Hubungi admin.'
     }
 
     console.log(`[telegram-ai] Processing: "${userMessage.slice(0, 80)}" | providers=${providers.map(p => `${p.name}:${p.model}`).join(', ')}`)
