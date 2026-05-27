@@ -96,6 +96,22 @@ NEXT_PUBLIC_APP_NAME=ELYASR Business Operation
 
 # Mode
 NODE_ENV=production
+
+# ──────────────────────────────────────────
+# AI PRIMARY — Adye / Antigravity
+# App akan mencoba provider ini pertama kali
+# ──────────────────────────────────────────
+ADYE_API_KEY=ISI_DENGAN_ADYE_API_KEY
+ADYE_BASE_URL=https://antigravity.u9uhfo.easypanel.host/v1
+ADYE_MODEL=claude-sonnet-4-6
+
+# ──────────────────────────────────────────
+# AI BACKUP — SumoPod (auto-failover)
+# Digunakan otomatis jika Adye gagal/timeout
+# ──────────────────────────────────────────
+SUMOPOD_API_KEY=sk-Am9_VYRlVdrdsdFxbxcvfw--
+SUMOPOD_BASE_URL=https://ai.sumopod.com/v1
+SUMOPOD_MODEL=gpt-4o-mini
 ```
 
 > ⚠️ **PENTING:**
@@ -225,12 +241,20 @@ Pastikan **Build Arguments** sudah diisi dengan benar, terutama `DATABASE_URL`.
 
 ## 📌 Ringkasan Environment Variables
 
-| Variable               | Wajib | Contoh Nilai                                              |
+| Variable               | Wajib | Keterangan                                                |
 |------------------------|-------|-----------------------------------------------------------|
 | `DATABASE_URL`         | ✅    | `postgresql://elyasr_user:pass@elyasr-db:5432/elyasr_ops` |
-| `SESSION_SECRET`       | ✅    | `a3f8...` (32+ karakter hex)                              |
+| `SESSION_SECRET`       | ✅    | Random string minimal 32 karakter hex                     |
 | `NEXT_PUBLIC_APP_NAME` | ✅    | `ELYASR Business Operation`                               |
 | `NODE_ENV`             | ✅    | `production`                                              |
+| `ADYE_API_KEY`         | ⚠️    | API key Adye/Antigravity (AI primary)                     |
+| `ADYE_BASE_URL`        | ⚠️    | `https://antigravity.u9uhfo.easypanel.host/v1`            |
+| `ADYE_MODEL`           | ⚠️    | `claude-sonnet-4-6`                                       |
+| `SUMOPOD_API_KEY`      | ⚠️    | API key SumoPod (AI backup/failover)                      |
+| `SUMOPOD_BASE_URL`     | ⚠️    | `https://ai.sumopod.com/v1`                               |
+| `SUMOPOD_MODEL`        | ⚠️    | `gpt-4o-mini`                                             |
+
+> ⚠️ = Wajib jika menggunakan fitur AI Telegram Bot. Minimal satu dari Adye atau SumoPod harus diisi.
 
 ---
 
