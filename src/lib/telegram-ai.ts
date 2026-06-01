@@ -1,6 +1,6 @@
 /**
- * Telegram AI Assistant — menggunakan Adye API (OpenAI-compatible) sebagai primary
- * dan SumoPod sebagai backup. Auto-failover jika provider pertama down.
+ * Telegram AI Assistant — 3-slot provider dengan auto-failover.
+ * Slot 1 (prioritas utama) → Slot 2 (fallback 1) → Slot 3 (fallback terakhir)
  */
 
 import {
@@ -22,15 +22,19 @@ import {
 } from '@/lib/bot-tools'
 
 // ─────────────────────────────────────────────
-// Config — Primary: Adye | Backup: SumoPod
+// Config — 3 Slot Provider (auto-failover)
 // ─────────────────────────────────────────────
-const ADYE_BASE_URL = process.env.ADYE_BASE_URL || 'https://antigravity.u9uhfo.easypanel.host/v1'
-const ADYE_MODEL = process.env.ADYE_MODEL || 'claude-sonnet-4-6'
-const ADYE_API_KEY = process.env.ADYE_API_KEY || ''
+const SLOT1_BASE_URL = process.env.ANTIGRAVITY_URL_1 || ''
+const SLOT1_API_KEY  = process.env.ANTIGRAVITY_KEY_1 || ''
+const SLOT1_MODEL    = process.env.ANTIGRAVITY_MODEL_1 || ''
 
-const SUMOPOD_BASE_URL = process.env.SUMOPOD_BASE_URL || 'https://ai.sumopod.com/v1'
-const SUMOPOD_MODEL = process.env.SUMOPOD_MODEL || 'gpt-4o-mini'
-const SUMOPOD_API_KEY = process.env.SUMOPOD_API_KEY || ''
+const SLOT2_BASE_URL = process.env.ANTIGRAVITY_URL_2 || ''
+const SLOT2_API_KEY  = process.env.ANTIGRAVITY_KEY_2 || ''
+const SLOT2_MODEL    = process.env.ANTIGRAVITY_MODEL_2 || ''
+
+const SLOT3_BASE_URL = process.env.ANTIGRAVITY_URL_3 || ''
+const SLOT3_API_KEY  = process.env.ANTIGRAVITY_KEY_3 || ''
+const SLOT3_MODEL    = process.env.ANTIGRAVITY_MODEL_3 || ''
 
 // Timeout untuk API call (30 detik)
 const API_TIMEOUT_MS = 30_000
@@ -511,21 +515,30 @@ async function callProvider(
 function buildProviders(): ProviderConfig[] {
     const providers: ProviderConfig[] = []
 
-    if (ADYE_API_KEY) {
+    if (SLOT1_API_KEY && SLOT1_BASE_URL) {
         providers.push({
-            name: 'Adye',
-            baseUrl: ADYE_BASE_URL,
-            apiKey: ADYE_API_KEY,
-            model: ADYE_MODEL,
+            name: 'Slot1',
+            baseUrl: SLOT1_BASE_URL,
+            apiKey: SLOT1_API_KEY,
+            model: SLOT1_MODEL,
         })
     }
 
-    if (SUMOPOD_API_KEY) {
+    if (SLOT2_API_KEY && SLOT2_BASE_URL) {
         providers.push({
-            name: 'SumoPod',
-            baseUrl: SUMOPOD_BASE_URL,
-            apiKey: SUMOPOD_API_KEY,
-            model: SUMOPOD_MODEL,
+            name: 'Slot2',
+            baseUrl: SLOT2_BASE_URL,
+            apiKey: SLOT2_API_KEY,
+            model: SLOT2_MODEL,
+        })
+    }
+
+    if (SLOT3_API_KEY && SLOT3_BASE_URL) {
+        providers.push({
+            name: 'Slot3',
+            baseUrl: SLOT3_BASE_URL,
+            apiKey: SLOT3_API_KEY,
+            model: SLOT3_MODEL,
         })
     }
 
@@ -547,7 +560,7 @@ export async function processWithAI(userMessage: string): Promise<string> {
     const providers = buildProviders()
     if (providers.length === 0) {
         console.error('[telegram-ai] AI provider belum dikonfigurasi')
-        return '❌ AI belum dikonfigurasi (ADYE_API_KEY & SUMOPOD_API_KEY kosong). Hubungi admin.'
+        return '❌ AI belum dikonfigurasi (semua slot ANTIGRAVITY_KEY kosong). Hubungi admin.'
     }
 
     console.log(`[telegram-ai] Processing: "${userMessage.slice(0, 80)}" | providers=${providers.map(p => `${p.name}:${p.model}`).join(', ')}`)

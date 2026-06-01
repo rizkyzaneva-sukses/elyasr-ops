@@ -256,55 +256,78 @@ export async function POST(request: NextRequest) {
   if (!session.isLoggedIn) return apiError('Unauthorized', 401)
   if (session.userRole !== 'OWNER') return apiError('Hanya Owner yang bisa generate AI Insights', 403)
 
-  const apiKey = process.env.ADYE_API_KEY
-  if (!apiKey) return apiError('ADYE_API_KEY belum di-set di environment', 500)
+  const apiKey = process.env.ANTIGRAVITY_KEY_1 || process.env.ANTIGRAVITY_KEY_2 || process.env.ANTIGRAVITY_KEY_3
+  if (!apiKey) return apiError('Semua ANTIGRAVITY_KEY belum di-set di environment', 500)
 
-  const BASE_URL = process.env.ADYE_BASE_URL || 'https://antigravity.u9uhfo.easypanel.host/v1'
-  const MODEL = process.env.ADYE_MODEL || 'claude-sonnet-4-6'
+  const providers = [
+    { url: process.env.ANTIGRAVITY_URL_1, key: process.env.ANTIGRAVITY_KEY_1, model: process.env.ANTIGRAVITY_MODEL_1, name: 'Slot1' },
+    { url: process.env.ANTIGRAVITY_URL_2, key: process.env.ANTIGRAVITY_KEY_2, model: process.env.ANTIGRAVITY_MODEL_2, name: 'Slot2' },
+    { url: process.env.ANTIGRAVITY_URL_3, key: process.env.ANTIGRAVITY_KEY_3, model: process.env.ANTIGRAVITY_MODEL_3, name: 'Slot3' },
+  ].filter(p => p.url && p.key) as { url: string; key: string; model: string; name: string }[]
+
+  if (providers.length === 0) return apiError('Tidak ada AI provider yang dikonfigurasi', 500)
 
   try {
     const periodType = (request.nextUrl.searchParams.get('type') || 'monthly') as 'monthly' | 'weekly'
     const data = await collectPerformanceData(periodType)
     const prompt = buildPrompt(data)
 
-    // Call AI API (OpenAI-compatible)
-    const aiRes = await fetch(`${BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 1500,
-        temperature: 0.7,
-      }),
-    })
+    let content = ''
+    let modelUsed = ''
+    const errors: string[] = []
 
-    if (!aiRes.ok) {
-      const errText = await aiRes.text()
-      return apiError(`AI API error: ${errText}`, 500)
+    for (const provider of providers) {
+      try {
+        const aiRes = await fetch(`${provider.url}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${provider.key}`,
+          },
+          body: JSON.stringify({
+            model: provider.model,
+            messages: [{ role: 'user', content: prompt }],
+            max_tokens: 1500,
+            temperature: 0.7,
+          }),
+          signal: AbortSignal.timeout(30000),
+        })
+
+        if (!aiRes.ok) {
+          const errText = await aiRes.text()
+          errors.push(`${provider.name}: HTTP ${aiRes.status} — ${errText.slice(0, 200)}`)
+          continue
+        }
+
+        const aiText = await aiRes.text()
+        let aiJson: any
+        try {
+          aiJson = JSON.parse(aiText)
+        } catch {
+          errors.push(`${provider.name}: Response bukan JSON`)
+          continue
+        }
+
+        content = aiJson?.choices?.[0]?.message?.content ?? ''
+        modelUsed = provider.model
+        if (content) break
+      } catch (err: any) {
+        errors.push(`${provider.name}: ${err.message}`)
+      }
     }
 
-    const aiText = await aiRes.text()
-    let aiJson;
-    try {
-      aiJson = JSON.parse(aiText)
-    } catch (e: any) {
-      return apiError(`AI API mengembalikan format bukan JSON. Status: ${aiRes.status}. Text: ${aiText.substring(0, 100)}...`, 500)
+    if (!content) {
+      return apiError(`Semua AI provider gagal: ${errors.join(' | ')}`, 500)
     }
-    const content = aiJson?.choices?.[0]?.message?.content ?? 'Tidak ada respons dari AI.'
 
-    // Simpan ke DB
     const nowWIB  = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
-    const period  = nowWIB.toISOString().slice(0, 7) // YYYY-MM
+    const period  = nowWIB.toISOString().slice(0, 7)
     const insight = await prisma.aiInsight.create({
       data: {
         period,
         periodType,
         content,
-        modelUsed: MODEL,
+        modelUsed,
         generatedBy: session.username,
         dataSnapshot: data as any,
       },

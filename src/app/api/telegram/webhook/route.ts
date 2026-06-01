@@ -439,7 +439,9 @@ export async function POST(req: NextRequest) {
 // ─────────────────────────────────────────────
 export async function GET() {
     const hasToken = !!(await getBotToken())
-    const hasAdyeKey = !!process.env.ADYE_API_KEY
+    const hasSlot1 = !!(process.env.ANTIGRAVITY_KEY_1 && process.env.ANTIGRAVITY_URL_1)
+    const hasSlot2 = !!(process.env.ANTIGRAVITY_KEY_2 && process.env.ANTIGRAVITY_URL_2)
+    const hasSlot3 = !!(process.env.ANTIGRAVITY_KEY_3 && process.env.ANTIGRAVITY_URL_3)
     const ownerIds = OWNER_CHAT_ID.split(',').map((s: string) => s.trim()).filter(Boolean)
 
     return NextResponse.json({
@@ -447,9 +449,9 @@ export async function GET() {
         status: 'Webhook endpoint active',
         config: {
             botToken: hasToken ? '✅ configured' : '❌ missing',
-            adyeApiKey: hasAdyeKey ? '✅ configured' : '❌ missing',
-            adyeModel: process.env.ADYE_MODEL || 'claude-sonnet-4-6',
-            adyeBaseUrl: process.env.ADYE_BASE_URL || 'https://antigravity.u9uhfo.easypanel.host/v1',
+            slot1: hasSlot1 ? `✅ ${process.env.ANTIGRAVITY_MODEL_1} @ ${process.env.ANTIGRAVITY_URL_1}` : '❌ missing',
+            slot2: hasSlot2 ? `✅ ${process.env.ANTIGRAVITY_MODEL_2} @ ${process.env.ANTIGRAVITY_URL_2}` : '❌ missing',
+            slot3: hasSlot3 ? `✅ ${process.env.ANTIGRAVITY_MODEL_3} @ ${process.env.ANTIGRAVITY_URL_3}` : '❌ missing',
             ownerChatIds: ownerIds.length > 0 ? `✅ ${ownerIds.length} ID(s)` : '❌ none',
         },
         timestamp: new Date().toISOString(),
