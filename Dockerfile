@@ -50,5 +50,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# FIX: CMD yang benar dengan grouping
-CMD ["sh", "-c", "node node_modules/prisma/build/index.js db push --accept-data-loss || echo 'Prisma push failed, starting anyway' && node server.js"]
+# Production: deploy migrations first, then start the app
+CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]
