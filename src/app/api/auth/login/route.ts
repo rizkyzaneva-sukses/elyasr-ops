@@ -3,11 +3,19 @@ import { prisma } from '@/lib/prisma'
 import { getIronSession } from 'iron-session'
 import { SessionData, sessionOptions } from '@/lib/session'
 import { apiError } from '@/lib/utils'
+import { checkRateLimit, getClientId, RATE_LIMITS } from '@/lib/rate-limit'
 import bcrypt from 'bcryptjs'
 import { cookies } from 'next/headers'
 
 // POST /api/auth/login
 export async function POST(request: NextRequest) {
+  // Rate limit: 5 attempts per minute per IP
+  const clientId = getClientId(request)
+  const rateLimit = checkRateLimit(`login:${clientId}`, RATE_LIMITS.LOGIN)
+  if (!rateLimit.allowed) {
+    return apiError(`Terlalu banyak percobaan. Coba lagi dalam ${rateLimit.retryAfterSeconds} detik.`, 429)
+  }
+
   try {
     const body = await request.json()
     const { username, password } = body
