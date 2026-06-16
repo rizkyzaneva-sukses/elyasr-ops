@@ -1,7 +1,6 @@
-import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/session'
-import { apiSuccess, apiError, calculateSOH } from '@/lib/utils'
+import { apiSuccess, calculateSOH } from '@/lib/utils'
+import { withFinance } from '@/lib/api-helpers'
 
 /**
  * GET /api/alerts
@@ -12,25 +11,18 @@ import { apiSuccess, apiError, calculateSOH } from '@/lib/utils'
  *   summary: { emptyCount, lowCount, overdue24h, overdue48h }
  * }
  */
-export async function GET(_request: NextRequest) {
-  const session = await getSession()
-  if (!session.isLoggedIn) return apiError('Unauthorized', 401)
-  if (!['OWNER', 'FINANCE'].includes(session.userRole)) return apiError('Forbidden', 403)
-
+export const GET = withFinance(async (session) => {
   const [products, ledgerEntries, overdueOrders] = await Promise.all([
-    // All active products with category
     prisma.masterProduct.findMany({
       where: { isActive: true },
       include: { category: { select: { categoryName: true } } },
       orderBy: { sku: 'asc' },
     }),
 
-    // All inventory ledger
     prisma.inventoryLedger.findMany({
       select: { sku: true, direction: true, qty: true, trxDate: true },
     }),
 
-    // Orders pending lebih dari 24 jam
     prisma.$queryRaw<{
       id: string
       order_no: string
@@ -43,14 +35,7 @@ export async function GET(_request: NextRequest) {
       hours_pending: number
     }[]>`
       SELECT
-        id,
-        order_no,
-        platform,
-        sku,
-        receiver_name,
-        city,
-        status,
-        created_at,
+        id, order_no, platform, sku, receiver_name, city, status, created_at,
         ROUND(EXTRACT(EPOCH FROM (NOW() - created_at)) / 3600) AS hours_pending
       FROM orders
       WHERE status NOT LIKE 'TERKIRIM%'
@@ -71,7 +56,7 @@ export async function GET(_request: NextRequest) {
     ledgerBySku.set(entry.sku, list)
   }
 
-  // Calculate SOH per product — same logic as /api/inventory
+  // Calculate SOH per product
   const withSoh = products.map(p => {
     const entries = ledgerBySku.get(p.sku) ?? []
     const soh = calculateSOH(
@@ -96,11 +81,9 @@ export async function GET(_request: NextRequest) {
     }
   })
 
-  // Separate by stock status
   const stockEmpty = withSoh.filter(p => p.soh <= 0).sort((a, b) => a.soh - b.soh)
-  const stockLow   = withSoh.filter(p => p.soh > 0 && p.soh <= p.rop).sort((a, b) => a.soh - b.soh)
+  const stockLow = withSoh.filter(p => p.soh > 0 && p.soh <= p.rop).sort((a, b) => a.soh - b.soh)
 
-  // Format overdue orders
   const orderOverdue = (overdueOrders as any[]).map(o => ({
     id: o.id,
     orderNo: o.order_no,
@@ -127,4 +110,4 @@ export async function GET(_request: NextRequest) {
       overdue48h: overdue48h.length,
     },
   })
-}
+})

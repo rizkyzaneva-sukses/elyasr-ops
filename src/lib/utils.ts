@@ -1,8 +1,29 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { toZonedTime, format as formatTz } from 'date-fns-tz'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
+}
+
+// ── Timezone WIB (Asia/Jakarta) ─────────────────────────
+// Centralized WIB helpers — gunakan ini daripada manual
+// `new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' })`
+export const WIB = 'Asia/Jakarta'
+
+/** Dapatkan "sekarang" dalam zona WIB */
+export function nowWIB(): Date {
+  return toZonedTime(new Date(), WIB)
+}
+
+/** Format Date ke string di zona WIB */
+export function formatWIB(d: Date, pattern: string): string {
+  return formatTz(d, pattern, { timeZone: WIB })
+}
+
+/** Dapatkan tanggal hari ini di WIB sebagai string YYYY-MM-DD */
+export function todayWIBStr(): string {
+  return formatTz(nowWIB(), 'yyyy-MM-dd', { timeZone: WIB })
 }
 
 // ── Format currency (IDR) ──────────────────────────────

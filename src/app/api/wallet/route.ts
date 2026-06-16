@@ -1,14 +1,9 @@
-import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/session'
 import { apiSuccess, apiError } from '@/lib/utils'
+import { withFinance } from '@/lib/api-helpers'
 
 // GET /api/wallet — all wallets with balance
-export async function GET(request: NextRequest) {
-  const session = await getSession()
-  if (!session.isLoggedIn) return apiError('Unauthorized', 401)
-  if (!['OWNER', 'FINANCE'].includes(session.userRole)) return apiError('Forbidden', 403)
-
+export const GET = withFinance(async (session) => {
   const wallets = await prisma.wallet.findMany({
     where: { isActive: true },
     orderBy: { name: 'asc' },
@@ -28,14 +23,10 @@ export async function GET(request: NextRequest) {
   }))
 
   return apiSuccess(result)
-}
+})
 
 // POST /api/wallet — create wallet
-export async function POST(request: NextRequest) {
-  const session = await getSession()
-  if (!session.isLoggedIn) return apiError('Unauthorized', 401)
-  if (!['OWNER', 'FINANCE'].includes(session.userRole)) return apiError('Forbidden', 403)
-
+export const POST = withFinance(async (session, request) => {
   const body = await request.json()
   const { name, isAdsBudget, linkedPlatform } = body
   if (!name) return apiError('Nama wallet wajib diisi')
@@ -43,9 +34,9 @@ export async function POST(request: NextRequest) {
   const wallet = await prisma.wallet.create({
     data: {
       name,
-      ...(isAdsBudget     !== undefined && { isAdsBudget }),
-      ...(linkedPlatform  !== undefined && { linkedPlatform }),
+      ...(isAdsBudget !== undefined && { isAdsBudget }),
+      ...(linkedPlatform !== undefined && { linkedPlatform }),
     },
   })
   return apiSuccess(wallet, 201)
-}
+})
