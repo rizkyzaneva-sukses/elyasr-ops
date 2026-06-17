@@ -1,7 +1,8 @@
 'use client'
 
 import { AppLayout } from '@/components/layout/app-layout'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useAuth } from '@/lib/session.client'
 import {
   BookOpen, LayoutDashboard, ShoppingCart, Package, ScanLine,
   Wallet, Users, Shield, ClipboardCheck, Building2, CreditCard,
@@ -10,6 +11,7 @@ import {
   ChevronDown, ChevronRight, CheckCircle2, Clock, Zap,
   ArrowRight, Star, Info, Boxes, Receipt, PiggyBank,
   Landmark, PackageSearch, Truck, BadgeCheck, CircleDot,
+  Lock, Unlock, Eye, EyeOff, Lightbulb,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -49,7 +51,175 @@ interface RoleData {
   importantNotes: string[]
 }
 
+interface OwnerSecretFeature {
+  title: string
+  icon: React.ElementType
+  desc: string
+  details: string[]
+  useCases: string[]
+  tips: string[]
+}
+
 // ─── Role Data ────────────────────────────────────────────────────────────────
+
+const OWNER_SECRET_FEATURES: OwnerSecretFeature[] = [
+  {
+    title: '🔐 User Management & Role Assignment',
+    icon: Users,
+    desc: 'Buat, edit, dan kelola akun pengguna dengan role assignment. Kontrol siapa yang bisa akses modul apa.',
+    details: [
+      'Buat user baru dengan username & password unik',
+      'Assign role: OWNER, FINANCE, STAFF, EXTERNAL',
+      'Edit user: nama, role, password, status aktif/nonaktif',
+      'Bulk deactivate users yang sudah resign',
+      'Reset password user jika lupa',
+      'Track user activity melalui audit logs',
+    ],
+    useCases: [
+      'Onboard karyawan baru → buat user + assign role STAFF/FINANCE',
+      'Promosi user → ubah role dari STAFF ke FINANCE',
+      'Offboard → deactivate akun untuk security',
+      'Vendor integration → create EXTERNAL user untuk mitra',
+    ],
+    tips: [
+      'JANGAN share admin credentials dengan siapa saja',
+      'Ganti default password admin (admin/admin123) setelah first login',
+      'Backup passwords lama sebelum reset',
+      'Monitor user activity di Audit Logs jika ada aktivitas mencurigakan',
+    ],
+  },
+  {
+    title: '📊 Audit Trail & Activity Monitoring',
+    icon: BarChart3,
+    desc: 'Pantau semua aktivitas sistem: siapa edit apa, kapan, dan hasilnya. Essential untuk compliance & security audit.',
+    details: [
+      'Real-time log: CREATE, UPDATE, DELETE, SCAN, COMMIT, CANCEL',
+      'Filter by user, modul, date range',
+      'Lihat full detail: siapa, tanggal, waktu, perubahan data',
+      'Export audit log untuk arsip compliance',
+      'Search user activity spesifik',
+      'Detect anomali: edit data multiple kali, delete bulk, perubahan harga HPP',
+    ],
+    useCases: [
+      'Audit internal: verifikasi siapa yang edit harga/HPP bulan lalu',
+      'Investigasi bug: track kapan data corrupted',
+      'Compliance: siap untuk audit eksternal/pajak',
+      'Security: deteksi unauthorized access atau bulk delete',
+    ],
+    tips: [
+      'Rutin check audit logs 1x/minggu untuk anomali',
+      'Jika ada perubahan mencurigakan, cross-check dengan user yang bersangkutan',
+      'Archive audit logs bulanan untuk historical records',
+      'Alert: lebih dari 5 DELETE dalam 10 menit = suspicious activity',
+    ],
+  },
+  {
+    title: '💾 Data Backup & Restore',
+    icon: Database,
+    desc: 'Export semua data aplikasi dalam format JSON atau import kembali. Backup sebelum perubahan besar, import untuk disaster recovery.',
+    details: [
+      'Export all entities: products, orders, vendors, wallets, ledger, SKU mappings',
+      'Format JSON terstruktur dengan metadata (exportedAt, exportedBy)',
+      'Single entity export atau all-in-one backup',
+      'Import dengan duplicate handling: INSERT baru / UPDATE existing',
+      'Preview data sebelum import (preview count)',
+      'Restore dari backup lama kapan saja tanpa downtime',
+    ],
+    useCases: [
+      'Sebelum migrasi server → backup all data',
+      'Disaster recovery → restore dari backup harian',
+      'Migration antar sistem → export dari old system, import ke baru',
+      'Bulk data reset untuk testing → backup produksi, clear data, test, restore',
+      'Data analysis → export historical data untuk analisis di Excel/Python',
+    ],
+    tips: [
+      'Backup SETIAP HARI PUKUL 23:59 → simpan di drive/nas',
+      'Test restore backup 1x/bulan untuk ensure dapat direcover',
+      'Jangan export saat high traffic → bisa lambat/timeout',
+      'Simpan encrypted backup offline untuk disaster recovery',
+      'Dokumentasikan: tanggal backup, jumlah records, purpose',
+    ],
+  },
+  {
+    title: '⚙️ System Settings & Configuration',
+    icon: Shield,
+    desc: 'Konfigurasi platform fee, Telegram bot, master data, dan parameter sistem lainnya.',
+    details: [
+      'Platform fee: Shopee %, TikTok % (otomatis hitung net omzet)',
+      'Telegram bot config: chat ID, thread ID, schedule laporan',
+      'Report frequency: daily 14:00, weekly Senin 08:00, monthly tgl 1',
+      'Master categories: expense categories untuk profit calculation',
+      'ROP (Reorder Point): minimum stok default per kategori',
+      'HPP default: untuk produk baru',
+      'Currency & timezone setting',
+    ],
+    useCases: [
+      'Setup: konfigurasi platform fee saat pertama kali setup',
+      'Telegram integration: set chat ID untuk laporan otomatis',
+      'Adjust fee: jika Shopee/TikTok fee berubah, update langsung di setting',
+      'Master kategori: tambah kategori expense baru untuk akun akuntan',
+    ],
+    tips: [
+      'Platform fee harus akurat — mempengaruhi profit calculation',
+      'Telegram chat ID harus group/supergroup, bukan personal chat',
+      'Jangan asal ubah ROP default — bisa trigger false alerts stok',
+      'Backup setting sebelum perubahan besar',
+    ],
+  },
+  {
+    title: '🎯 Advanced Data Management',
+    icon: Database,
+    desc: 'Bulk operasi data: import, update, delete. Fitur power-user untuk manajemen skala besar.',
+    details: [
+      'Bulk delete products (soft delete/deactivate)',
+      'Bulk import products dari Excel dengan format standar',
+      'Update HPP & ROP bulk untuk kategori tertentu',
+      'Migrate SKU: merge/split produk dengan mapping',
+      'Bulk edit product metadata (category, unit, deskripsi)',
+      'CSV export/import untuk integration eksternal',
+    ],
+    useCases: [
+      'Stock reset: awal tahun, deactivate all products, import dari master baru',
+      'HPP adjustment: semua produk naikkan harga 10% → bulk update HPP',
+      'Category merge: pisahkan produk ke kategori baru → bulk recategorize',
+      'Marketplace sync: import produk dari Shopee bulk 500 SKU',
+    ],
+    tips: [
+      'ALWAYS backup sebelum bulk delete — tidak bisa undo!',
+      'Test dengan sample data dulu sebelum bulk import besar',
+      'Jangan import saat peak traffic hours (19:00-22:00)',
+      'Validate file format sebelum upload (check HPP, SKU unique)',
+      'Monitor server resources saat bulk operation berjalan',
+    ],
+  },
+  {
+    title: '🤖 AI Strategic Insights',
+    icon: Brain,
+    desc: 'AI-powered analytics untuk strategi bisnis: ROAS analysis, margin optimization, inventory forecasting, trend prediction.',
+    details: [
+      'Weekly AI Brief: ringkasan strategi untuk minggu depan',
+      'ROAS optimization: per platform, recommended budget reallocation',
+      'Margin analysis: produk paling profitable, produk loss-leader',
+      'Inventory forecast: prediksi penjualan 2 minggu ke depan',
+      'Trend analysis: produk trend naik/turun dalam 30 hari',
+      'Competitor pricing: rekomendasi harga vs kompetitor (jika data tersedia)',
+      'Cash flow forecast: proyeksi likuiditas bulan depan',
+    ],
+    useCases: [
+      'Setiap Senin pagi: baca AI Brief → buat keputusan strategis minggu ini',
+      'Optimalkan ad spend: lihat ROAS per platform → reallocate budget',
+      'Manage inventory: lihat forecast → buat PO lebih akurat, kurangi deadstock',
+      'Pricing strategy: lihat margin analysis → adjust harga produk low-margin',
+    ],
+    tips: [
+      'AI insights akurat hanya jika data bersih (cek audit logs untuk anomali)',
+      'Jangan 100% percaya AI — cross-check dengan domain knowledge Anda',
+      'Update master data rutin agar AI training data akurat',
+      'Archive AI Brief bulanan untuk historical analysis & learning',
+      'Share AI Insights dengan tim Finance/Manager untuk diskusi strategis',
+    ],
+  },
+]
 
 const ROLES: RoleData[] = [
   // ══════════════════════════════════════════════════════════ OWNER
@@ -588,6 +758,70 @@ function ModuleCard({ mod }: { mod: Module }) {
   )
 }
 
+function OwnerSecretCard({ feature }: { feature: OwnerSecretFeature }) {
+  const [open, setOpen] = useState(false)
+  const Icon = feature.icon
+  return (
+    <div className="bg-gradient-to-br from-emerald-950/40 to-zinc-900 border border-emerald-700/40 rounded-xl overflow-hidden">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-emerald-950/30 transition-colors text-left"
+      >
+        <div className="w-8 h-8 rounded-lg bg-emerald-900/40 border border-emerald-700/40 flex items-center justify-center shrink-0">
+          <Icon size={16} className="text-emerald-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-emerald-300">{feature.title}</p>
+          <p className="text-xs text-emerald-200/60 truncate">{feature.desc}</p>
+        </div>
+        {open ? <ChevronDown size={14} className="text-emerald-600 shrink-0" /> : <ChevronRight size={14} className="text-emerald-700 shrink-0" />}
+      </button>
+      {open && (
+        <div className="px-4 pb-4 border-t border-emerald-700/30 space-y-4">
+          {/* Details */}
+          <div className="mt-4">
+            <p className="text-xs font-semibold text-emerald-300 mb-2">📋 Fitur Detail:</p>
+            <ul className="space-y-1">
+              {feature.details.map((d, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <CheckCircle2 size={11} className="text-emerald-500 shrink-0 mt-0.5" />
+                  <span className="text-xs text-emerald-200/70">{d}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Use Cases */}
+          <div>
+            <p className="text-xs font-semibold text-emerald-300 mb-2">🎯 Use Cases:</p>
+            <ul className="space-y-1">
+              {feature.useCases.map((uc, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <Zap size={11} className="text-yellow-500 shrink-0 mt-0.5" />
+                  <span className="text-xs text-emerald-200/70">{uc}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Tips */}
+          <div>
+            <p className="text-xs font-semibold text-emerald-300 mb-2">💡 Pro Tips:</p>
+            <ul className="space-y-1">
+              {feature.tips.map((t, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <Lightbulb size={11} className="text-amber-500 shrink-0 mt-0.5" />
+                  <span className="text-xs text-emerald-200/70">{t}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function WorkflowCard({ step, index }: { step: WorkflowStep; index: number }) {
   const [open, setOpen] = useState(false)
   const Icon = step.icon
@@ -656,7 +890,24 @@ function WorkflowCard({ step, index }: { step: WorkflowStep; index: number }) {
 
 export default function DocumentationPage() {
   const [activeRole, setActiveRole] = useState<RoleKey>('OWNER')
+  const [showOwnerSecrets, setShowOwnerSecrets] = useState(false)
+  const [userRole, setUserRole] = useState<RoleKey | null>(null)
   const role = ROLES.find(r => r.key === activeRole)!
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await fetch('/api/auth/me')
+        const data = await res.json()
+        if (data.user?.userRole) {
+          setUserRole(data.user.userRole as RoleKey)
+        }
+      } catch (err) {
+        console.error('Failed to fetch user:', err)
+      }
+    }
+    fetchUser()
+  }, [])
 
   return (
     <AppLayout>
@@ -777,9 +1028,86 @@ export default function DocumentationPage() {
         </div>
       </div>
 
+      {/* 🔐 OWNER SECRET SECTION */}
+      {userRole === 'OWNER' && (
+        <div className="mt-10 pt-6 border-t border-emerald-700/30">
+          {/* Header */}
+          <div className="mb-6 pb-4 border-b border-emerald-700/30 flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Lock size={16} className="text-emerald-400" />
+                <h2 className="text-lg font-bold text-emerald-300">🔐 OWNER Secret Features</h2>
+              </div>
+              <p className="text-sm text-emerald-200/60 max-w-2xl">
+                Advanced administration tools dan fitur eksklusif Owner saja. Informasi ini tidak terlihat oleh role lain.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowOwnerSecrets(!showOwnerSecrets)}
+              className="px-4 py-2 rounded-lg bg-emerald-900/50 border border-emerald-700 text-emerald-400 hover:bg-emerald-900/70 text-sm font-medium transition-colors flex items-center gap-2 shrink-0"
+            >
+              {showOwnerSecrets ? (
+                <>
+                  <EyeOff size={14} />
+                  Sembunyikan
+                </>
+              ) : (
+                <>
+                  <Eye size={14} />
+                  Lihat Detail
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Secret Features Grid */}
+          {showOwnerSecrets && (
+            <div className="grid grid-cols-1 gap-3">
+              {OWNER_SECRET_FEATURES.map((feature, i) => (
+                <OwnerSecretCard key={i} feature={feature} />
+              ))}
+              
+              {/* Security Best Practices */}
+              <div className="mt-6 p-4 bg-red-950/20 border border-red-900/40 rounded-xl">
+                <p className="text-sm font-semibold text-red-400 mb-3 flex items-center gap-2">
+                  <Shield size={14} />
+                  🔒 Security Best Practices untuk Owner
+                </p>
+                <ul className="space-y-2">
+                  <li className="text-xs text-red-200/70 flex items-start gap-2">
+                    <span className="shrink-0">•</span>
+                    <span><strong>Jangan share credentials:</strong> Akun Owner adalah akses penuh ke sistem. Jangan bagikan username/password.</span>
+                  </li>
+                  <li className="text-xs text-red-200/70 flex items-start gap-2">
+                    <span className="shrink-0">•</span>
+                    <span><strong>Enable 2FA:</strong> Setup 2-factor authentication untuk proteksi maksimal.</span>
+                  </li>
+                  <li className="text-xs text-red-200/70 flex items-start gap-2">
+                    <span className="shrink-0">•</span>
+                    <span><strong>Monitor Audit Logs:</strong> Rutin check audit logs untuk deteksi anomali dan unauthorized access.</span>
+                  </li>
+                  <li className="text-xs text-red-200/70 flex items-start gap-2">
+                    <span className="shrink-0">•</span>
+                    <span><strong>Backup Rutin:</strong> Backup data setiap hari dan test restore 1x/bulan.</span>
+                  </li>
+                  <li className="text-xs text-red-200/70 flex items-start gap-2">
+                    <span className="shrink-0">•</span>
+                    <span><strong>Dokumentasi Perubahan:</strong> Log semua perubahan konfigurasi sistem untuk compliance.</span>
+                  </li>
+                  <li className="text-xs text-red-200/70 flex items-start gap-2">
+                    <span className="shrink-0">•</span>
+                    <span><strong>Training Team:</strong> Educate team tentang role dan permissions mereka, tidak over-grant akses.</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Footer */}
       <div className="mt-10 pt-6 border-t border-zinc-800 flex items-center justify-between">
-        <p className="text-xs text-zinc-600">ELYASR Management System · Panduan diperbarui Mei 2026</p>
+        <p className="text-xs text-zinc-600">ELYASR Management System · Panduan diperbarui 17 Juni 2026 · {userRole === 'OWNER' && <span className="text-emerald-600">✓ Owner Access</span>}</p>
         <div className="flex gap-2">
           {ROLES.map(r => (
             <span key={r.key} className={`text-[10px] font-bold px-2 py-0.5 rounded border ${ROLE_BADGE[r.key]}`}>
