@@ -2,9 +2,27 @@
 
 import { useState, useEffect } from 'react'
 import { useToast } from '@/components/ui/toaster'
-import { Loader2, Settings, CheckCircle2, Send, Bell, Eye, EyeOff } from 'lucide-react'
+import { Loader2, Settings, CheckCircle2, Send, Bell, Eye, EyeOff, Activity, RefreshCw, AlertTriangle } from 'lucide-react'
 
 export function TelegramSection() {
+  type Recipient = { id: string; name: string; chatId: string; threadId?: string | null; isActive: boolean }
+  type ScheduleData = { hour: number; minute: number; isActive: boolean } | null
+  type HealthData = {
+    scheduler: {
+      alive: boolean
+      heartbeatAt: string | null
+      heartbeatAgeSeconds: number | null
+      lastWib: string | null
+      schedule: string
+      isActive: boolean
+    }
+    reports: {
+      daily: { lastSentAt: string | null; schedule?: ScheduleData }
+      weekly: { lastSentAt: string | null; schedule?: ScheduleData }
+      monthly: { lastSentAt: string | null }
+    }
+  }
+
   const { toast } = useToast()
   const [botToken, setBotToken] = useState('')
   const [chatId, setChatId] = useState('')
@@ -25,8 +43,6 @@ export function TelegramSection() {
   const [weeklySchedHour, setWeeklySchedHour] = useState(8)
   const [weeklySchedMinute, setWeeklySchedMinute] = useState(0)
   const [savingWeeklySched, setSavingWeeklySched] = useState(false)
-  // Recipients
-  type Recipient = { id: string; name: string; chatId: string; threadId?: string | null; isActive: boolean }
   const [recipients, setRecipients] = useState<Recipient[]>([])
   const [loadingRecipients, setLoadingRecipients] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -35,6 +51,10 @@ export function TelegramSection() {
   const [newThreadId, setNewThreadId] = useState('')
   const [addingRecipient, setAddingRecipient] = useState(false)
   const [testingId, setTestingId] = useState<string | null>(null)
+  const [health, setHealth] = useState<HealthData | null>(null)
+  const [healthError, setHealthError] = useState<string | null>(null)
+  const [loadingHealth, setLoadingHealth] = useState(true)
+  const [refreshingHealth, setRefreshingHealth] = useState(false)
 
   useEffect(() => {
     // Load token + chat ID
@@ -75,12 +95,37 @@ export function TelegramSection() {
       .then(r => r.json())
       .then(d => { if (d.success) setRecipients(d.data) })
       .finally(() => setLoadingRecipients(false))
+
+    loadHealth()
+    const healthTimer = window.setInterval(() => {
+      loadHealth(true)
+    }, 30000)
+
+    return () => window.clearInterval(healthTimer)
   }, [])
 
   const loadRecipients = () => {
     fetch('/api/settings/telegram-recipients')
       .then(r => r.json())
       .then(d => { if (d.success) setRecipients(d.data) })
+  }
+
+  const loadHealth = async (silent = false) => {
+    if (silent) setRefreshingHealth(true)
+    else setLoadingHealth(true)
+
+    try {
+      const res = await fetch('/api/report/scheduler-status', { cache: 'no-store' })
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error || 'Gagal memuat status sistem')
+      setHealth(json)
+      setHealthError(null)
+    } catch (err: any) {
+      setHealthError(err.message || 'Gagal memuat status sistem')
+    } finally {
+      if (silent) setRefreshingHealth(false)
+      else setLoadingHealth(false)
+    }
   }
 
   const handleAddRecipient = async (e: React.FormEvent) => {
@@ -277,6 +322,21 @@ export function TelegramSection() {
 
   const activeRecipientCount = recipients.filter(r => r.isActive).length
   const hasTelegramTarget = Boolean(botToken && (chatId || activeRecipientCount > 0))
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return 'Belum ada'
+    return new Date(value).toLocaleString('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    })
+  }
+  const healthStale = !!health && !health.scheduler.alive
+  const dailyScheduleLabel = health?.reports.daily.schedule
+    ? `${String(health.reports.daily.schedule.hour).padStart(2, '0')}:${String(health.reports.daily.schedule.minute).padStart(2, '0')} WIB`
+    : `${String(schedHour).padStart(2, '0')}:${String(schedMinute).padStart(2, '0')} WIB`
+  const weeklyScheduleLabel = health?.reports.weekly.schedule
+    ? `Senin ${String(health.reports.weekly.schedule.hour).padStart(2, '0')}:${String(health.reports.weekly.schedule.minute).padStart(2, '0')} WIB`
+    : `Senin ${String(weeklySchedHour).padStart(2, '0')}:${String(weeklySchedMinute).padStart(2, '0')} WIB`
 
   return (
     <div className="mt-8 pt-8 border-t border-zinc-800">
@@ -288,6 +348,73 @@ export function TelegramSection() {
       <p className="text-xs text-zinc-500 mb-5">
         Laporan harian otomatis langsung dari aplikasi ke Telegram kamu — tidak perlu n8n lagi.
       </p>
+
+      <div className={`rounded-xl border p-4 mb-5 ${healthError || healthStale ? 'bg-red-950/20 border-red-800/50' : 'bg-zinc-900 border-zinc-800'}`}>
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2">
+            {healthError || healthStale ? (
+              <AlertTriangle size={16} className="text-red-400" />
+            ) : (
+              <Activity size={16} className="text-emerald-400" />
+            )}
+            <div>
+              <p className="text-sm font-semibold text-zinc-200">System Health</p>
+              <p className={`text-xs mt-0.5 ${healthError || healthStale ? 'text-red-300' : 'text-zinc-500'}`}>
+                {healthError
+                  ? 'Status sistem gagal dibaca dari server.'
+                  : healthStale
+                    ? 'Scheduler terdeteksi stale atau tidak mengirim heartbeat.'
+                    : 'Scheduler dan auto-report sedang berjalan normal.'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => loadHealth(true)}
+            disabled={refreshingHealth || loadingHealth}
+            className="flex items-center gap-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 border border-zinc-700 text-zinc-200 rounded-lg px-3 py-2 transition-colors"
+          >
+            <RefreshCw size={12} className={refreshingHealth || loadingHealth ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
+
+        {loadingHealth ? (
+          <div className="flex items-center gap-2 text-zinc-500 text-sm py-1">
+            <Loader2 size={14} className="animate-spin" /> Memuat status sistem...
+          </div>
+        ) : healthError ? (
+          <p className="text-xs text-red-300">{healthError}</p>
+        ) : health ? (
+          <div className="grid gap-2 text-xs text-zinc-300">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-lg bg-zinc-950/60 border border-zinc-800 px-3 py-2">
+                <p className="text-zinc-500 mb-1">Scheduler</p>
+                <p className={health.scheduler.alive ? 'text-emerald-300 font-medium' : 'text-red-300 font-medium'}>
+                  {health.scheduler.alive ? 'Alive' : 'Stale'}
+                </p>
+              </div>
+              <div className="rounded-lg bg-zinc-950/60 border border-zinc-800 px-3 py-2">
+                <p className="text-zinc-500 mb-1">Heartbeat Terakhir</p>
+                <p className="font-medium text-zinc-200">{formatDateTime(health.scheduler.heartbeatAt)}</p>
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-zinc-950/60 border border-zinc-800 px-3 py-2">
+              <p className="text-zinc-500 mb-1">Jadwal Aktif</p>
+              <p className="font-medium text-zinc-200">Daily: {dailyScheduleLabel}</p>
+              <p className="font-medium text-zinc-200">Weekly: {weeklyScheduleLabel}</p>
+            </div>
+
+            <div className="rounded-lg bg-zinc-950/60 border border-zinc-800 px-3 py-2">
+              <p className="text-zinc-500 mb-1">Laporan Terakhir</p>
+              <p className="text-zinc-200">Daily: {formatDateTime(health.reports.daily.lastSentAt)}</p>
+              <p className="text-zinc-200">Weekly: {formatDateTime(health.reports.weekly.lastSentAt)}</p>
+              <p className="text-zinc-200">Monthly: {formatDateTime(health.reports.monthly.lastSentAt)}</p>
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       {/* How to get Chat ID */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-5 text-xs text-zinc-400 space-y-1.5">
