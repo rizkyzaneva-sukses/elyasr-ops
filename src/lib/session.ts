@@ -10,8 +10,24 @@ export interface SessionData {
   isLoggedIn: boolean
 }
 
+const DEV_SESSION_SECRET = 'elyasr-ops-local-development-session-secret-32chars'
+
+function getSessionPassword() {
+  const sessionSecret = process.env.SESSION_SECRET
+
+  if (sessionSecret && sessionSecret.length >= 32) {
+    return sessionSecret
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    return DEV_SESSION_SECRET
+  }
+
+  throw new Error('SESSION_SECRET must be set and at least 32 characters long.')
+}
+
 export const sessionOptions: SessionOptions = {
-  password: process.env.SESSION_SECRET as string,
+  password: getSessionPassword(),
   cookieName: 'elyasr-session',
   cookieOptions: {
     secure: process.env.NODE_ENV === 'production',

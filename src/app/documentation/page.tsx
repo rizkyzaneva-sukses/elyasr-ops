@@ -2,7 +2,7 @@
 
 import { AppLayout } from '@/components/layout/app-layout'
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/lib/session.client'
+import { useAuth } from '@/components/providers'
 import {
   BookOpen, LayoutDashboard, ShoppingCart, Package, ScanLine,
   Wallet, Users, Shield, ClipboardCheck, Building2, CreditCard,
@@ -892,22 +892,12 @@ export default function DocumentationPage() {
   const [activeRole, setActiveRole] = useState<RoleKey>('OWNER')
   const [showOwnerSecrets, setShowOwnerSecrets] = useState(false)
   const [userRole, setUserRole] = useState<RoleKey | null>(null)
+  const { user } = useAuth()
   const role = ROLES.find(r => r.key === activeRole)!
 
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const res = await fetch('/api/auth/me')
-        const data = await res.json()
-        if (data.user?.userRole) {
-          setUserRole(data.user.userRole as RoleKey)
-        }
-      } catch (err) {
-        console.error('Failed to fetch user:', err)
-      }
-    }
-    fetchUser()
-  }, [])
+    setUserRole(user?.userRole ?? null)
+  }, [user])
 
   return (
     <AppLayout>
