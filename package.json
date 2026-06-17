@@ -15,7 +15,8 @@
     "db:migrate:prod": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
-    "db:seed:demo": "tsx prisma/seed-demo.ts"
+    "db:seed:demo": "tsx prisma/seed-demo.ts",
+    "db:fix": "prisma migrate resolve --applied 20260101000001_add_payout_platform_fields && prisma migrate resolve --applied 20260101000002_add_trx_date && prisma migrate resolve --applied 20260101000003_add_ads_wallet_fields && prisma migrate resolve --applied 20260101000004_add_app_settings && prisma migrate resolve --applied 20260101000005_add_sku_mappings && prisma migrate resolve --applied 20260616000000_init"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.2",
