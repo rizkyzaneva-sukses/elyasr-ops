@@ -1,13 +1,9 @@
-import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/session'
 import { apiSuccess, apiError, getPagination } from '@/lib/utils'
+import { withFinance } from '@/lib/api-helpers'
 
-export async function GET(request: NextRequest) {
-  const session = await getSession()
-  if (!session.isLoggedIn) return apiError('Unauthorized', 401)
-  if (!['OWNER', 'FINANCE'].includes(session.userRole)) return apiError('Forbidden', 403)
-
+// GET /api/vendors
+export const GET = withFinance(async (session, request) => {
   const { searchParams } = request.nextUrl
   const search = searchParams.get('search') || ''
   const all = searchParams.get('all') === 'true'
@@ -40,13 +36,10 @@ export async function GET(request: NextRequest) {
   ])
 
   return apiSuccess({ vendors, total })
-}
+})
 
-export async function POST(request: NextRequest) {
-  const session = await getSession()
-  if (!session.isLoggedIn) return apiError('Unauthorized', 401)
-  if (!['OWNER', 'FINANCE'].includes(session.userRole)) return apiError('Forbidden', 403)
-
+// POST /api/vendors
+export const POST = withFinance(async (session, request) => {
   const body = await request.json()
   const { vendorCode, namaVendor, kontak, email, alamat, rekening, bank, termPayment } = body
 
@@ -56,8 +49,10 @@ export async function POST(request: NextRequest) {
   if (existing) return apiError(`Kode vendor "${vendorCode}" sudah digunakan`)
 
   const vendor = await prisma.vendor.create({
-    data: { vendorCode, namaVendor, kontak, email, alamat, rekening, bank,
-            termPayment: termPayment || 0, createdBy: session.username },
+    data: {
+      vendorCode, namaVendor, kontak, email, alamat, rekening, bank,
+      termPayment: termPayment || 0, createdBy: session.username,
+    },
   })
   return apiSuccess(vendor, 201)
-}
+})

@@ -41,3 +41,18 @@ prisma/*.db-journal
 
 # Claude worktrees & memory (jangan di-commit)
 .claude/
+
+# Test & temp files
+test-query.js
+test-query.ts
+fix_params.js
+build_output.txt
+.next-start.log
+*.log
+
+# n8n workflow exports (not source code)
+n8n-*.json
+workflow_*.json
+
+# Kiro AI
+.kiro/

@@ -1,27 +1,21 @@
-import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/session'
 import { apiSuccess, apiError } from '@/lib/utils'
+import { withAuth, withFinance } from '@/lib/api-helpers'
 
-export async function GET(request: NextRequest) {
-  const session = await getSession()
-  if (!session.isLoggedIn) return apiError('Unauthorized', 401)
-
+// GET /api/categories — any logged-in user can read
+export const GET = withAuth(async (session) => {
   const categories = await prisma.productCategory.findMany({
     where: { isActive: true },
     orderBy: { categoryName: 'asc' },
   })
   return apiSuccess({ categories })
-}
+})
 
-export async function POST(request: NextRequest) {
-  const session = await getSession()
-  if (!session.isLoggedIn) return apiError('Unauthorized', 401)
-  if (!['OWNER', 'FINANCE'].includes(session.userRole)) return apiError('Forbidden', 403)
-
+// POST /api/categories — only OWNER + FINANCE can create
+export const POST = withFinance(async (session, request) => {
   const { categoryName, description } = await request.json()
   if (!categoryName) return apiError('Nama kategori wajib diisi')
 
   const cat = await prisma.productCategory.create({ data: { categoryName, description } })
   return apiSuccess(cat, 201)
-}
+})
