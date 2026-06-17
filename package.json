@@ -16,7 +16,7 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:demo": "tsx prisma/seed-demo.ts",
-    "db:fix": "node node_modules/prisma/build/index.js migrate resolve --applied 20260101000001_add_payout_platform_fields && node node_modules/prisma/build/index.js migrate resolve --applied 20260101000002_add_trx_date && node node_modules/prisma/build/index.js migrate resolve --applied 20260101000003_add_ads_wallet_fields && node node_modules/prisma/build/index.js migrate resolve --applied 20260101000004_add_app_settings && node node_modules/prisma/build/index.js migrate resolve --applied 20260101000005_add_sku_mappings && node node_modules/prisma/build/index.js migrate resolve --applied 20260616000000_init"
+    "db:fix": "node node_modules/prisma/build/index.js migrate resolve --rolled-back 20260101000004_add_app_settings || true && node node_modules/prisma/build/index.js migrate resolve --applied 20260101000001_add_payout_platform_fields || true && node node_modules/prisma/build/index.js migrate resolve --applied 20260101000002_add_trx_date || true && node node_modules/prisma/build/index.js migrate resolve --applied 20260101000003_add_ads_wallet_fields || true && node node_modules/prisma/build/index.js migrate resolve --applied 20260101000004_add_app_settings || true && node node_modules/prisma/build/index.js migrate resolve --applied 20260101000005_add_sku_mappings || true && node node_modules/prisma/build/index.js migrate resolve --applied 20260616000000_init || true && node node_modules/prisma/build/index.js migrate deploy && node server.js"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.2",
