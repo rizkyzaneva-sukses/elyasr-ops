@@ -7,6 +7,7 @@ import { Shield } from 'lucide-react'
 import { UsersTab } from './_components/user-management'
 import { AuditTab } from './_components/audit-tab'
 import { KategoriTab } from './_components/kategori-tab'
+import { KesehatanTab } from './_components/kesehatan-tab'
 import { BackupTab } from './_components/backup-tab'
 import { PengaturanTab } from './_components/pengaturan-tab'
 import { TABS } from './_components/constants'
@@ -40,6 +41,7 @@ function OwnerRoomContent() {
       {activeTab === 'Users' && <UsersTab />}
       {activeTab === 'Audit Log' && <AuditTab />}
       {activeTab === 'Kategori' && <KategoriTab />}
+      {activeTab === 'Kesehatan' && <KesehatanTab />}
       {activeTab === 'Backup Data' && <BackupTab />}
       {activeTab === 'Pengaturan' && <PengaturanTab />}
     </AppLayout>
