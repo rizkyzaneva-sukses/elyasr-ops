@@ -20,35 +20,8 @@ export async function register() {
         const { buildWeeklyReport }               = await import('@/lib/weekly-report')
         const { buildMonthlyReport }              = await import('@/lib/monthly-report')
         const { broadcastTelegramReport }         = await import('@/lib/telegram')
+        const { getReportSchedule }               = await import('@/lib/report-schedule')
         const { prisma }                          = await import('@/lib/prisma')
-
-        const fallbackCron = process.env.DAILY_REPORT_CRON ?? '30 17 * * *' // default 17:30 WIB
-
-        function parseCronPart(value: string | undefined, fallback: number): number {
-            const raw = value?.trim()
-            if (!raw) return fallback
-            const parsed = Number.parseInt(raw, 10)
-            return Number.isFinite(parsed) ? parsed : fallback
-        }
-
-        // Baca schedule dari DB — buat default kalau belum ada
-        async function getSchedule(): Promise<{ hour: number; minute: number; isActive: boolean }> {
-            try {
-                let sched = await prisma.reportSchedule.findFirst()
-                if (!sched) {
-                    sched = await prisma.reportSchedule.create({
-                        data: { cronSchedule: fallbackCron, isActive: true },
-                    })
-                }
-                const parts  = sched.cronSchedule.split(' ')
-                const minute = parseCronPart(parts[0], 30)
-                const hour   = parseCronPart(parts[1], 17)
-                return { minute, hour, isActive: sched.isActive }
-            } catch {
-                const parts  = fallbackCron.split(' ')
-                return { minute: parseCronPart(parts[0], 30), hour: parseCronPart(parts[1], 17), isActive: true }
-            }
-        }
 
         // Cek apakah laporan sudah terkirim hari ini (dari DB — tahan restart)
         async function isAlreadySent(settingKey: string, todayStr: string): Promise<boolean> {
@@ -85,7 +58,7 @@ export async function register() {
 
         nodeCron.schedule('* * * * *', async () => {
             try {
-                const { hour, minute, isActive } = await getSchedule()
+                const { hour, minute, isActive } = await getReportSchedule('daily')
 
                 const nowJkt = new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' })
                 const d      = new Date(nowJkt)
@@ -143,17 +116,18 @@ export async function register() {
 
         nodeCron.schedule('* * * * *', async () => {
             try {
+                const { hour, minute, isActive } = await getReportSchedule('weekly')
                 const nowJkt = new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' })
                 const d      = new Date(nowJkt)
                 const today  = d.toLocaleDateString('en-CA')
 
-                // Hanya hari Senin (getDay() === 1)
+                if (!isActive) return
                 if (d.getDay() !== 1) return
                 if (lastWeeklySent === today) return
                 if (weeklySending) return
 
-                // Window: 08:00 – 08:29 WIB
-                const scheduledMin = 8 * 60
+                // Window: jadwal weekly s/d +29 menit
+                const scheduledMin = hour * 60 + minute
                 const currentMin   = d.getHours() * 60 + d.getMinutes()
                 const inWindow = currentMin >= scheduledMin && currentMin < scheduledMin + 30
                 if (!inWindow) return
@@ -164,7 +138,7 @@ export async function register() {
                 }
 
                 weeklySending = true
-                console.log(`[weekly-report] 🚀 ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')} WIB — kirim laporan mingguan...`)
+                console.log(`[weekly-report] 🚀 ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')} WIB — kirim laporan mingguan (jadwal: ${hour}:${String(minute).padStart(2,'0')})...`)
 
                 const report = await buildWeeklyReport()
                 const { sent, failed } = await broadcastTelegramReport(report)
@@ -180,7 +154,7 @@ export async function register() {
             }
         }, { timezone: 'Asia/Jakarta' })
 
-        console.log('[weekly-report] 🟢 Scheduler aktif — Senin 08:00 WIB, catch-up window 30 menit')
+        console.log('[weekly-report] 🟢 Scheduler aktif — jadwal dari DB/settings, hari Senin, catch-up window 30 menit')
 
         // ─── Monthly Report Scheduler — Tanggal 1, 09:00 WIB ─────────────
         let lastMonthlySent: string | null = null

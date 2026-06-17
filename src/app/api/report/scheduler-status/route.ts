@@ -1,13 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-
-function parseCronPart(value: string | undefined, fallback: number): number {
-    const raw = value?.trim()
-    if (!raw) return fallback
-    const parsed = Number.parseInt(raw, 10)
-    return Number.isFinite(parsed) ? parsed : fallback
-}
+import { getReportSchedule } from '@/lib/report-schedule'
 
 /**
  * GET /api/report/scheduler-status
@@ -45,16 +39,13 @@ export async function GET() {
         const heartbeatAgeMs = heartbeatAt ? Date.now() - heartbeatAt.getTime() : null
         const schedulerAlive = heartbeatAgeMs !== null && heartbeatAgeMs >= 0 && heartbeatAgeMs < 10 * 60 * 1000
 
-        // Ambil jadwal dari DB
-        let scheduleInfo: { hour: number; minute: number; isActive: boolean } | null = null
+        let dailySchedule = null
+        let weeklySchedule = null
         try {
-            const sched = await prisma.reportSchedule.findFirst()
-            if (sched) {
-                const parts  = sched.cronSchedule.split(' ')
-                const minute = parseCronPart(parts[0], 30)
-                const hour   = parseCronPart(parts[1], 17)
-                scheduleInfo = { hour, minute, isActive: sched.isActive }
-            }
+            dailySchedule = await getReportSchedule('daily')
+        } catch { /* ignore */ }
+        try {
+            weeklySchedule = await getReportSchedule('weekly')
         } catch { /* ignore */ }
 
         return NextResponse.json({
@@ -64,10 +55,10 @@ export async function GET() {
                 heartbeatAt: data.scheduler_heartbeat,
                 heartbeatAgeSeconds: heartbeatAgeMs === null ? null : Math.round(heartbeatAgeMs / 1000),
                 lastWib: data.scheduler_last_wib,
-                schedule: scheduleInfo
-                    ? `${String(scheduleInfo.hour).padStart(2,'0')}:${String(scheduleInfo.minute).padStart(2,'0')} WIB`
+                schedule: dailySchedule
+                    ? `${String(dailySchedule.hour).padStart(2,'0')}:${String(dailySchedule.minute).padStart(2,'0')} WIB`
                     : (data.scheduler_schedule ?? '17:30 WIB'),
-                isActive: scheduleInfo?.isActive ?? true,
+                isActive: dailySchedule?.isActive ?? true,
             },
             autoReport: {
                 enabled: data.auto_report_enabled !== 'false',
@@ -75,8 +66,14 @@ export async function GET() {
                 sentToday,
             },
             reports: {
-                daily:   { lastSentAt: data.last_auto_report_sent },
-                weekly:  { lastSentAt: data.last_weekly_report_sent },
+                daily:   {
+                    lastSentAt: data.last_auto_report_sent,
+                    schedule: dailySchedule,
+                },
+                weekly:  {
+                    lastSentAt: data.last_weekly_report_sent,
+                    schedule: weeklySchedule,
+                },
                 monthly: { lastSentAt: data.last_monthly_report_sent },
             },
         })

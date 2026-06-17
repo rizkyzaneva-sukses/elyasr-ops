@@ -16,10 +16,15 @@ export function TelegramSection() {
   const [autoEnabled, setAutoEnabled] = useState(true)
   const [lastSent, setLastSent] = useState<string | null>(null)
   const [togglingAuto, setTogglingAuto] = useState(false)
-  // Schedule picker
   const [schedHour, setSchedHour] = useState(17)
   const [schedMinute, setSchedMinute] = useState(30)
   const [savingSched, setSavingSched] = useState(false)
+  const [weeklyAutoEnabled, setWeeklyAutoEnabled] = useState(true)
+  const [lastWeeklySent, setLastWeeklySent] = useState<string | null>(null)
+  const [togglingWeeklyAuto, setTogglingWeeklyAuto] = useState(false)
+  const [weeklySchedHour, setWeeklySchedHour] = useState(8)
+  const [weeklySchedMinute, setWeeklySchedMinute] = useState(0)
+  const [savingWeeklySched, setSavingWeeklySched] = useState(false)
   // Recipients
   type Recipient = { id: string; name: string; chatId: string; threadId?: string | null; isActive: boolean }
   const [recipients, setRecipients] = useState<Recipient[]>([])
@@ -41,13 +46,29 @@ export function TelegramSection() {
           setChatId(d.data?.telegram_chat_id ?? '')
           setAutoEnabled(d.data?.auto_report_enabled !== 'false')
           setLastSent(d.data?.last_auto_report_sent ?? null)
+          setLastWeeklySent(d.data?.last_weekly_report_sent ?? null)
         }
       })
       .finally(() => setFetching(false))
-    // Load schedule dari DB
-    fetch('/api/settings/report-schedule')
+    fetch('/api/settings/report-schedule?type=daily')
       .then(r => r.json())
-      .then(d => { if (d.success) { setSchedHour(d.data.hour); setSchedMinute(d.data.minute) } })
+      .then(d => {
+        if (d.success) {
+          setSchedHour(d.data.hour)
+          setSchedMinute(d.data.minute)
+          setAutoEnabled(d.data.isActive)
+        }
+      })
+      .catch(() => {})
+    fetch('/api/settings/report-schedule?type=weekly')
+      .then(r => r.json())
+      .then(d => {
+        if (d.success) {
+          setWeeklySchedHour(d.data.hour)
+          setWeeklySchedMinute(d.data.minute)
+          setWeeklyAutoEnabled(d.data.isActive)
+        }
+      })
       .catch(() => {})
     // Load recipients
     fetch('/api/settings/telegram-recipients')
@@ -123,11 +144,13 @@ export function TelegramSection() {
       const j1 = await r1.json()
       if (!j1.success) throw new Error(j1.error)
       // Update ReportSchedule.isActive
-      await fetch('/api/settings/report-schedule', {
+      const r2 = await fetch('/api/settings/report-schedule?type=daily', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: newValue }),
       })
+      const j2 = await r2.json()
+      if (!j2.success) throw new Error(j2.error)
       setAutoEnabled(newValue)
       const timeLabel = `${String(schedHour).padStart(2,'0')}:${String(schedMinute).padStart(2,'0')}`
       toast({ title: newValue ? `⏰ Auto report ${timeLabel} WIB diaktifkan!` : '⏸️ Auto report dinonaktifkan', type: 'success' })
@@ -139,7 +162,7 @@ export function TelegramSection() {
   const handleSaveSchedule = async () => {
     setSavingSched(true)
     try {
-      const res = await fetch('/api/settings/report-schedule', {
+      const res = await fetch('/api/settings/report-schedule?type=daily', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ hour: schedHour, minute: schedMinute }),
@@ -150,6 +173,41 @@ export function TelegramSection() {
     } catch (err: any) {
       toast({ title: err.message || 'Gagal simpan jadwal', type: 'error' })
     } finally { setSavingSched(false) }
+  }
+
+  const handleToggleWeeklyAuto = async () => {
+    setTogglingWeeklyAuto(true)
+    const newValue = !weeklyAutoEnabled
+    try {
+      const res = await fetch('/api/settings/report-schedule?type=weekly', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: newValue }),
+      })
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error)
+      setWeeklyAutoEnabled(newValue)
+      const timeLabel = `${String(weeklySchedHour).padStart(2,'0')}:${String(weeklySchedMinute).padStart(2,'0')}`
+      toast({ title: newValue ? `Auto weekly report ${timeLabel} WIB diaktifkan!` : 'Auto weekly report dinonaktifkan', type: 'success' })
+    } catch (err: any) {
+      toast({ title: err.message || 'Gagal mengubah weekly report', type: 'error' })
+    } finally { setTogglingWeeklyAuto(false) }
+  }
+
+  const handleSaveWeeklySchedule = async () => {
+    setSavingWeeklySched(true)
+    try {
+      const res = await fetch('/api/settings/report-schedule?type=weekly', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hour: weeklySchedHour, minute: weeklySchedMinute }),
+      })
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error)
+      toast({ title: `Jadwal mingguan disimpan: Senin ${String(weeklySchedHour).padStart(2,'0')}:${String(weeklySchedMinute).padStart(2,'0')} WIB`, type: 'success' })
+    } catch (err: any) {
+      toast({ title: err.message || 'Gagal simpan jadwal mingguan', type: 'error' })
+    } finally { setSavingWeeklySched(false) }
   }
 
   const handleSave = async (e: React.FormEvent) => {
@@ -370,6 +428,71 @@ export function TelegramSection() {
           </div>
           <p className="text-[10px] text-zinc-600 mt-2">
             Perubahan langsung aktif tanpa perlu restart server.
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between pt-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-zinc-200">Auto Report Mingguan</span>
+              <span className={`text-[10px] rounded px-2 py-0.5 ${weeklyAutoEnabled ? 'bg-emerald-900/40 border border-emerald-700/50 text-emerald-300' : 'bg-zinc-800 border border-zinc-700 text-zinc-500'}`}>
+                {weeklyAutoEnabled ? 'AKTIF' : 'NONAKTIF'}
+              </span>
+            </div>
+            <p className="text-xs text-zinc-500 mt-1">
+              Dikirim otomatis setiap hari Senin oleh server.
+            </p>
+            {lastWeeklySent && (
+              <p className="text-[10px] text-zinc-600 mt-1">
+                Terakhir dikirim: {new Date(lastWeeklySent).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short' })}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleToggleWeeklyAuto}
+            disabled={togglingWeeklyAuto || !hasTelegramTarget}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-40 ${weeklyAutoEnabled ? 'bg-emerald-600' : 'bg-zinc-700'}`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${weeklyAutoEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+        </div>
+
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+          <p className="text-xs text-zinc-400 font-medium mb-3">Jam Kirim Laporan Mingguan (Senin, WIB)</p>
+          <div className="flex items-center gap-3">
+            <select
+              value={weeklySchedHour}
+              onChange={e => setWeeklySchedHour(Number(e.target.value))}
+              className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-sky-600"
+            >
+              {Array.from({ length: 24 }, (_, i) => (
+                <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
+              ))}
+            </select>
+            <span className="text-zinc-400 font-bold">:</span>
+            <select
+              value={weeklySchedMinute}
+              onChange={e => setWeeklySchedMinute(Number(e.target.value))}
+              className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-sky-600"
+            >
+              {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map(m => (
+                <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+              ))}
+            </select>
+            <span className="text-xs text-zinc-500">WIB</span>
+            <button
+              type="button"
+              onClick={handleSaveWeeklySchedule}
+              disabled={savingWeeklySched}
+              className="flex items-center gap-1.5 bg-sky-700 hover:bg-sky-600 disabled:opacity-50 text-white rounded-lg px-3 py-2 text-xs font-medium transition-colors"
+            >
+              {savingWeeklySched ? <Loader2 size={12} className="animate-spin" /> : null}
+              {savingWeeklySched ? 'Menyimpan...' : 'Simpan Jadwal'}
+            </button>
+          </div>
+          <p className="text-[10px] text-zinc-600 mt-2">
+            Laporan mingguan selalu dikirim hari Senin pada jam yang kamu atur.
           </p>
         </div>
 
