@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { formatDate } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
 import { Plus, Edit2 } from 'lucide-react'
-import { ROLES } from '../page'
+import { ROLES } from './constants'
 
 function UserModal({ user, onClose }: { user?: any; onClose: () => void }) {
   const qc = useQueryClient()

@@ -34,7 +34,7 @@ export function withAuth(
   handler: AuthenticatedHandler,
   allowedRoles?: Role[]
 ) {
-  return async (request: NextRequest, context?: { params?: Record<string, string> }) => {
+  return async (request: NextRequest, context?: any) => {
     try {
       const session = await getSession()
 
@@ -50,7 +50,7 @@ export function withAuth(
         }
       }
 
-      return await handler(session, request, context as Record<string, unknown>)
+      return await handler(session, request, context)
     } catch (err) {
       console.error(`[API Error] ${request.method} ${request.nextUrl.pathname}:`, err)
       const message = err instanceof Error ? err.message : 'Internal server error'

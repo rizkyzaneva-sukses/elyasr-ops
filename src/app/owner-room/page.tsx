@@ -9,9 +9,7 @@ import { AuditTab } from './_components/audit-tab'
 import { KategoriTab } from './_components/kategori-tab'
 import { BackupTab } from './_components/backup-tab'
 import { PengaturanTab } from './_components/pengaturan-tab'
-
-export const TABS = ['Users', 'Audit Log', 'Kategori', 'Backup Data', 'Pengaturan']
-export const ROLES = ['OWNER', 'FINANCE', 'STAFF', 'EXTERNAL']
+import { TABS } from './_components/constants'
 
 function OwnerRoomContent() {
   const searchParams = useSearchParams()
