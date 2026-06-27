@@ -6,8 +6,9 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { formatRupiah, formatDate, downloadCSV } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
 import { useAuth } from '@/components/providers'
-import { FileText, Plus, ChevronLeft, ChevronRight, Search, Eye, FileDown, Printer, X, CreditCard, ChevronDown, Pencil, Trash2, AlertTriangle } from 'lucide-react'
+import { FileText, Plus, ChevronLeft, ChevronRight, Search, Eye, FileDown, Printer, X, CreditCard, ChevronDown, Pencil, Trash2, AlertTriangle, Package } from 'lucide-react'
 import { PayVendorModal } from '@/components/ui/pay-vendor-modal'
+import { ReceiveGoodsModal } from '@/components/ui/receive-goods-modal'
 
 const PO_STATUS_COLOR: Record<string, string> = {
   OPEN: 'badge-warning', PARTIAL: 'badge-info', COMPLETED: 'badge-success', CANCELLED: 'badge-danger',
@@ -604,6 +605,7 @@ export default function PurchaseOrdersPage() {
   const [printPO, setPrintPO] = useState<any>(null)
   const [detailPO, setDetailPO] = useState<any>(null)
   const [payPO, setPayPO] = useState<any>(null)
+  const [showReceive, setShowReceive] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const limit = 20
 
@@ -693,6 +695,15 @@ export default function PurchaseOrdersPage() {
           }}
         />
       )}
+      {showReceive && (
+        <ReceiveGoodsModal
+          onClose={() => setShowReceive(false)}
+          onSuccess={() => {
+            setShowReceive(false)
+            qc.invalidateQueries({ queryKey: ['purchase-orders'] })
+          }}
+        />
+      )}
       {(showCreate || editPO) && vendors && (
         <POFormModal
           vendors={vendors}
@@ -705,6 +716,9 @@ export default function PurchaseOrdersPage() {
         <h1 className="page-title flex items-center gap-2"><FileText size={22} className="text-emerald-400"/>Purchase Orders</h1>
         <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors">
           <Plus size={14}/> Buat PO
+        </button>
+        <button onClick={() => setShowReceive(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-600 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors ml-2">
+          <Package size={14}/> Terima Barang
         </button>
       </div>
 
@@ -779,6 +793,11 @@ export default function PurchaseOrdersPage() {
                         {po.paymentStatus !== 'PAID' && (
                           <button onClick={() => setPayPO(po)} className="p-1.5 rounded bg-zinc-800 hover:bg-emerald-900/50 text-zinc-400 hover:text-emerald-400 transition-colors" title="Bayar Vendor">
                             <CreditCard size={13} />
+                          </button>
+                        )}
+                        {(po.status === 'OPEN' || po.status === 'PARTIAL') && (
+                          <button onClick={() => setShowReceive(true)} className="p-1.5 rounded bg-zinc-800 hover:bg-blue-900/50 text-zinc-400 hover:text-blue-400 transition-colors" title="Terima Barang">
+                            <Package size={13} />
                           </button>
                         )}
                         {/* Edit — OWNER only */}

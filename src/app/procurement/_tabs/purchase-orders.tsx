@@ -5,8 +5,9 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { formatRupiah, formatDate, downloadCSV } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
 import { useAuth } from '@/components/providers'
-import { FileText, Plus, ChevronLeft, ChevronRight, Search, Eye, FileDown, Printer, X, CreditCard, ChevronDown, Pencil, Trash2, AlertTriangle } from 'lucide-react'
+import { FileText, Plus, ChevronLeft, ChevronRight, Search, Eye, FileDown, Printer, X, CreditCard, ChevronDown, Pencil, Trash2, AlertTriangle, Package } from 'lucide-react'
 import { PayVendorModal } from '@/components/ui/pay-vendor-modal'
+import { ReceiveGoodsModal } from '@/components/ui/receive-goods-modal'
 
 const PO_STATUS_COLOR: Record<string, string> = {
   OPEN: 'badge-warning', PARTIAL: 'badge-info', COMPLETED: 'badge-success', CANCELLED: 'badge-danger',
@@ -480,6 +481,7 @@ export function PurchaseOrdersTab() {
   const [printPO, setPrintPO]       = useState<any>(null)
   const [detailPO, setDetailPO]     = useState<any>(null)
   const [payPO, setPayPO]           = useState<any>(null)
+  const [showReceive, setShowReceive] = useState(false)
   const [deletingId, setDeletingId] = useState<string|null>(null)
   const limit = 20
 
@@ -527,6 +529,7 @@ export function PurchaseOrdersTab() {
       {detailPO && <DetailPOModal po={detailPO} onClose={() => setDetailPO(null)} onDownload={handleDownload} onPrint={po => { setDetailPO(null); setPrintPO(po) }} />}
       {printPO  && <PrintPOModal po={printPO} onClose={() => setPrintPO(null)} />}
       {payPO    && <PayVendorModal prefillVendorId={payPO.vendorId} prefillPoId={payPO.id} onClose={() => setPayPO(null)} onSuccess={() => { setPayPO(null); qc.invalidateQueries({ queryKey:['purchase-orders'] }) }} />}
+      {showReceive && <ReceiveGoodsModal onClose={() => setShowReceive(false)} onSuccess={() => { setShowReceive(false); qc.invalidateQueries({ queryKey:['purchase-orders'] }) }} />}
       {(showCreate || editPO) && vendors && <POFormModal vendors={vendors} editPO={editPO} onClose={() => { setShowCreate(false); setEditPO(null) }} />}
 
       <div className="flex items-center justify-between mb-4">
@@ -544,6 +547,9 @@ export function PurchaseOrdersTab() {
         </div>
         <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg px-3 py-2 text-sm font-medium ml-3">
           <Plus size={14} />Buat PO
+        </button>
+        <button onClick={() => setShowReceive(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-600 text-white rounded-lg px-3 py-2 text-sm font-medium ml-2">
+          <Package size={14} />Terima Barang
         </button>
       </div>
 
@@ -585,6 +591,7 @@ export function PurchaseOrdersTab() {
                         <button onClick={() => setPrintPO(po)} className="p-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-emerald-400" title="Cetak"><Printer size={13}/></button>
                         <button onClick={() => handleDownload(po)} className="p-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-blue-400" title="Download"><FileDown size={13}/></button>
                         {po.paymentStatus !== 'PAID' && <button onClick={() => setPayPO(po)} className="p-1.5 rounded bg-zinc-800 hover:bg-emerald-900/50 text-zinc-400 hover:text-emerald-400" title="Bayar"><CreditCard size={13}/></button>}
+                        {(po.status === 'OPEN' || po.status === 'PARTIAL') && <button onClick={() => setShowReceive(true)} className="p-1.5 rounded bg-zinc-800 hover:bg-blue-900/50 text-zinc-400 hover:text-blue-400" title="Terima Barang"><Package size={13}/></button>}
                         {isOwner && <button onClick={() => setEditPO(po)} className="p-1.5 rounded bg-zinc-800 hover:bg-amber-900/40 text-zinc-400 hover:text-amber-400" title="Edit"><Pencil size={13}/></button>}
                         {(isOwner || isFinance) && (
                           <button onClick={() => handleDelete(po)} disabled={deletingId===po.id}

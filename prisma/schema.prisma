@@ -152,15 +152,15 @@ enum AuditAction {
 // 1. AppUser
 // ─────────────────────────────────────────────
 model AppUser {
-  id            String    @id @default(cuid())
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  username      String    @unique
-  passwordHash  String    @map("password_hash")
-  userRole      UserRole  @map("user_role")
-  isActive      Boolean   @default(true) @map("is_active")
-  fullName      String?   @map("full_name")
+  username     String   @unique
+  passwordHash String   @map("password_hash")
+  userRole     UserRole @map("user_role")
+  isActive     Boolean  @default(true) @map("is_active")
+  fullName     String?  @map("full_name")
 
   @@map("app_users")
 }
@@ -169,15 +169,15 @@ model AppUser {
 // 2. ProductCategory
 // ─────────────────────────────────────────────
 model ProductCategory {
-  id            String    @id @default(cuid())
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  categoryName  String    @map("category_name")
-  description   String?
-  isActive      Boolean   @default(true) @map("is_active")
+  categoryName String  @map("category_name")
+  description  String?
+  isActive     Boolean @default(true) @map("is_active")
 
-  products      MasterProduct[]
+  products MasterProduct[]
 
   @@map("product_categories")
 }
@@ -186,28 +186,28 @@ model ProductCategory {
 // 3. MasterProduct
 // ─────────────────────────────────────────────
 model MasterProduct {
-  id              String    @id @default(cuid())
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-  createdBy       String?   @map("created_by")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String?  @map("created_by")
 
-  sku             String    @unique
-  productName     String    @map("product_name")
-  categoryId      String?   @map("category_id")
-  categoryName    String?   @map("category_name")
-  unit            String    @default("pcs")
-  hpp             Int       @default(0)
-  rop             Int       @default(0)     @map("rop")
-  leadTimeDays    Int       @default(0)     @map("lead_time_days")
-  stokAwal        Int       @default(0)     @map("stok_awal")
-  lastOpnameDate  DateTime? @map("last_opname_date")
-  variantInfo     Json?     @map("variant_info")
-  isActive        Boolean   @default(true)  @map("is_active")
+  sku            String    @unique
+  productName    String    @map("product_name")
+  categoryId     String?   @map("category_id")
+  categoryName   String?   @map("category_name")
+  unit           String    @default("pcs")
+  hpp            Int       @default(0)
+  rop            Int       @default(0) @map("rop")
+  leadTimeDays   Int       @default(0) @map("lead_time_days")
+  stokAwal       Int       @default(0) @map("stok_awal")
+  lastOpnameDate DateTime? @map("last_opname_date")
+  variantInfo    Json?     @map("variant_info")
+  isActive       Boolean   @default(true) @map("is_active")
 
-  category        ProductCategory? @relation(fields: [categoryId], references: [id])
-  ledgerEntries   InventoryLedger[]
-  poItems         PurchaseOrderItem[]
-  opnameItems     StockOpnameItem[]
+  category      ProductCategory?    @relation(fields: [categoryId], references: [id])
+  ledgerEntries InventoryLedger[]
+  poItems       PurchaseOrderItem[]
+  opnameItems   StockOpnameItem[]
 
   @@map("master_products")
 }
@@ -216,10 +216,10 @@ model MasterProduct {
 // 4. InventoryLedger
 // ─────────────────────────────────────────────
 model InventoryLedger {
-  id          String          @id @default(cuid())
-  createdAt   DateTime        @default(now()) @map("created_at")
-  updatedAt   DateTime        @updatedAt @map("updated_at")
-  createdBy   String?         @map("created_by")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String?  @map("created_by")
 
   sku         String
   trxDate     DateTime        @map("trx_date")
@@ -230,9 +230,9 @@ model InventoryLedger {
   refOpnameId String?         @map("ref_opname_id")
   note        String?
 
-  product     MasterProduct       @relation(fields: [sku], references: [sku])
-  batch       InventoryScanBatch? @relation(fields: [batchId], references: [id])
-  opname      StockOpnameBatch?   @relation(fields: [refOpnameId], references: [id])
+  product MasterProduct       @relation(fields: [sku], references: [sku])
+  batch   InventoryScanBatch? @relation(fields: [batchId], references: [id])
+  opname  StockOpnameBatch?   @relation(fields: [refOpnameId], references: [id])
 
   @@index([sku])
   @@index([trxDate])
@@ -244,17 +244,17 @@ model InventoryLedger {
 // 5. InventoryScanBatch
 // ─────────────────────────────────────────────
 model InventoryScanBatch {
-  id          String          @id @default(cuid())
-  createdAt   DateTime        @default(now()) @map("created_at")
-  updatedAt   DateTime        @updatedAt @map("updated_at")
-  createdBy   String?         @map("created_by")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String?  @map("created_by")
 
-  batchDate   DateTime        @map("batch_date")
-  direction   LedgerDirection
-  reason      ScanBatchReason?
-  status      ScanBatchStatus @default(DRAFT)
-  itemsJson   Json?           @map("items_json")
-  scannedBy   String?         @map("scanned_by")
+  batchDate DateTime         @map("batch_date")
+  direction LedgerDirection
+  reason    ScanBatchReason?
+  status    ScanBatchStatus  @default(DRAFT)
+  itemsJson Json?            @map("items_json")
+  scannedBy String?          @map("scanned_by")
 
   ledgerEntries InventoryLedger[]
 
@@ -265,22 +265,22 @@ model InventoryScanBatch {
 // 6. StockOpnameBatch
 // ─────────────────────────────────────────────
 model StockOpnameBatch {
-  id                    String            @id @default(cuid())
-  createdAt             DateTime          @default(now()) @map("created_at")
-  updatedAt             DateTime          @updatedAt @map("updated_at")
-  createdBy             String?           @map("created_by")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String?  @map("created_by")
 
-  opnameDate            DateTime          @map("opname_date")
-  warehouseName         String?           @map("warehouse_name")
-  status                OpnameBatchStatus @default(DRAFT)
-  note                  String?
-  totalSku              Int               @default(0) @map("total_sku")
-  totalAdjustmentQty    Int               @default(0) @map("total_adjustment_qty")
-  committedAt           DateTime?         @map("committed_at")
-  committedBy           String?           @map("committed_by")
+  opnameDate         DateTime          @map("opname_date")
+  warehouseName      String?           @map("warehouse_name")
+  status             OpnameBatchStatus @default(DRAFT)
+  note               String?
+  totalSku           Int               @default(0) @map("total_sku")
+  totalAdjustmentQty Int               @default(0) @map("total_adjustment_qty")
+  committedAt        DateTime?         @map("committed_at")
+  committedBy        String?           @map("committed_by")
 
-  items                 StockOpnameItem[]
-  ledgerEntries         InventoryLedger[]
+  items         StockOpnameItem[]
+  ledgerEntries InventoryLedger[]
 
   @@map("stock_opname_batches")
 }
@@ -289,19 +289,19 @@ model StockOpnameBatch {
 // 7. StockOpnameItem
 // ─────────────────────────────────────────────
 model StockOpnameItem {
-  id          String    @id @default(cuid())
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  opnameId    String    @map("opname_id")
-  sku         String
-  systemQty   Int       @map("system_qty")
-  actualQty   Int       @map("actual_qty")
-  diffQty     Int       @map("diff_qty")
-  note        String?
+  opnameId  String  @map("opname_id")
+  sku       String
+  systemQty Int     @map("system_qty")
+  actualQty Int     @map("actual_qty")
+  diffQty   Int     @map("diff_qty")
+  note      String?
 
-  opname      StockOpnameBatch  @relation(fields: [opnameId], references: [id])
-  product     MasterProduct     @relation(fields: [sku], references: [sku])
+  opname  StockOpnameBatch @relation(fields: [opnameId], references: [id])
+  product MasterProduct    @relation(fields: [sku], references: [sku])
 
   @@index([opnameId])
   @@map("stock_opname_items")
@@ -311,31 +311,31 @@ model StockOpnameItem {
 // 8. Order
 // ─────────────────────────────────────────────
 model Order {
-  id                  String    @id @default(cuid())
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
-  createdBy           String?   @map("created_by")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String?  @map("created_by")
 
-  orderNo             String    @map("order_no")
-  status              String
-  platform            String?
-  airwaybill          String?
-  orderCreatedAt      String?   @map("order_created_at")
-  trxDate             DateTime? @map("trx_date")
-  sku                 String?
-  productName         String?   @map("product_name")
-  qty                 Int       @default(1)
-  totalProductPrice   Int       @default(0) @map("total_product_price")
-  realOmzet           Int       @default(0) @map("real_omzet")
-  city                String?
-  province            String?
-  buyerUsername       String?   @map("buyer_username")
-  receiverName        String?   @map("receiver_name")
-  phone               String?
-  hpp                 Int       @default(0)
+  orderNo           String    @map("order_no")
+  status            String
+  platform          String?
+  airwaybill        String?
+  orderCreatedAt    String?   @map("order_created_at")
+  trxDate           DateTime? @map("trx_date")
+  sku               String?
+  productName       String?   @map("product_name")
+  qty               Int       @default(1)
+  totalProductPrice Int       @default(0) @map("total_product_price")
+  realOmzet         Int       @default(0) @map("real_omzet")
+  city              String?
+  province          String?
+  buyerUsername     String?   @map("buyer_username")
+  receiverName      String?   @map("receiver_name")
+  phone             String?
+  hpp               Int       @default(0)
 
-  payout              Payout?
-  scanLogs            OrderScanLog[]
+  payout   Payout?
+  scanLogs OrderScanLog[]
 
   @@index([orderNo])
   @@index([airwaybill])
@@ -354,16 +354,16 @@ model Order {
 // 9. OrderScanLog
 // ─────────────────────────────────────────────
 model OrderScanLog {
-  id          String    @id @default(cuid())
-  createdAt   DateTime  @default(now()) @map("created_at")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
 
-  orderId     String    @map("order_id")
-  orderNo     String    @map("order_no")
-  scannedAt   DateTime  @map("scanned_at")
-  scannedBy   String?   @map("scanned_by")
-  note        String?
+  orderId   String   @map("order_id")
+  orderNo   String   @map("order_no")
+  scannedAt DateTime @map("scanned_at")
+  scannedBy String?  @map("scanned_by")
+  note      String?
 
-  order       Order     @relation(fields: [orderId], references: [id])
+  order Order @relation(fields: [orderId], references: [id])
 
   @@index([orderNo])
   @@map("order_scan_logs")
@@ -373,14 +373,14 @@ model OrderScanLog {
 // 10. Wallet
 // ─────────────────────────────────────────────
 model Wallet {
-  id          String    @id @default(cuid())
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  name            String    @unique
-  isActive        Boolean   @default(true)  @map("is_active")
-  isAdsBudget     Boolean   @default(false) @map("is_ads_budget")
-  linkedPlatform  String?                   @map("linked_platform")
+  name           String  @unique
+  isActive       Boolean @default(true) @map("is_active")
+  isAdsBudget    Boolean @default(false) @map("is_ads_budget")
+  linkedPlatform String? @map("linked_platform")
 
   ledgerEntries      WalletLedger[]
   payouts            Payout[]
@@ -399,26 +399,26 @@ model Wallet {
 // 11. Payout
 // ─────────────────────────────────────────────
 model Payout {
-  id                String    @id @default(cuid())
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
-  createdBy         String?   @map("created_by")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String?  @map("created_by")
 
-  orderNo           String    @unique @map("order_no")
-  releasedDate      DateTime  @map("released_date")
-  platform          String?   @map("platform")
-  omzet             Int
-  platformFee       Int       @map("platform_fee")
-  amsFee            Int       @map("ams_fee")
-  platformFeeOther  Int       @default(0) @map("platform_fee_other")
-  bebanOngkir       Int       @default(0) @map("beban_ongkir")
-  totalIncome       Int       @map("total_income")
-  walletId          String    @map("wallet_id")
-  source            String?   @map("source")
+  orderNo          String   @unique @map("order_no")
+  releasedDate     DateTime @map("released_date")
+  platform         String?  @map("platform")
+  omzet            Int
+  platformFee      Int      @map("platform_fee")
+  amsFee           Int      @map("ams_fee")
+  platformFeeOther Int      @default(0) @map("platform_fee_other")
+  bebanOngkir      Int      @default(0) @map("beban_ongkir")
+  totalIncome      Int      @map("total_income")
+  walletId         String   @map("wallet_id")
+  source           String?  @map("source")
 
-  orderId           String?   @unique @map("order_id")
-  order             Order?    @relation(fields: [orderId], references: [id])
-  wallet            Wallet    @relation(fields: [walletId], references: [id])
+  orderId String? @unique @map("order_id")
+  order   Order?  @relation(fields: [orderId], references: [id])
+  wallet  Wallet  @relation(fields: [walletId], references: [id])
 
   @@index([orderNo])
   @@index([walletId])
@@ -431,20 +431,20 @@ model Payout {
 // 12. WalletLedger
 // ─────────────────────────────────────────────
 model WalletLedger {
-  id          String        @id @default(cuid())
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
-  createdBy   String?       @map("created_by")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String?  @map("created_by")
 
-  walletId    String        @map("wallet_id")
-  trxDate     DateTime      @map("trx_date")
-  trxType     WalletTrxType @map("trx_type")
-  category    String?
-  amount      Int
-  note        String?
-  refOrderNo  String?       @map("ref_order_no")
+  walletId   String        @map("wallet_id")
+  trxDate    DateTime      @map("trx_date")
+  trxType    WalletTrxType @map("trx_type")
+  category   String?
+  amount     Int
+  note       String?
+  refOrderNo String?       @map("ref_order_no")
 
-  wallet      Wallet        @relation(fields: [walletId], references: [id])
+  wallet Wallet @relation(fields: [walletId], references: [id])
 
   @@index([walletId])
   @@index([trxDate])
@@ -456,13 +456,13 @@ model WalletLedger {
 // 13. MasterCategory
 // ─────────────────────────────────────────────
 model MasterCategory {
-  id            String              @id @default(cuid())
-  createdAt     DateTime            @default(now()) @map("created_at")
-  updatedAt     DateTime            @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  categoryType  MasterCategoryType  @map("category_type")
-  name          String
-  isActive      Boolean             @default(true) @map("is_active")
+  categoryType MasterCategoryType @map("category_type")
+  name         String
+  isActive     Boolean            @default(true) @map("is_active")
 
   @@map("master_categories")
 }
@@ -471,14 +471,14 @@ model MasterCategory {
 // 14. MasterReason
 // ─────────────────────────────────────────────
 model MasterReason {
-  id          String          @id @default(cuid())
-  createdAt   DateTime        @default(now()) @map("created_at")
-  updatedAt   DateTime        @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  reasonCode  String          @map("reason_code")
-  name        String
-  direction   LedgerDirection
-  isActive    Boolean         @default(true) @map("is_active")
+  reasonCode String          @map("reason_code")
+  name       String
+  direction  LedgerDirection
+  isActive   Boolean         @default(true) @map("is_active")
 
   @@map("master_reasons")
 }
@@ -487,23 +487,23 @@ model MasterReason {
 // 15. Vendor
 // ─────────────────────────────────────────────
 model Vendor {
-  id            String    @id @default(cuid())
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  createdBy     String?   @map("created_by")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String?  @map("created_by")
 
-  vendorCode    String    @unique @map("vendor_code")
-  namaVendor    String    @map("nama_vendor")
-  kontak        String?
-  email         String?
-  alamat        String?
-  rekening      String?
-  bank          String?
-  termPayment   Int       @default(0) @map("term_payment")
-  isActive      Boolean   @default(true) @map("is_active")
+  vendorCode  String  @unique @map("vendor_code")
+  namaVendor  String  @map("nama_vendor")
+  kontak      String?
+  email       String?
+  alamat      String?
+  rekening    String?
+  bank        String?
+  termPayment Int     @default(0) @map("term_payment")
+  isActive    Boolean @default(true) @map("is_active")
 
-  purchaseOrders  PurchaseOrder[]
-  payments        VendorPayment[]
+  purchaseOrders PurchaseOrder[]
+  payments       VendorPayment[]
 
   @@map("vendors")
 }
@@ -512,28 +512,29 @@ model Vendor {
 // 16. PurchaseOrder
 // ─────────────────────────────────────────────
 model PurchaseOrder {
-  id                String          @id @default(cuid())
-  createdAt         DateTime        @default(now()) @map("created_at")
-  updatedAt         DateTime        @updatedAt @map("updated_at")
-  createdBy         String?         @map("created_by")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String?  @map("created_by")
 
-  poNumber          String          @unique @map("po_number")
-  vendorId          String          @map("vendor_id")
-  vendorName        String          @map("vendor_name")
-  poDate            DateTime        @map("po_date")
-  expectedDate      DateTime?       @map("expected_date")
-  status            POStatus        @default(OPEN)
-  paymentStatus     POPaymentStatus @default(UNPAID) @map("payment_status")
-  totalItems        Int             @default(0) @map("total_items")
-  totalQtyOrder     Int             @default(0) @map("total_qty_order")
-  totalQtyReceived  Int             @default(0) @map("total_qty_received")
-  totalAmount       Int             @default(0) @map("total_amount")
-  totalPaid         Int             @default(0) @map("total_paid")
-  note              String?
+  poNumber         String          @unique @map("po_number")
+  vendorId         String          @map("vendor_id")
+  vendorName       String          @map("vendor_name")
+  poDate           DateTime        @map("po_date")
+  expectedDate     DateTime?       @map("expected_date")
+  status           POStatus        @default(OPEN)
+  paymentStatus    POPaymentStatus @default(UNPAID) @map("payment_status")
+  totalItems       Int             @default(0) @map("total_items")
+  totalQtyOrder    Int             @default(0) @map("total_qty_order")
+  totalQtyReceived Int             @default(0) @map("total_qty_received")
+  totalAmount      Int             @default(0) @map("total_amount")
+  totalPaid        Int             @default(0) @map("total_paid")
+  note             String?
 
   vendor            Vendor              @relation(fields: [vendorId], references: [id])
   items             PurchaseOrderItem[]
   goodsReceipts     GoodsReceipt[]
+  goodsReceiptItems GoodsReceiptItem[]
   vendorPayments    VendorPayment[]
   piutangs          Piutang[]
 
@@ -546,20 +547,20 @@ model PurchaseOrder {
 // 17. PurchaseOrderItem
 // ─────────────────────────────────────────────
 model PurchaseOrderItem {
-  id            String        @id @default(cuid())
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  poId          String        @map("po_id")
-  poNumber      String        @map("po_number")
-  vendorId      String        @map("vendor_id")
-  vendorName    String        @map("vendor_name")
-  sku           String
-  productName   String        @map("product_name")
-  qtyOrder      Int           @map("qty_order")
-  qtyReceived   Int           @default(0) @map("qty_received")
-  unitPrice     Int           @default(0) @map("unit_price")
-  status        POItemStatus  @default(OPEN)
+  poId        String       @map("po_id")
+  poNumber    String       @map("po_number")
+  vendorId    String       @map("vendor_id")
+  vendorName  String       @map("vendor_name")
+  sku         String
+  productName String       @map("product_name")
+  qtyOrder    Int          @map("qty_order")
+  qtyReceived Int          @default(0) @map("qty_received")
+  unitPrice   Int          @default(0) @map("unit_price")
+  status      POItemStatus @default(OPEN)
 
   purchaseOrder MasterProduct @relation(fields: [sku], references: [sku])
   po            PurchaseOrder @relation(fields: [poId], references: [id])
@@ -573,50 +574,78 @@ model PurchaseOrderItem {
 // 18. GoodsReceipt
 // ─────────────────────────────────────────────
 model GoodsReceipt {
-  id            String    @id @default(cuid())
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  createdBy     String?   @map("created_by")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String?  @map("created_by")
 
-  poId          String    @map("po_id")
-  poNumber      String    @map("po_number")
-  vendorId      String    @map("vendor_id")
-  vendorName    String    @map("vendor_name")
-  receiptDate   DateTime  @map("receipt_date")
-  itemsJson     Json?     @map("items_json")
-  note          String?
+  receiptNumber    String   @unique @map("receipt_number")
+  poId             String?  @map("po_id")
+  poNumber         String?  @map("po_number")
+  vendorId         String   @map("vendor_id")
+  vendorName       String   @map("vendor_name")
+  receiptDate      DateTime @map("receipt_date")
+  suratJalanNumber String?  @map("surat_jalan_number")
+  itemsJson        Json?    @map("items_json")
+  note             String?
 
-  purchaseOrder PurchaseOrder @relation(fields: [poId], references: [id])
+  purchaseOrder PurchaseOrder?     @relation(fields: [poId], references: [id])
+  items         GoodsReceiptItem[]
 
   @@index([poId])
+  @@index([receiptNumber])
   @@map("goods_receipts")
+}
+
+// ─────────────────────────────────────────────
+// 18b. GoodsReceiptItem
+// ─────────────────────────────────────────────
+model GoodsReceiptItem {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  receiptId   String  @map("receipt_id")
+  poId        String? @map("po_id")
+  poItemId    String? @map("po_item_id")
+  sku         String
+  productName String  @map("product_name")
+  qtyReceived Int     @map("qty_received")
+  unitPrice   Int     @default(0) @map("unit_price")
+  note        String?
+
+  receipt GoodsReceipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  po      PurchaseOrder? @relation(fields: [poId], references: [id])
+
+  @@index([receiptId])
+  @@index([poId])
+  @@map("goods_receipt_items")
 }
 
 // ─────────────────────────────────────────────
 // 19. VendorPayment
 // ─────────────────────────────────────────────
 model VendorPayment {
-  id              String              @id @default(cuid())
-  createdAt       DateTime            @default(now()) @map("created_at")
-  updatedAt       DateTime            @updatedAt @map("updated_at")
-  createdBy       String?             @map("created_by")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String?  @map("created_by")
 
-  paymentNumber   String?             @map("payment_number")
-  paymentDate     DateTime            @map("payment_date")
-  vendorId        String              @map("vendor_id")
-  vendorName      String              @map("vendor_name")
-  poId            String?             @map("po_id")
-  poNumber        String?             @map("po_number")
-  walletId        String              @map("wallet_id")
-  walletName      String              @map("wallet_name")
-  amount          Int
-  paymentType     VendorPaymentType   @map("payment_type")
-  status          VendorPaymentStatus @default(COMPLETED)
-  note            String?
+  paymentNumber String?             @map("payment_number")
+  paymentDate   DateTime            @map("payment_date")
+  vendorId      String              @map("vendor_id")
+  vendorName    String              @map("vendor_name")
+  poId          String?             @map("po_id")
+  poNumber      String?             @map("po_number")
+  walletId      String              @map("wallet_id")
+  walletName    String              @map("wallet_name")
+  amount        Int
+  paymentType   VendorPaymentType   @map("payment_type")
+  status        VendorPaymentStatus @default(COMPLETED)
+  note          String?
 
-  vendor          Vendor        @relation(fields: [vendorId], references: [id])
-  purchaseOrder   PurchaseOrder? @relation(fields: [poId], references: [id])
-  wallet          Wallet        @relation(fields: [walletId], references: [id])
+  vendor        Vendor         @relation(fields: [vendorId], references: [id])
+  purchaseOrder PurchaseOrder? @relation(fields: [poId], references: [id])
+  wallet        Wallet         @relation(fields: [walletId], references: [id])
 
   @@index([vendorId])
   @@index([poId])
@@ -627,25 +656,25 @@ model VendorPayment {
 // 20. Utang
 // ─────────────────────────────────────────────
 model Utang {
-  id                String      @id @default(cuid())
-  createdAt         DateTime    @default(now()) @map("created_at")
-  updatedAt         DateTime    @updatedAt @map("updated_at")
-  createdBy         String?     @map("created_by")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String?  @map("created_by")
 
-  type              UtangType
-  creditorName      String      @map("creditor_name")
-  sourceWalletId    String      @map("source_wallet_id")
-  sourceWalletName  String      @map("source_wallet_name")
-  amount            Int
-  amountPaid        Int         @default(0) @map("amount_paid")
-  trxDate           DateTime    @map("trx_date")
-  dueDate           DateTime?   @map("due_date")
-  status            UtangStatus @default(OUTSTANDING)
-  proofImageUrl     String?     @map("proof_image_url")
-  note              String?
+  type             UtangType
+  creditorName     String      @map("creditor_name")
+  sourceWalletId   String      @map("source_wallet_id")
+  sourceWalletName String      @map("source_wallet_name")
+  amount           Int
+  amountPaid       Int         @default(0) @map("amount_paid")
+  trxDate          DateTime    @map("trx_date")
+  dueDate          DateTime?   @map("due_date")
+  status           UtangStatus @default(OUTSTANDING)
+  proofImageUrl    String?     @map("proof_image_url")
+  note             String?
 
-  sourceWallet      Wallet      @relation(fields: [sourceWalletId], references: [id])
-  payments          UtangPayment[]
+  sourceWallet Wallet         @relation(fields: [sourceWalletId], references: [id])
+  payments     UtangPayment[]
 
   @@map("utangs")
 }
@@ -654,20 +683,20 @@ model Utang {
 // 21. UtangPayment
 // ─────────────────────────────────────────────
 model UtangPayment {
-  id            String    @id @default(cuid())
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  utangId       String    @map("utang_id")
-  paymentDate   DateTime  @map("payment_date")
+  utangId       String   @map("utang_id")
+  paymentDate   DateTime @map("payment_date")
   amount        Int
-  walletId      String    @map("wallet_id")
-  walletName    String    @map("wallet_name")
-  proofImageUrl String?   @map("proof_image_url")
+  walletId      String   @map("wallet_id")
+  walletName    String   @map("wallet_name")
+  proofImageUrl String?  @map("proof_image_url")
   note          String?
 
-  utang         Utang     @relation(fields: [utangId], references: [id])
-  wallet        Wallet    @relation(fields: [walletId], references: [id])
+  utang  Utang  @relation(fields: [utangId], references: [id])
+  wallet Wallet @relation(fields: [walletId], references: [id])
 
   @@index([utangId])
   @@map("utang_payments")
@@ -677,28 +706,28 @@ model UtangPayment {
 // 22. Piutang
 // ─────────────────────────────────────────────
 model Piutang {
-  id                  String            @id @default(cuid())
-  createdAt           DateTime          @default(now()) @map("created_at")
-  updatedAt           DateTime          @updatedAt @map("updated_at")
-  createdBy           String?           @map("created_by")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String?  @map("created_by")
 
-  type                PiutangType
-  debtorName          String            @map("debtor_name")
-  sourceWalletId      String            @map("source_wallet_id")
-  sourceWalletName    String            @map("source_wallet_name")
-  amount              Int
-  amountCollected     Int               @default(0) @map("amount_collected")
-  trxDate             DateTime          @map("trx_date")
-  dueDate             DateTime?         @map("due_date")
-  status              PiutangStatus     @default(OUTSTANDING)
-  relatedEntityId     String?           @map("related_entity_id")
-  relatedEntityType   RelatedEntityType? @map("related_entity_type")
-  proofImageUrl       String?           @map("proof_image_url")
-  note                String?
+  type              PiutangType
+  debtorName        String             @map("debtor_name")
+  sourceWalletId    String             @map("source_wallet_id")
+  sourceWalletName  String             @map("source_wallet_name")
+  amount            Int
+  amountCollected   Int                @default(0) @map("amount_collected")
+  trxDate           DateTime           @map("trx_date")
+  dueDate           DateTime?          @map("due_date")
+  status            PiutangStatus      @default(OUTSTANDING)
+  relatedEntityId   String?            @map("related_entity_id")
+  relatedEntityType RelatedEntityType? @map("related_entity_type")
+  proofImageUrl     String?            @map("proof_image_url")
+  note              String?
 
-  sourceWallet        Wallet            @relation(fields: [sourceWalletId], references: [id])
-  purchaseOrder       PurchaseOrder?    @relation(fields: [relatedEntityId], references: [id])
-  collections         PiutangCollection[]
+  sourceWallet  Wallet              @relation(fields: [sourceWalletId], references: [id])
+  purchaseOrder PurchaseOrder?      @relation(fields: [relatedEntityId], references: [id])
+  collections   PiutangCollection[]
 
   @@map("piutangs")
 }
@@ -707,20 +736,20 @@ model Piutang {
 // 23. PiutangCollection
 // ─────────────────────────────────────────────
 model PiutangCollection {
-  id              String    @id @default(cuid())
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  piutangId       String    @map("piutang_id")
-  collectionDate  DateTime  @map("collection_date")
-  amount          Int
-  walletId        String    @map("wallet_id")
-  walletName      String    @map("wallet_name")
-  proofImageUrl   String?   @map("proof_image_url")
-  note            String?
+  piutangId      String   @map("piutang_id")
+  collectionDate DateTime @map("collection_date")
+  amount         Int
+  walletId       String   @map("wallet_id")
+  walletName     String   @map("wallet_name")
+  proofImageUrl  String?  @map("proof_image_url")
+  note           String?
 
-  piutang         Piutang   @relation(fields: [piutangId], references: [id])
-  wallet          Wallet    @relation(fields: [walletId], references: [id])
+  piutang Piutang @relation(fields: [piutangId], references: [id])
+  wallet  Wallet  @relation(fields: [walletId], references: [id])
 
   @@index([piutangId])
   @@map("piutang_collections")
@@ -730,17 +759,17 @@ model PiutangCollection {
 // 24. AuditLog
 // ─────────────────────────────────────────────
 model AuditLog {
-  id            String      @id @default(cuid())
-  createdAt     DateTime    @default(now()) @map("created_at")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
 
-  entityType    String      @map("entity_type")
-  action        AuditAction
-  entityId      String?     @map("entity_id")
-  refOrderNo    String?     @map("ref_order_no")
-  beforeJson    Json?       @map("before_json")
-  afterJson     Json?       @map("after_json")
-  note          String?
-  performedBy   String      @map("performed_by")
+  entityType  String      @map("entity_type")
+  action      AuditAction
+  entityId    String?     @map("entity_id")
+  refOrderNo  String?     @map("ref_order_no")
+  beforeJson  Json?       @map("before_json")
+  afterJson   Json?       @map("after_json")
+  note        String?
+  performedBy String      @map("performed_by")
 
   @@index([entityType])
   @@index([entityId])
@@ -752,15 +781,15 @@ model AuditLog {
 // 25. MasterExpenseCategory
 // ─────────────────────────────────────────────
 model MasterExpenseCategory {
-  id          String   @id @default(cuid())
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  name        String   @unique
-  group       String
-  isBeban     Boolean  @default(true) @map("is_beban")
-  isActive    Boolean  @default(true) @map("is_active")
-  isSystem    Boolean  @default(false) @map("is_system")
+  name     String  @unique
+  group    String
+  isBeban  Boolean @default(true) @map("is_beban")
+  isActive Boolean @default(true) @map("is_active")
+  isSystem Boolean @default(false) @map("is_system")
 
   @@index([group])
   @@map("master_expense_categories")
@@ -770,20 +799,20 @@ model MasterExpenseCategory {
 // 26. AsetTetap
 // ─────────────────────────────────────────────
 model AsetTetap {
-  id                 String    @id @default(cuid())
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
-  createdBy          String?   @map("created_by")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String?  @map("created_by")
 
-  namaAset           String    @map("nama_aset")
-  nilaiPerolehan     Int       @map("nilai_perolehan")
-  tanggalBeli        DateTime  @map("tanggal_beli")
-  umurEkonomisThn    Int       @map("umur_ekonomis_thn")
-  isActive           Boolean   @default(true) @map("is_active")
-  walletId           String?   @map("wallet_id")
-  note               String?
+  namaAset        String   @map("nama_aset")
+  nilaiPerolehan  Int      @map("nilai_perolehan")
+  tanggalBeli     DateTime @map("tanggal_beli")
+  umurEkonomisThn Int      @map("umur_ekonomis_thn")
+  isActive        Boolean  @default(true) @map("is_active")
+  walletId        String?  @map("wallet_id")
+  note            String?
 
-  wallet             Wallet?   @relation(fields: [walletId], references: [id])
+  wallet Wallet? @relation(fields: [walletId], references: [id])
 
   @@index([isActive])
   @@map("aset_tetap")
@@ -793,16 +822,16 @@ model AsetTetap {
 // 27. ModalAwal
 // ─────────────────────────────────────────────
 model ModalAwal {
-  id            String   @id @default(cuid())
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  walletId      String   @unique @map("wallet_id")
-  jumlah        Int
-  tanggalSetup  DateTime @map("tanggal_setup")
-  note          String?
+  walletId     String   @unique @map("wallet_id")
+  jumlah       Int
+  tanggalSetup DateTime @map("tanggal_setup")
+  note         String?
 
-  wallet        Wallet   @relation(fields: [walletId], references: [id])
+  wallet Wallet @relation(fields: [walletId], references: [id])
 
   @@map("modal_awal")
 }
@@ -811,15 +840,15 @@ model ModalAwal {
 // 28. SuggestRevision
 // ─────────────────────────────────────────────
 model SuggestRevision {
-  id            String   @id @default(cuid())
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  title         String
-  description   String?
-  imagesBase64  String[] @default([]) @map("images_base64")
-  status        String   @default("PENDING")
-  createdBy     String?  @map("created_by")
+  title        String
+  description  String?
+  imagesBase64 String[] @default([]) @map("images_base64")
+  status       String   @default("PENDING")
+  createdBy    String?  @map("created_by")
 
   @@map("suggest_revisions")
 }
@@ -834,9 +863,9 @@ model SkuMapping {
   updatedAt DateTime @updatedAt @map("updated_at")
   createdBy String?  @map("created_by")
 
-  fromSku   String   @unique @map("from_sku")  // SKU dari marketplace (col A)
-  toSku     String   @map("to_sku")            // SKU internal DB (col B, bisa ada +)
-  isActive  Boolean  @default(true) @map("is_active")
+  fromSku  String  @unique @map("from_sku") // SKU dari marketplace (col A)
+  toSku    String  @map("to_sku") // SKU internal DB (col B, bisa ada +)
+  isActive Boolean @default(true) @map("is_active")
 
   @@map("sku_mappings")
 }
@@ -858,9 +887,9 @@ model AppSetting {
 // ─────────────────────────────────────────────
 model TelegramRecipient {
   id        String   @id @default(cuid())
-  name      String                           // label bebas, misal "Owner", "Group Ops"
+  name      String // label bebas, misal "Owner", "Group Ops"
   chatId    String   @unique @map("chat_id") // bisa negatif untuk grup
-  threadId  String?  @map("thread_id")       // opsional: Topic ID untuk Grup dengan Topics
+  threadId  String?  @map("thread_id") // opsional: Topic ID untuk Grup dengan Topics
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -884,15 +913,15 @@ model ReportSchedule {
 // AI Insights (cache hasil analisis Gemini)
 // ─────────────────────────────────────────────
 model AiInsight {
-  id            String   @id @default(cuid())
-  createdAt     DateTime @default(now()) @map("created_at")
-  generatedBy   String?  @map("generated_by")
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now()) @map("created_at")
+  generatedBy String?  @map("generated_by")
 
-  period        String   // e.g. "2026-05" or "2026-05-03"
-  periodType    String   @default("monthly") @map("period_type") // "daily" | "monthly"
-  content       String   // full AI text output
-  modelUsed     String   @default("gemini-1.5-flash") @map("model_used")
-  dataSnapshot  Json?    @map("data_snapshot") // raw numbers used for generation
+  period       String // e.g. "2026-05" or "2026-05-03"
+  periodType   String @default("monthly") @map("period_type") // "daily" | "monthly"
+  content      String // full AI text output
+  modelUsed    String @default("gemini-1.5-flash") @map("model_used")
+  dataSnapshot Json?  @map("data_snapshot") // raw numbers used for generation
 
   @@index([periodType, createdAt])
   @@map("ai_insights")

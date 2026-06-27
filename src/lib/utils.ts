@@ -74,6 +74,18 @@ export function generatePONumber(poDate: Date, existingPONumbers: string[]): str
   return `${prefix}${next.toString().padStart(2, '0')}`
 }
 
+// ── GR Number Generator ────────────────────────────────
+export function generateGRNumber(receiptDate: Date, existingGRNumbers: string[]): string {
+  const yearMonth = `${receiptDate.getFullYear()}${(receiptDate.getMonth() + 1).toString().padStart(2, '0')}`
+  const prefix = `GR-${yearMonth}-`
+  const existing = existingGRNumbers
+    .filter(n => n.startsWith(prefix))
+    .map(n => parseInt(n.replace(prefix, ''), 10))
+    .filter(n => !isNaN(n))
+  const next = existing.length > 0 ? Math.max(...existing) + 1 : 1
+  return `${prefix}${next.toString().padStart(3, '0')}`
+}
+
 // ── SOH Calculator ─────────────────────────────────────
 export interface LedgerEntry {
   sku: string
