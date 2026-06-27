@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   if (!['OWNER', 'FINANCE', 'STAFF'].includes(session.userRole)) return apiError('Forbidden', 403)
 
   const body = await request.json()
-  const { direction, reason, items, itemsWithDetails } = body
+  const { direction, reason, items, itemsWithDetails, vendorId, vendorName } = body
   // items: { [sku]: qty } OR itemsWithDetails: [{ sku, qty, trxDate, note }]
 
   const finalItems = itemsWithDetails || items;
@@ -39,6 +39,8 @@ export async function POST(request: NextRequest) {
       status: 'DRAFT',
       itemsJson: finalItems,
       scannedBy: session.userId,
+      vendorId: vendorId || null,
+      vendorName: vendorName || null,
       createdBy: session.username,
     },
   })

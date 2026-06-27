@@ -424,6 +424,7 @@ export default function InventoryScanPage() {
   const [suggestLoading, setSuggestLoading] = useState(false)
   const [committing, setCommitting] = useState(false)
   const [committed, setCommitted] = useState(false)
+  const [vendorId, setVendorId] = useState('')
   const skuRef = useRef<HTMLInputElement>(null)
   const lockRef = useRef(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -444,6 +445,17 @@ export default function InventoryScanPage() {
       const res = await fetch('/api/products?limit=all&isActive=true')
       return res.json().then(d => d.data?.products ?? [])
     },
+  })
+
+  const { data: vendorsData } = useQuery({
+    queryKey: ['vendors-all'],
+    queryFn: () => fetch('/api/vendors?all=true').then(r => r.json()).then(d => d.data ?? []),
+  })
+
+  const { data: openPOs } = useQuery({
+    queryKey: ['open-pos', vendorId],
+    queryFn: () => fetch(`/api/procurement/open-pos?vendorId=${vendorId}`).then(r => r.json()).then(d => d.data ?? []),
+    enabled: !!vendorId && activeTab === 'masuk',
   })
 
   // Live search suggest via API
@@ -588,6 +600,8 @@ export default function InventoryScanPage() {
         body: JSON.stringify({
           direction: tab.direction,
           reason: tab.reason,
+          vendorId: activeTab === 'masuk' ? vendorId || undefined : undefined,
+          vendorName: activeTab === 'masuk' && vendorId ? (vendorsData || []).find((v: any) => v.id === vendorId)?.namaVendor : undefined,
           itemsWithDetails: items.map(i => ({ 
             sku: i.sku, 
             qty: i.qty, 
@@ -609,8 +623,8 @@ export default function InventoryScanPage() {
 
       // Toast utama
       const bs = commitData.data?.bebanSample
+      const poMatched = commitData.data?.poMatched
       if (bs) {
-        // Endorsement: tampilkan ringkasan beban sample
         const nominal = bs.totalAmount > 0
           ? ` — Beban Sample Rp${bs.totalAmount.toLocaleString('id-ID')} dibukukan ke Finance`
           : ''
@@ -621,6 +635,17 @@ export default function InventoryScanPage() {
         if (bs.warning) {
           setTimeout(() => toast({ title: `⚠️ ${bs.warning}`, type: 'error' }), 800)
         }
+      } else if (poMatched && poMatched.length > 0) {
+        const poList = poMatched.map((p: any) => p.poNumber).join(', ')
+        const totalItems = commitData.data?.totalPOItemsMatched || 0
+        toast({
+          title: `${items.length} SKU di-commit + ${totalItems} item PO ter-update`,
+          type: 'success',
+        })
+        setTimeout(() => toast({
+          title: `PO ter-update: ${poList}`,
+          type: 'success',
+        }), 600)
       } else {
         toast({ title: `${items.length} SKU berhasil di-commit ke ledger`, type: 'success' })
       }
@@ -631,6 +656,7 @@ export default function InventoryScanPage() {
         qc.invalidateQueries({ queryKey: ['inventory'] })
         qc.invalidateQueries({ queryKey: ['wallets'] })
         qc.invalidateQueries({ queryKey: ['wallet-ledger'] })
+        qc.invalidateQueries({ queryKey: ['purchase-orders'] })
       }, 2000)
     } catch (err: any) {
       toast({ title: err.message || 'Commit gagal', type: 'error' })
@@ -646,6 +672,7 @@ export default function InventoryScanPage() {
     setActiveTab(key)
     setItems([])
     setLookupError('')
+    setVendorId('')
     setTimeout(() => skuRef.current?.focus(), 100)
   }
 
@@ -706,6 +733,30 @@ export default function InventoryScanPage() {
                   </span>
                 )}
               </div>
+
+              {/* Vendor dropdown — only for Scan Masuk */}
+              {activeTab === 'masuk' && (
+                <div className="mb-3">
+                  <label className="block text-xs text-zinc-500 mb-1">Vendor <span className="text-zinc-600">(untuk auto-match PO)</span></label>
+                  <select value={vendorId} onChange={e => setVendorId(e.target.value)}
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50">
+                    <option value="">Tanpa Vendor (non-PO)</option>
+                    {(vendorsData || []).map((v: any) => <option key={v.id} value={v.id}>{v.namaVendor}</option>)}
+                  </select>
+                  {vendorId && openPOs && openPOs.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {openPOs.map((po: any) => (
+                        <span key={po.id} className="text-[9px] bg-emerald-900/30 text-emerald-400 border border-emerald-800/50 px-1.5 py-0.5 rounded-full font-mono">
+                          {po.poNumber} ({po.items.length} item)
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {vendorId && openPOs && openPOs.length === 0 && (
+                    <p className="mt-1 text-[10px] text-amber-500">Tidak ada PO OPEN/PARTIAL untuk vendor ini</p>
+                  )}
+                </div>
+              )}
 
               {/* Pilihan Form Input */}
               {activeTab === 'retur_pembelian' ? (

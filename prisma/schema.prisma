@@ -249,15 +249,18 @@ model InventoryScanBatch {
   updatedAt DateTime @updatedAt @map("updated_at")
   createdBy String?  @map("created_by")
 
-  batchDate DateTime         @map("batch_date")
-  direction LedgerDirection
-  reason    ScanBatchReason?
-  status    ScanBatchStatus  @default(DRAFT)
-  itemsJson Json?            @map("items_json")
-  scannedBy String?          @map("scanned_by")
+  batchDate  DateTime         @map("batch_date")
+  direction  LedgerDirection
+  reason     ScanBatchReason?
+  status     ScanBatchStatus  @default(DRAFT)
+  itemsJson  Json?            @map("items_json")
+  scannedBy  String?          @map("scanned_by")
+  vendorId   String?          @map("vendor_id")
+  vendorName String?          @map("vendor_name")
 
   ledgerEntries InventoryLedger[]
 
+  @@index([vendorId])
   @@map("inventory_scan_batches")
 }
 

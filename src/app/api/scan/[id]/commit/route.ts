@@ -3,12 +3,6 @@ import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { apiSuccess, apiError } from '@/lib/utils'
 
-// Waktu Jakarta (WIB)
-function nowJakarta(): Date {
-  return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
-}
-
-// POST /api/scan/[id]/commit
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -26,17 +20,15 @@ export async function POST(
     return apiError('Batch kosong')
   }
 
-  // Parse skus based on if it's Array or Object
   const isArray = Array.isArray(itemsJson)
   const skus = Array.from(new Set(isArray ? itemsJson.map((x: any) => x.sku) : Object.keys(itemsJson)))
 
-  // Validate all SKUs exist (include hpp for endorsement booking)
   const products = await prisma.masterProduct.findMany({ where: { sku: { in: skus } } })
   const foundSkus = new Set(products.map(p => p.sku))
   const missing = skus.filter(s => !foundSkus.has(s))
   if (missing.length > 0) return apiError(`SKU tidak ditemukan: ${missing.join(', ')}`)
 
-  // Prepare inventory ledger data
+  // Build ledger data
   const ledgerData: any[] = []
   if (isArray) {
     for (const item of itemsJson) {
@@ -65,15 +57,103 @@ export async function POST(
     }
   }
 
-  // ── Auto-booking Beban Sample untuk Endorsement ──────────────────────────
-  // Jika reason = MARKETING, otomatis buat entri EXPENSE di wallet ledger
-  // Nominal = HPP × qty per SKU. Default wallet = "Kas Operasional".
+  // ── PO Auto-Match: PURCHASE + vendorId → update PO items ──
+  const isPurchase = batch.reason === 'PURCHASE' && batch.vendorId
+  const poUpdates: { poId: string; poNumber: string; matched: { sku: string; qty: number }[] }[] = []
+
+  if (isPurchase) {
+    const openPOs = await prisma.purchaseOrder.findMany({
+      where: {
+        vendorId: batch.vendorId!,
+        status: { in: ['OPEN', 'PARTIAL'] },
+      },
+      include: {
+        items: {
+          where: { status: { not: 'COMPLETED' } },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+      orderBy: { poDate: 'asc' },
+    })
+
+    // Build a map: sku → [{ poItemId, poId, poNumber, remaining }]
+    const skuPOMap = new Map<string, { poItemId: string; poId: string; poNumber: string; remaining: number }[]>()
+    for (const po of openPOs) {
+      for (const item of po.items) {
+        const remaining = item.qtyOrder - item.qtyReceived
+        if (remaining <= 0) continue
+        const list = skuPOMap.get(item.sku) || []
+        list.push({ poItemId: item.id, poId: po.id, poNumber: po.poNumber, remaining })
+        skuPOMap.set(item.sku, list)
+      }
+    }
+
+    // For each scanned item, distribute qty across matching PO items (FIFO)
+    for (const entry of ledgerData) {
+      const poItems = skuPOMap.get(entry.sku)
+      if (!poItems || poItems.length === 0) continue
+
+      let qtyLeft = entry.qty
+      const matched: { sku: string; qty: number }[] = []
+
+      for (const pi of poItems) {
+        if (qtyLeft <= 0) break
+        const allocQty = Math.min(qtyLeft, pi.remaining)
+        if (allocQty <= 0) continue
+
+        // Update PO item
+        const poItem = await prisma.purchaseOrderItem.findUnique({ where: { id: pi.poItemId } })
+        if (poItem) {
+          const newQtyReceived = poItem.qtyReceived + allocQty
+          const itemStatus = newQtyReceived >= poItem.qtyOrder ? 'COMPLETED' : 'PARTIAL'
+          await prisma.purchaseOrderItem.update({
+            where: { id: pi.poItemId },
+            data: { qtyReceived: newQtyReceived, status: itemStatus },
+          })
+        }
+
+        pi.remaining -= allocQty
+        qtyLeft -= allocQty
+        matched.push({ sku: entry.sku, qty: allocQty })
+
+        // Update ledger note to include PO reference
+        entry.note = [entry.note, `→ ${pi.poNumber}`].filter(Boolean).join(' | ')
+      }
+
+      // Also update ledger note with PO summary
+      if (matched.length > 0) {
+        const poNumbers = [...new Set(openPOs.filter(p => matched.some(m => m.sku === entry.sku)).map(p => p.poNumber))]
+        if (poNumbers.length > 0) {
+          entry.note = [entry.note, `PO: ${poNumbers.join(', ')}`].filter(Boolean).join(' | ')
+        }
+      }
+
+      // Track which POs were updated
+      const affectedPOIds = new Set<string>()
+      for (const pi of skuPOMap.get(entry.sku) || []) {
+        if (pi.remaining < (pi.remaining + (qtyLeft < entry.qty ? entry.qty - qtyLeft : 0))) {
+          affectedPOIds.add(pi.poId)
+        }
+      }
+
+      for (const poId of affectedPOIds) {
+        const existing = poUpdates.find(u => u.poId === poId)
+        if (existing) {
+          existing.matched.push(...matched)
+        } else {
+          const po = openPOs.find(p => p.id === poId)
+          poUpdates.push({ poId, poNumber: po?.poNumber || '-', matched: [...matched] })
+        }
+      }
+    }
+  }
+
+  // ── Endorsement Beban Sample ──
   const isEndorsement = batch.reason === 'MARKETING'
   let walletBookingWarning: string | null = null
   const walletLedgerData: any[] = []
 
   if (isEndorsement) {
-    // Cari wallet "Kas Operasional" (case-insensitive, harus aktif)
     const kasOps = await prisma.wallet.findFirst({
       where: {
         isActive: true,
@@ -85,7 +165,6 @@ export async function POST(
       walletBookingWarning =
         'Wallet "Kas Operasional" tidak ditemukan — Beban Sample TIDAK otomatis dibukukan ke Finance. Silakan input manual di modul Finance.'
     } else {
-      // Map sku → hpp dari master_products
       const hppMap = new Map(products.map(p => [p.sku, p.hpp ?? 0]))
 
       for (const entry of ledgerData) {
@@ -99,7 +178,6 @@ export async function POST(
             trxDate: entry.trxDate,
             trxType: 'EXPENSE' as const,
             category: 'Beban Sample',
-            // Negatif = keluar dari wallet
             amount: -Math.abs(totalBeban),
             note: `Endorsement: ${entry.sku} × ${qty} unit (HPP Rp${hpp.toLocaleString('id-ID')}/unit) | Ref: ${batch.id.slice(-8)}`,
             createdBy: session.username,
@@ -114,23 +192,40 @@ export async function POST(
     }
   }
 
-  // Create ledger entries + commit batch in transaction
+  // Commit everything in transaction
   await prisma.$transaction(async (tx) => {
     // 1. Inventory ledger
     await tx.inventoryLedger.createMany({ data: ledgerData })
 
-    // 2. Finance: Beban Sample (hanya jika endorsement & ada data)
+    // 2. PO status updates
+    if (isPurchase) {
+      const affectedPOIds = [...new Set(poUpdates.map(u => u.poId))]
+      for (const poId of affectedPOIds) {
+        const updatedItems = await tx.purchaseOrderItem.findMany({ where: { poId } })
+        const anyReceived = updatedItems.some(i => i.qtyReceived > 0)
+        const allCompleted = updatedItems.every(i => i.status === 'COMPLETED')
+        const poStatus = allCompleted ? 'COMPLETED' : anyReceived ? 'PARTIAL' : 'OPEN'
+        const totalQtyReceived = updatedItems.reduce((sum, i) => sum + i.qtyReceived, 0)
+
+        await tx.purchaseOrder.update({
+          where: { id: poId },
+          data: { status: poStatus, totalQtyReceived },
+        })
+      }
+    }
+
+    // 3. Finance: Beban Sample
     if (walletLedgerData.length > 0) {
       await tx.walletLedger.createMany({ data: walletLedgerData })
     }
 
-    // 3. Commit batch
+    // 4. Commit batch
     await tx.inventoryScanBatch.update({
       where: { id: batch.id },
       data: { status: 'COMMITTED' },
     })
 
-    // 4. Audit log
+    // 5. Audit log
     await tx.auditLog.create({
       data: {
         entityType: 'InventoryScanBatch',
@@ -140,6 +235,8 @@ export async function POST(
           items: itemsJson,
           direction: batch.direction,
           reason: batch.reason,
+          vendorId: batch.vendorId,
+          poUpdates: poUpdates.length > 0 ? poUpdates.map(u => ({ poNumber: u.poNumber, items: u.matched })) : undefined,
           bebanSampleBooked: walletLedgerData.length,
         },
         performedBy: session.username,
@@ -148,10 +245,18 @@ export async function POST(
   })
 
   const totalBebanSample = walletLedgerData.reduce((s, e) => s + Math.abs(e.amount), 0)
+  const totalPOItems = poUpdates.reduce((s, u) => s + u.matched.length, 0)
 
   return apiSuccess({
     message: 'Batch berhasil dicommit',
     batchId: batch.id,
+    ...(poUpdates.length > 0 && {
+      poMatched: poUpdates.map(u => ({
+        poNumber: u.poNumber,
+        items: u.matched,
+      })),
+      totalPOItemsMatched: totalPOItems,
+    }),
     ...(isEndorsement && {
       bebanSample: {
         booked: walletLedgerData.length,
