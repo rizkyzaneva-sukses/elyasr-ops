@@ -6,9 +6,10 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { formatRupiah, formatDate, downloadCSV } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
 import { useAuth } from '@/components/providers'
-import { FileText, Plus, ChevronLeft, ChevronRight, Search, Eye, FileDown, Printer, X, CreditCard, ChevronDown, Pencil, Trash2, AlertTriangle, Package } from 'lucide-react'
+import { FileText, Plus, ChevronLeft, ChevronRight, Search, Eye, FileDown, Printer, X, CreditCard, ChevronDown, Pencil, Trash2, AlertTriangle, Package, MessageCircle } from 'lucide-react'
 import { PayVendorModal } from '@/components/ui/pay-vendor-modal'
 import { ReceiveGoodsModal } from '@/components/ui/receive-goods-modal'
+import { SendWhatsAppModal } from '@/components/ui/send-whatsapp-modal'
 
 const PO_STATUS_COLOR: Record<string, string> = {
   OPEN: 'badge-warning', PARTIAL: 'badge-info', COMPLETED: 'badge-success', CANCELLED: 'badge-danger',
@@ -606,6 +607,7 @@ export default function PurchaseOrdersPage() {
   const [detailPO, setDetailPO] = useState<any>(null)
   const [payPO, setPayPO] = useState<any>(null)
   const [showReceive, setShowReceive] = useState(false)
+  const [sendWA, setSendWA] = useState<any>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const limit = 20
 
@@ -704,6 +706,9 @@ export default function PurchaseOrdersPage() {
           }}
         />
       )}
+      {sendWA && (
+        <SendWhatsAppModal po={sendWA} onClose={() => setSendWA(null)} />
+      )}
       {(showCreate || editPO) && vendors && (
         <POFormModal
           vendors={vendors}
@@ -800,6 +805,9 @@ export default function PurchaseOrdersPage() {
                             <Package size={13} />
                           </button>
                         )}
+                        <button onClick={() => setSendWA(po)} className="p-1.5 rounded bg-zinc-800 hover:bg-green-900/50 text-zinc-400 hover:text-green-400 transition-colors" title="Kirim ke Vendor via WA">
+                          <MessageCircle size={13} />
+                        </button>
                         {/* Edit — OWNER only */}
                         {isOwner && (
                           <button onClick={() => setEditPO(po)} className="p-1.5 rounded bg-zinc-800 hover:bg-amber-900/40 text-zinc-400 hover:text-amber-400 transition-colors" title="Edit PO">

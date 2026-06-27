@@ -5,9 +5,10 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { formatRupiah, formatDate, downloadCSV } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
 import { useAuth } from '@/components/providers'
-import { FileText, Plus, ChevronLeft, ChevronRight, Search, Eye, FileDown, Printer, X, CreditCard, ChevronDown, Pencil, Trash2, AlertTriangle, Package } from 'lucide-react'
+import { FileText, Plus, ChevronLeft, ChevronRight, Search, Eye, FileDown, Printer, X, CreditCard, ChevronDown, Pencil, Trash2, AlertTriangle, Package, MessageCircle } from 'lucide-react'
 import { PayVendorModal } from '@/components/ui/pay-vendor-modal'
 import { ReceiveGoodsModal } from '@/components/ui/receive-goods-modal'
+import { SendWhatsAppModal } from '@/components/ui/send-whatsapp-modal'
 
 const PO_STATUS_COLOR: Record<string, string> = {
   OPEN: 'badge-warning', PARTIAL: 'badge-info', COMPLETED: 'badge-success', CANCELLED: 'badge-danger',
@@ -482,6 +483,7 @@ export function PurchaseOrdersTab() {
   const [detailPO, setDetailPO]     = useState<any>(null)
   const [payPO, setPayPO]           = useState<any>(null)
   const [showReceive, setShowReceive] = useState(false)
+  const [sendWA, setSendWA]         = useState<any>(null)
   const [deletingId, setDeletingId] = useState<string|null>(null)
   const limit = 20
 
@@ -530,6 +532,7 @@ export function PurchaseOrdersTab() {
       {printPO  && <PrintPOModal po={printPO} onClose={() => setPrintPO(null)} />}
       {payPO    && <PayVendorModal prefillVendorId={payPO.vendorId} prefillPoId={payPO.id} onClose={() => setPayPO(null)} onSuccess={() => { setPayPO(null); qc.invalidateQueries({ queryKey:['purchase-orders'] }) }} />}
       {showReceive && <ReceiveGoodsModal onClose={() => setShowReceive(false)} onSuccess={() => { setShowReceive(false); qc.invalidateQueries({ queryKey:['purchase-orders'] }) }} />}
+      {sendWA && <SendWhatsAppModal po={sendWA} onClose={() => setSendWA(null)} />}
       {(showCreate || editPO) && vendors && <POFormModal vendors={vendors} editPO={editPO} onClose={() => { setShowCreate(false); setEditPO(null) }} />}
 
       <div className="flex items-center justify-between mb-4">
@@ -592,6 +595,7 @@ export function PurchaseOrdersTab() {
                         <button onClick={() => handleDownload(po)} className="p-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-blue-400" title="Download"><FileDown size={13}/></button>
                         {po.paymentStatus !== 'PAID' && <button onClick={() => setPayPO(po)} className="p-1.5 rounded bg-zinc-800 hover:bg-emerald-900/50 text-zinc-400 hover:text-emerald-400" title="Bayar"><CreditCard size={13}/></button>}
                         {(po.status === 'OPEN' || po.status === 'PARTIAL') && <button onClick={() => setShowReceive(true)} className="p-1.5 rounded bg-zinc-800 hover:bg-blue-900/50 text-zinc-400 hover:text-blue-400" title="Terima Barang"><Package size={13}/></button>}
+                        <button onClick={() => setSendWA(po)} className="p-1.5 rounded bg-zinc-800 hover:bg-green-900/50 text-zinc-400 hover:text-green-400" title="Kirim ke Vendor via WA"><MessageCircle size={13}/></button>
                         {isOwner && <button onClick={() => setEditPO(po)} className="p-1.5 rounded bg-zinc-800 hover:bg-amber-900/40 text-zinc-400 hover:text-amber-400" title="Edit"><Pencil size={13}/></button>}
                         {(isOwner || isFinance) && (
                           <button onClick={() => handleDelete(po)} disabled={deletingId===po.id}
