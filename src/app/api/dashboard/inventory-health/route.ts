@@ -57,7 +57,7 @@ export async function GET(_req: NextRequest) {
       { sku: string; nama: string | null; soh: number; hpp: number; tied_up: bigint; last_sale: Date | null }[]
     >`
       WITH soh_calc AS (
-        SELECT p.sku, p.nama_produk AS nama, p.hpp,
+        SELECT p.sku, p.product_name AS nama, p.hpp,
           (p.stok_awal
             + COALESCE(SUM(CASE WHEN l.direction = 'IN'  AND (p.last_opname_date IS NULL OR l.trx_date >= p.last_opname_date) THEN l.qty ELSE 0 END), 0)
             - COALESCE(SUM(CASE WHEN l.direction = 'OUT' AND (p.last_opname_date IS NULL OR l.trx_date >= p.last_opname_date) THEN l.qty ELSE 0 END), 0)
@@ -65,7 +65,7 @@ export async function GET(_req: NextRequest) {
         FROM master_products p
         LEFT JOIN inventory_ledger l ON l.sku = p.sku
         WHERE p.is_active = true
-        GROUP BY p.sku, p.nama_produk, p.hpp, p.stok_awal, p.last_opname_date
+        GROUP BY p.sku, p.product_name, p.hpp, p.stok_awal, p.last_opname_date
       ),
       last_sale_per_sku AS (
         SELECT sku, MAX(trx_date) AS last_sale
@@ -91,7 +91,7 @@ export async function GET(_req: NextRequest) {
       { sku: string; nama: string | null; soh: number; hpp: number; sales_30d: bigint; tied_up: bigint }[]
     >`
       WITH soh_calc AS (
-        SELECT p.sku, p.nama_produk AS nama, p.hpp,
+        SELECT p.sku, p.product_name AS nama, p.hpp,
           (p.stok_awal
             + COALESCE(SUM(CASE WHEN l.direction = 'IN'  AND (p.last_opname_date IS NULL OR l.trx_date >= p.last_opname_date) THEN l.qty ELSE 0 END), 0)
             - COALESCE(SUM(CASE WHEN l.direction = 'OUT' AND (p.last_opname_date IS NULL OR l.trx_date >= p.last_opname_date) THEN l.qty ELSE 0 END), 0)
@@ -99,7 +99,7 @@ export async function GET(_req: NextRequest) {
         FROM master_products p
         LEFT JOIN inventory_ledger l ON l.sku = p.sku
         WHERE p.is_active = true
-        GROUP BY p.sku, p.nama_produk, p.hpp, p.stok_awal, p.last_opname_date
+        GROUP BY p.sku, p.product_name, p.hpp, p.stok_awal, p.last_opname_date
       ),
       sales30 AS (
         SELECT sku, COALESCE(SUM(qty), 0)::bigint AS sales_30d
@@ -125,7 +125,7 @@ export async function GET(_req: NextRequest) {
       { sku: string; nama: string | null; soh: number; rop: number; hpp: number }[]
     >`
       WITH soh_calc AS (
-        SELECT p.sku, p.nama_produk AS nama, p.hpp, p.rop,
+        SELECT p.sku, p.product_name AS nama, p.hpp, p.rop,
           (p.stok_awal
             + COALESCE(SUM(CASE WHEN l.direction = 'IN'  AND (p.last_opname_date IS NULL OR l.trx_date >= p.last_opname_date) THEN l.qty ELSE 0 END), 0)
             - COALESCE(SUM(CASE WHEN l.direction = 'OUT' AND (p.last_opname_date IS NULL OR l.trx_date >= p.last_opname_date) THEN l.qty ELSE 0 END), 0)
@@ -133,7 +133,7 @@ export async function GET(_req: NextRequest) {
         FROM master_products p
         LEFT JOIN inventory_ledger l ON l.sku = p.sku
         WHERE p.is_active = true
-        GROUP BY p.sku, p.nama_produk, p.hpp, p.rop, p.stok_awal, p.last_opname_date
+        GROUP BY p.sku, p.product_name, p.hpp, p.rop, p.stok_awal, p.last_opname_date
       )
       SELECT sku, nama, soh, rop, hpp
       FROM soh_calc

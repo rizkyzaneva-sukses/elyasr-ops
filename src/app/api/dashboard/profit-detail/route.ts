@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     >`
       SELECT
         o.sku,
-        MAX(p.nama_produk) AS nama,
+        MAX(p.product_name) AS nama,
         SUM(o.qty)::bigint AS qty,
         SUM(o.real_omzet)::bigint AS omzet,
         SUM(o.hpp * o.qty)::bigint AS hpp_total,
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
     >`
       SELECT
         o.sku,
-        MAX(p.nama_produk) AS nama,
+        MAX(p.product_name) AS nama,
         SUM(o.qty)::bigint AS qty,
         SUM(o.real_omzet)::bigint AS omzet,
         SUM(o.hpp * o.qty)::bigint AS hpp_total,
