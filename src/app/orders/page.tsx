@@ -5,13 +5,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef } from 'react'
 import { formatRupiah, formatDate } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
-import { usePermission, useAuth } from '@/components/providers'
+import { usePermission } from '@/components/providers'
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import {
   ShoppingCart, Upload, Download, Search,
   RefreshCw, ChevronLeft, ChevronRight, CheckCircle2,
-  Loader2, AlertCircle, Trash, X, CalendarRange
+  Loader2, AlertCircle, Trash, X, CalendarRange, Wallet
 } from 'lucide-react'
 
 const STATUS_GROUPS = [
@@ -162,9 +162,9 @@ function ExportModal({
 export default function OrdersPage() {
   const qc = useQueryClient()
   const { toast } = useToast()
-  const { canEdit } = usePermission()
-  const { user } = useAuth()
+  const { canEdit, isOwner } = usePermission()
   const fileRef = useRef<HTMLInputElement>(null)
+  const [backfilling, setBackfilling] = useState(false)
 
   const [search, setSearch] = useState('')
   const [statusGroup, setStatusGroup] = useState('')
@@ -307,6 +307,24 @@ export default function OrdersPage() {
     if (fileRef.current) fileRef.current.value = ''
   }
 
+  const handleBackfillHpp = async () => {
+    setBackfilling(true)
+    try {
+      const res = await fetch('/api/orders/backfill-hpp', { method: 'POST' })
+      const json = await res.json()
+      if (res.ok) {
+        toast({ title: json.data.message, type: 'success' })
+        qc.invalidateQueries({ queryKey: ['orders'] })
+      } else {
+        toast({ title: json.error || 'Gagal isi HPP', type: 'error' })
+      }
+    } catch (err: any) {
+      toast({ title: err.message || 'Gagal isi HPP', type: 'error' })
+    } finally {
+      setBackfilling(false)
+    }
+  }
+
   const handleDeleteSelected = async () => {
     if (!confirm(`Yakin menghapus ${selectedIds.length} pesanan terpilih?`)) return
     setDeleting(true)
@@ -389,6 +407,15 @@ export default function OrdersPage() {
               className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg px-3 py-2 text-sm transition-colors border border-zinc-700"
             >
               <Download size={14} /> Export
+            </button>
+            <button
+              onClick={handleBackfillHpp}
+              disabled={backfilling}
+              title="Isi HPP untuk pesanan yang HPP-nya masih kosong (tidak menimpa yang sudah terisi)"
+              className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-300 rounded-lg px-3 py-2 text-sm transition-colors border border-zinc-700"
+            >
+              {backfilling ? <Loader2 size={14} className="animate-spin" /> : <Wallet size={14} />}
+              Isi HPP Kosong
             </button>
             <button onClick={() => refetch()} className="p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-500 hover:text-zinc-300 transition-colors">
               <RefreshCw size={14} />
@@ -528,19 +555,19 @@ export default function OrdersPage() {
                 <th className="w-20 text-right">HPP</th>
                 <th className="w-28">Status</th>
                 <th className="w-24 text-right">Payout</th>
-                {user?.userRole === 'OWNER' && <th className="w-16"></th>}
+                {canEdit && <th className="w-16"></th>}
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 Array.from({ length: 8 }).map((_, i) => (
-                  <tr key={i}>{Array.from({ length: user?.userRole === 'OWNER' ? 12 : 11 }).map((_, j) => (
+                  <tr key={i}>{Array.from({ length: canEdit ? 12 : 11 }).map((_, j) => (
                     <td key={j}><div className="h-4 bg-zinc-800 rounded animate-pulse" /></td>
                   ))}</tr>
                 ))
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={user?.userRole === 'OWNER' ? 12 : 11} className="text-center py-12 text-zinc-600">
+                  <td colSpan={canEdit ? 12 : 11} className="text-center py-12 text-zinc-600">
                     <ShoppingCart size={32} className="mx-auto mb-2 opacity-30" />
                     <p>Tidak ada pesanan</p>
                     {canEdit && <p className="text-xs mt-1">Upload file dari TikTok atau Shopee untuk mulai</p>}
@@ -612,7 +639,7 @@ export default function OrdersPage() {
                         : <span className="text-zinc-700 text-[10px]">—</span>
                       }
                     </td>
-                    {user?.userRole === 'OWNER' && (
+                    {canEdit && (
                       <td>
                         <button onClick={() => setEditingOrder(o)} className="p-1 px-2 text-[10px] bg-zinc-800 text-zinc-400 hover:text-white rounded">
                           Edit
@@ -788,42 +815,53 @@ export default function OrdersPage() {
         </div>
       )}
 
-      {/* Edit Dialog (Owner Only) */}
+      {/* Edit Dialog (Owner: semua field · Finance: HPP saja) */}
       {editingOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm p-6">
-            <h2 className="text-base font-semibold text-white mb-4">Edit Pesanan (Owner)</h2>
+            <h2 className="text-base font-semibold text-white mb-4">{isOwner ? 'Edit Pesanan' : 'Edit HPP'}</h2>
             <form onSubmit={(e) => {
               const formData = new FormData(e.currentTarget)
               handleEditSubmit(e, {
-                status: formData.get('status'),
-                airwaybill: formData.get('airwaybill'),
-                qty: formData.get('qty'),
-                realOmzet: formData.get('realOmzet'),
-                totalProductPrice: formData.get('totalProductPrice')
+                ...(isOwner && {
+                  status: formData.get('status'),
+                  airwaybill: formData.get('airwaybill'),
+                  qty: formData.get('qty'),
+                  realOmzet: formData.get('realOmzet'),
+                  totalProductPrice: formData.get('totalProductPrice'),
+                }),
+                hpp: formData.get('hpp'),
               })
             }} className="space-y-3">
+              {isOwner && (
+                <>
+                  <div>
+                    <label className="block text-xs text-zinc-500 mb-1">Status</label>
+                    <input name="status" defaultValue={editingOrder.status} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none"/>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-zinc-500 mb-1">No. Resi</label>
+                    <input name="airwaybill" defaultValue={editingOrder.airwaybill || ''} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none"/>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-zinc-500 mb-1">Qty</label>
+                      <input name="qty" type="number" defaultValue={editingOrder.qty} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none"/>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-500 mb-1">Harga Produk</label>
+                      <input name="totalProductPrice" type="number" defaultValue={editingOrder.totalProductPrice} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none"/>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-zinc-500 mb-1">Real Omzet</label>
+                    <input name="realOmzet" type="number" defaultValue={editingOrder.realOmzet} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm border-emerald-500/50 text-emerald-400 focus:outline-none"/>
+                  </div>
+                </>
+              )}
               <div>
-                <label className="block text-xs text-zinc-500 mb-1">Status</label>
-                <input name="status" defaultValue={editingOrder.status} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none"/>
-              </div>
-              <div>
-                <label className="block text-xs text-zinc-500 mb-1">No. Resi</label>
-                <input name="airwaybill" defaultValue={editingOrder.airwaybill || ''} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none"/>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-zinc-500 mb-1">Qty</label>
-                  <input name="qty" type="number" defaultValue={editingOrder.qty} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none"/>
-                </div>
-                <div>
-                  <label className="block text-xs text-zinc-500 mb-1">Harga Produk</label>
-                  <input name="totalProductPrice" type="number" defaultValue={editingOrder.totalProductPrice} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none"/>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs text-zinc-500 mb-1">Real Omzet</label>
-                <input name="realOmzet" type="number" defaultValue={editingOrder.realOmzet} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm border-emerald-500/50 text-emerald-400 focus:outline-none"/>
+                <label className="block text-xs text-zinc-500 mb-1">HPP</label>
+                <input name="hpp" type="number" defaultValue={editingOrder.hpp} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm border-amber-500/50 text-amber-400 focus:outline-none"/>
               </div>
               <div className="flex gap-2 pt-3">
                 <button type="button" onClick={() => setEditingOrder(null)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg py-2 text-sm">Batal</button>

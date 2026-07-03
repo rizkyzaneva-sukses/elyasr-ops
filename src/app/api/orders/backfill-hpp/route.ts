@@ -9,7 +9,7 @@ import { apiSuccess, apiError } from '@/lib/utils'
 export async function POST(request: NextRequest) {
   const session = await getSession()
   if (!session.isLoggedIn) return apiError('Unauthorized', 401)
-  if (!['OWNER'].includes(session.userRole)) return apiError('Forbidden', 403)
+  if (!['OWNER', 'FINANCE'].includes(session.userRole)) return apiError('Forbidden', 403)
 
   const [products, skuMappings] = await Promise.all([
     prisma.masterProduct.findMany({
