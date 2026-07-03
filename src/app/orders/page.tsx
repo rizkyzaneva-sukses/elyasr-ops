@@ -443,6 +443,7 @@ export default function OrdersPage() {
                 <tr>
                   <th className="px-3 py-2 text-left font-medium">SKU / Nama Produk (dari file marketplace)</th>
                   <th className="px-3 py-2 text-right font-medium">Jumlah Order</th>
+                  <th className="px-3 py-2 text-left font-medium">Harus Kemana?</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-amber-800/20">
@@ -450,16 +451,26 @@ export default function OrdersPage() {
                   <tr key={i} className="text-zinc-300">
                     <td className="px-3 py-2 font-mono">{u.sku}</td>
                     <td className="px-3 py-2 text-right text-zinc-400">{u.count}</td>
+                    <td className="px-3 py-2">
+                      {u.sku.includes('+')
+                        ? <span className="text-yellow-400">Produk Gabungan</span>
+                        : <span className="text-cyan-400">Cek Master Produk</span>}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <div className="px-4 py-3 border-t border-amber-800/30 bg-zinc-900/30">
+          <div className="px-4 py-3 border-t border-amber-800/30 bg-zinc-900/30 space-y-1">
             <p className="text-xs text-zinc-500">
-              Ini muncul karena teks di atas tidak persis cocok dengan SKU/Nama di Master Produk. Tambahkan mapping di{' '}
-              <a href="/produk-gabungan" className="text-yellow-400 underline">Produk Gabungan</a> (Kolom A = teks di atas, Kolom B = SKU internal yang benar), lalu klik "Isi HPP Kosong" lagi.
+              <span className="text-yellow-400 font-medium">Produk Gabungan</span> — teks mengandung tanda <code className="text-yellow-400">+</code> (paket/bundel 2 produk jadi 1). Tambahkan mapping di{' '}
+              <a href="/produk-gabungan" className="text-yellow-400 underline">halaman Produk Gabungan</a> (Kolom A = teks di atas, Kolom B = SKU internal digabung tanda +).
             </p>
+            <p className="text-xs text-zinc-500">
+              <span className="text-cyan-400 font-medium">Cek Master Produk</span> — produk biasa, tapi teksnya tidak cocok dengan SKU/Nama di{' '}
+              <a href="/master-products" className="text-cyan-400 underline">halaman Master Produk</a>. Cek apakah SKU untuk varian ini sudah ada dan HPP-nya sudah diisi; kalau beda ejaan/penulisan, samakan di sana.
+            </p>
+            <p className="text-xs text-zinc-600">Setelah dibenarkan, klik "Isi HPP Kosong" lagi.</p>
           </div>
         </div>
       )}
