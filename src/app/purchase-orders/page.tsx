@@ -6,13 +6,13 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { formatRupiah, formatDate, downloadCSV } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
 import { useAuth } from '@/components/providers'
-import { FileText, Plus, ChevronLeft, ChevronRight, Search, Eye, FileDown, Printer, X, CreditCard, ChevronDown, Pencil, Trash2, AlertTriangle, Package, MessageCircle } from 'lucide-react'
+import { FileText, Plus, ChevronLeft, ChevronRight, Search, Eye, FileDown, Printer, X, CreditCard, ChevronDown, Pencil, Trash2, AlertTriangle, Package, MessageCircle, Lock, Unlock } from 'lucide-react'
 import { PayVendorModal } from '@/components/ui/pay-vendor-modal'
 import { ReceiveGoodsModal } from '@/components/ui/receive-goods-modal'
 import { SendWhatsAppModal } from '@/components/ui/send-whatsapp-modal'
 
 const PO_STATUS_COLOR: Record<string, string> = {
-  OPEN: 'badge-warning', PARTIAL: 'badge-info', COMPLETED: 'badge-success', CANCELLED: 'badge-danger',
+  OPEN: 'badge-warning', PARTIAL: 'badge-info', COMPLETED: 'badge-success', CANCELLED: 'badge-danger', CLOSED: 'badge-muted',
 }
 const PAY_STATUS_COLOR: Record<string, string> = {
   UNPAID: 'badge-danger', PARTIAL_PAID: 'badge-warning', PAID: 'badge-success',
@@ -609,6 +609,7 @@ export default function PurchaseOrdersPage() {
   const [showReceive, setShowReceive] = useState(false)
   const [sendWA, setSendWA] = useState<any>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [closingId, setClosingId] = useState<string | null>(null)
   const limit = 20
 
   const { data, isLoading } = useQuery({
@@ -670,6 +671,28 @@ export default function PurchaseOrdersPage() {
       toast({ title: err.message || 'Gagal', type: 'error' })
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  const handleToggleClose = async (po: any, action: 'close' | 'reopen') => {
+    if (!confirm(action === 'close'
+      ? `Tutup PO ${po.poNumber}? Kiriman baru tidak akan bisa masuk ke PO ini lagi.`
+      : `Buka kembali PO ${po.poNumber}?`)) return
+    setClosingId(po.id)
+    try {
+      const res = await fetch(`/api/purchase-orders/${po.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      toast({ title: json.data.message, type: 'success' })
+      qc.invalidateQueries({ queryKey: ['purchase-orders'] })
+    } catch (err: any) {
+      toast({ title: err.message || 'Gagal', type: 'error' })
+    } finally {
+      setClosingId(null)
     }
   }
 
@@ -737,7 +760,7 @@ export default function PurchaseOrdersPage() {
         <select value={status} onChange={e => { setStatus(e.target.value); setPage(1) }}
           className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-400 focus:outline-none">
           <option value="">Semua Status</option>
-          {['OPEN','PARTIAL','COMPLETED','CANCELLED'].map(s => <option key={s} value={s}>{s}</option>)}
+          {['OPEN','PARTIAL','COMPLETED','CANCELLED','CLOSED'].map(s => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
 
@@ -808,6 +831,19 @@ export default function PurchaseOrdersPage() {
                         <button onClick={() => setSendWA(po)} className="p-1.5 rounded bg-zinc-800 hover:bg-green-900/50 text-zinc-400 hover:text-green-400 transition-colors" title="Kirim ke Vendor via WA">
                           <MessageCircle size={13} />
                         </button>
+                        {/* Tutup / Buka Kembali PO — OWNER & FINANCE */}
+                        {(isOwner || isFinance) && (po.status === 'OPEN' || po.status === 'PARTIAL') && (
+                          <button onClick={() => handleToggleClose(po, 'close')} disabled={closingId === po.id}
+                            className="p-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors disabled:opacity-40" title="Tutup PO">
+                            <Lock size={13} />
+                          </button>
+                        )}
+                        {(isOwner || isFinance) && po.status === 'CLOSED' && (
+                          <button onClick={() => handleToggleClose(po, 'reopen')} disabled={closingId === po.id}
+                            className="p-1.5 rounded bg-zinc-800 hover:bg-emerald-900/40 text-zinc-400 hover:text-emerald-400 transition-colors disabled:opacity-40" title="Buka Kembali">
+                            <Unlock size={13} />
+                          </button>
+                        )}
                         {/* Edit — OWNER only */}
                         {isOwner && (
                           <button onClick={() => setEditPO(po)} className="p-1.5 rounded bg-zinc-800 hover:bg-amber-900/40 text-zinc-400 hover:text-amber-400 transition-colors" title="Edit PO">

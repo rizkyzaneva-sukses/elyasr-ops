@@ -14,6 +14,7 @@ interface POSummary {
   partial: number
   completed: number
   cancelled: number
+  closed: number
   totalAmount: number
   totalPaid: number
   totalOutstanding: number
@@ -84,6 +85,7 @@ const STATUS_COLOR: Record<string, string> = {
   PARTIAL: 'badge-info',
   COMPLETED: 'badge-success',
   CANCELLED: 'badge-danger',
+  CLOSED: 'badge-muted',
 }
 
 const PAY_COLOR: Record<string, string> = {
@@ -122,12 +124,13 @@ export function MonitoringTab() {
       if (po.status === 'PARTIAL')   acc.partial++
       if (po.status === 'COMPLETED') acc.completed++
       if (po.status === 'CANCELLED') acc.cancelled++
+      if (po.status === 'CLOSED')    acc.closed++
       acc.totalAmount      += po.totalAmount ?? 0
       acc.totalPaid        += po.totalPaid   ?? 0
       acc.totalOutstanding += (po.totalAmount ?? 0) - (po.totalPaid ?? 0)
       return acc
     },
-    { total: 0, open: 0, partial: 0, completed: 0, cancelled: 0, totalAmount: 0, totalPaid: 0, totalOutstanding: 0 }
+    { total: 0, open: 0, partial: 0, completed: 0, cancelled: 0, closed: 0, totalAmount: 0, totalPaid: 0, totalOutstanding: 0 }
   )
 
   // ── Vendor spend breakdown ─────────────────────────────
@@ -157,7 +160,8 @@ export function MonitoringTab() {
     po.expectedDate &&
     new Date(po.expectedDate) < today &&
     po.status !== 'COMPLETED' &&
-    po.status !== 'CANCELLED'
+    po.status !== 'CANCELLED' &&
+    po.status !== 'CLOSED'
   )
 
   // ── Recent open/partial POs ───────────────────────────
@@ -214,12 +218,13 @@ export function MonitoringTab() {
           <BarChart3 size={15} className="text-emerald-400" />
           Distribusi Status PO
         </h3>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           {[
             { label: 'Open',      count: summary.open,      color: 'bg-amber-500',  badge: 'badge-warning' },
             { label: 'Partial',   count: summary.partial,   color: 'bg-blue-500',   badge: 'badge-info'    },
             { label: 'Completed', count: summary.completed, color: 'bg-emerald-500',badge: 'badge-success' },
             { label: 'Cancelled', count: summary.cancelled, color: 'bg-red-500',    badge: 'badge-danger'  },
+            { label: 'Closed',    count: summary.closed,    color: 'bg-zinc-500',   badge: 'badge-muted'   },
           ].map(s => (
             <div key={s.label} className="bg-zinc-800/50 rounded-xl p-3">
               <div className="flex items-center justify-between mb-2">

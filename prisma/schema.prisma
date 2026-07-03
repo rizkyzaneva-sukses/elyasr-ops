@@ -62,6 +62,7 @@ enum POStatus {
   PARTIAL
   COMPLETED
   CANCELLED
+  CLOSED
 }
 
 enum POPaymentStatus {

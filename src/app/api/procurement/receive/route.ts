@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
     const po = pos.find(p => p.id === poId)
     if (!po) return apiError(`PO ${poId} tidak ditemukan`)
     if (po.vendorId !== vendorId) return apiError(`PO ${po.poNumber} bukan milik vendor ini`)
+    if (po.status === 'CLOSED') return apiError(`PO ${po.poNumber} sudah ditutup, tidak bisa menerima kiriman baru`)
   }
 
   const date = new Date(receiptDate || new Date())
