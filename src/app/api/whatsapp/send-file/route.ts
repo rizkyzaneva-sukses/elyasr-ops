@@ -4,6 +4,7 @@ import { apiSuccess, apiError } from '@/lib/utils'
 
 // POST /api/whatsapp/send-file — send file via WAHA
 // Body: { chatId, caption, fileBase64, fileName, mimeType }
+// Env: WAHA_URL, WAHA_SESSION (default: "default"), WAHA_API_KEY (opsional)
 export async function POST(request: NextRequest) {
   const session = await getSession()
   if (!session.isLoggedIn) return apiError('Unauthorized', 401)
@@ -17,15 +18,23 @@ export async function POST(request: NextRequest) {
   const WAHA_URL = process.env.WAHA_URL
   if (!WAHA_URL) return apiError('WAHA_URL belum dikonfigurasi di environment')
 
+  const WAHA_SESSION = process.env.WAHA_SESSION || 'default'
+  const WAHA_API_KEY = process.env.WAHA_API_KEY
+
   // Format phone: remove spaces, ensure @c.us suffix
   const formattedChatId = chatId.includes('@c.us') ? chatId : `${chatId.replace(/[^0-9]/g, '')}@c.us`
 
   try {
+    // Build headers — tambahkan X-Api-Key jika WAHA_API_KEY diset
+    const wahaHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (WAHA_API_KEY) wahaHeaders['X-Api-Key'] = WAHA_API_KEY
+
     // Send file via WAHA API
     const wahaRes = await fetch(`${WAHA_URL}/api/sendFile`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: wahaHeaders,
       body: JSON.stringify({
+        session: WAHA_SESSION,
         chatId: formattedChatId,
         file: {
           mimetype: mimeType || 'application/pdf',
