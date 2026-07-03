@@ -112,6 +112,13 @@ ADYE_MODEL=claude-sonnet-4-6
 SUMOPOD_API_KEY=sk-Am9_VYRlVdrdsdFxbxcvfw--
 SUMOPOD_BASE_URL=https://ai.sumopod.com/v1
 SUMOPOD_MODEL=gpt-4o-mini
+
+# ──────────────────────────────────────────
+# WHATSAPP — WAHA (kirim PO ke vendor via WA)
+# WAHA harus sudah running & session sudah login (scan QR)
+# Tidak perlu setting webhook — fitur ini hanya mengirim
+# ──────────────────────────────────────────
+WAHA_URL=http://alamat-server-waha-anda:3000
 ```
 
 > ⚠️ **PENTING:**
@@ -253,8 +260,10 @@ Pastikan **Build Arguments** sudah diisi dengan benar, terutama `DATABASE_URL`.
 | `SUMOPOD_API_KEY`      | ⚠️    | API key SumoPod (AI backup/failover)                      |
 | `SUMOPOD_BASE_URL`     | ⚠️    | `https://ai.sumopod.com/v1`                               |
 | `SUMOPOD_MODEL`        | ⚠️    | `gpt-4o-mini`                                             |
+| `WAHA_URL`             | ⚠️    | URL server WAHA yang sudah running & session sudah login, contoh `http://waha-anda:3000` |
 
 > ⚠️ = Wajib jika menggunakan fitur AI Telegram Bot. Minimal satu dari Adye atau SumoPod harus diisi.
+> `WAHA_URL` wajib jika menggunakan fitur "Kirim PO ke Vendor via WhatsApp" — tidak perlu setting webhook, fitur ini hanya mengirim (bukan menerima pesan).
 
 ---
 
