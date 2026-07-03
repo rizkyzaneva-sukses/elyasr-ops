@@ -186,6 +186,7 @@ export default function OrdersPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [deleting, setDeleting] = useState(false)
   const [editingOrder, setEditingOrder] = useState<any>(null)
+  const [unmatchedHpp, setUnmatchedHpp] = useState<{ sku: string, count: number }[] | null>(null)
   
   const limit = 50
 
@@ -309,12 +310,14 @@ export default function OrdersPage() {
 
   const handleBackfillHpp = async () => {
     setBackfilling(true)
+    setUnmatchedHpp(null)
     try {
       const res = await fetch('/api/orders/backfill-hpp', { method: 'POST' })
       const json = await res.json()
       if (res.ok) {
-        toast({ title: json.data.message, type: 'success' })
-        qc.invalidateQueries({ queryKey: ['orders'] })
+        toast({ title: json.data.message, type: json.data.updated > 0 ? 'success' : 'error' })
+        setUnmatchedHpp(json.data.unmatched?.length > 0 ? json.data.unmatched : null)
+        if (json.data.updated > 0) qc.invalidateQueries({ queryKey: ['orders'] })
       } else {
         toast({ title: json.error || 'Gagal isi HPP', type: 'error' })
       }
@@ -423,6 +426,43 @@ export default function OrdersPage() {
           </div>
         )}
       </div>
+
+      {/* Unmatched HPP banner */}
+      {unmatchedHpp && (
+        <div className="mb-4 bg-amber-950/20 border border-amber-800/40 rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-amber-800/40 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <AlertCircle size={14} className="text-amber-400" />
+              <span className="text-sm font-medium text-amber-300">SKU/Nama Produk Butuh Mapping Manual</span>
+            </div>
+            <button onClick={() => setUnmatchedHpp(null)} className="text-zinc-600 hover:text-zinc-400 text-xs">✕</button>
+          </div>
+          <div className="overflow-x-auto max-h-56">
+            <table className="w-full text-xs">
+              <thead className="text-zinc-500 border-b border-amber-800/30 sticky top-0 bg-zinc-900">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium">SKU / Nama Produk (dari file marketplace)</th>
+                  <th className="px-3 py-2 text-right font-medium">Jumlah Order</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-amber-800/20">
+                {unmatchedHpp.map((u, i) => (
+                  <tr key={i} className="text-zinc-300">
+                    <td className="px-3 py-2 font-mono">{u.sku}</td>
+                    <td className="px-3 py-2 text-right text-zinc-400">{u.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-4 py-3 border-t border-amber-800/30 bg-zinc-900/30">
+            <p className="text-xs text-zinc-500">
+              Ini muncul karena teks di atas tidak persis cocok dengan SKU/Nama di Master Produk. Tambahkan mapping di{' '}
+              <a href="/produk-gabungan" className="text-yellow-400 underline">Produk Gabungan</a> (Kolom A = teks di atas, Kolom B = SKU internal yang benar), lalu klik "Isi HPP Kosong" lagi.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Import result banner */}
       {importResult && (

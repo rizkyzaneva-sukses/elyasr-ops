@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
   })
 
   let updated = 0
+  const unmatchedCounts = new Map<string, number>()
   for (const order of zeroOrders) {
     const key = (order.sku ?? '').toLowerCase()
     const hpp = byInternalSku.get(key)
@@ -52,8 +53,22 @@ export async function POST(request: NextRequest) {
     if (hpp > 0) {
       await prisma.order.update({ where: { id: order.id }, data: { hpp } })
       updated++
+    } else if (order.sku) {
+      unmatchedCounts.set(order.sku, (unmatchedCounts.get(order.sku) ?? 0) + 1)
     }
   }
 
-  return apiSuccess({ updated, message: `${updated} order berhasil diperbarui HPP-nya` })
+  // SKU yang paling sering muncul tapi tidak ketemu — paling layak dimapping duluan
+  const unmatched = [...unmatchedCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([sku, count]) => ({ sku, count }))
+
+  const message = updated > 0
+    ? `${updated} order berhasil diperbarui HPP-nya`
+    : unmatched.length > 0
+      ? `Tidak ada yang cocok otomatis. ${unmatched.length} SKU/nama produk butuh mapping manual di Produk Gabungan.`
+      : 'Semua order sudah memiliki HPP'
+
+  return apiSuccess({ updated, unmatched, message })
 }
