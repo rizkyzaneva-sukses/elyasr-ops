@@ -96,6 +96,7 @@ export async function buildDailyReport(): Promise<string> {
         utangPiutangTempo,
         adSpendRows,
         cashflowHariIni,
+        topProductsHariIni,
     ] = await Promise.all([
 
         // Hari ini — omzet, hpp, count (GROUP BY status)
@@ -254,8 +255,24 @@ export async function buildDailyReport(): Promise<string> {
             SELECT
                 COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0)::bigint AS inflow,
                 COALESCE(SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END), 0)::bigint AS outflow
-            FROM wallet_ledger
+                FROM wallet_ledger
             WHERE trx_date >= ${gteToday} AND trx_date <= ${lteToday}
+        `,
+
+        // Top produk hari ini (untuk saran konten)
+        prisma.$queryRaw<any[]>`
+            SELECT
+                COALESCE(product_name, sku, '-') AS product_name,
+                SUM(qty)::int AS total_qty,
+                COALESCE(SUM(real_omzet), 0)::bigint AS total_omzet
+            FROM orders
+            WHERE trx_date >= ${gteToday} AND trx_date <= ${lteToday}
+              AND status NOT ILIKE '%batal%'
+              AND status NOT ILIKE '%cancel%'
+              AND status NOT ILIKE '%dibatalkan%'
+            GROUP BY product_name, sku
+            ORDER BY total_omzet DESC
+            LIMIT 3
         `,
     ])
 
@@ -304,6 +321,15 @@ export async function buildDailyReport(): Promise<string> {
             return `  ▪️ ${esc(p.platform)} — <b>${roas}</b>${adStr}`
           }).join('\n')
 
+    // Map ROAS numerik per platform (untuk keputusan marketing)
+    const roasMap = (platformRows as any[]).map((p: any) => {
+        const pn = (p.platform || '').toLowerCase()
+        const adSpend = adByCat.filter(a => pn && a.cat.includes(pn)).reduce((s: number, a: any) => s + a.total, 0)
+        const omzet = Number(p.total_omzet)
+        const roas = adSpend > 0 && omzet > 0 ? Number((omzet / adSpend).toFixed(1)) : null
+        return { platform: p.platform, omzet, adSpend, roas }
+    })
+
     // ─── Waktu ───────────────────────────────────────────────────────────────
     const dateStr = new Date().toLocaleDateString('id-ID', {
         timeZone: 'Asia/Jakarta',
@@ -333,30 +359,47 @@ export async function buildDailyReport(): Promise<string> {
             `  • ${esc(r.product_name)} | ${Number(r.total_qty)}`
           ).join('\n')
 
-    // ─── 1–3 EKSEKUSI BESOK (derive otomatis) ──────────────────────────
+    // 1-10 Eksekusi Besok (operasional + marketing + konten)
     const actions: string[] = []
 
-    // 1. Stok kritis (terburuk duluan) — top 2
-    for (const s of (stockCriticalRows as any[]).slice(0, 2)) {
-        actions.push(`🔴 Restock ${esc(s.product_name)} — stok ${Number(s.soh)} (ROP ${Number(s.rop)})`)
+    // 1. Stok kritis (terburuk duluan) - top 3
+    for (const s of (stockCriticalRows as any[]).slice(0, 3)) {
+        actions.push(`Restock ${esc(s.product_name)} - stok ${Number(s.soh)} (ROP ${Number(s.rop)})`)
     }
 
-    // 2. PO overdue (ETA lewat)
+    // 2. PO overdue (ETA lewat) - top 2
     for (const po of (poOverdue as any[]).slice(0, 2)) {
-        actions.push(`📦 PO ${esc(po.po_number)} (${esc(po.vendor_name)}) lewat ETA ${fmtTglShort(po.expected_date)}`)
+        actions.push(`PO ${esc(po.po_number)} (${esc(po.vendor_name)}) lewat ETA ${fmtTglShort(po.expected_date)}`)
     }
 
-    // 3. Piutang / Utang jatuh tempo
+    // 3. Piutang / Utang jatuh tempo (+/-7 hari) - masing top 1
     for (const u of (utangPiutangTempo as any[]).filter((x: any) => x.kind === 'piutang').slice(0, 1)) {
-        actions.push(`💰 Tagih ${esc(u.name)} ${fmt(Number(u.sisa))} · jatuh ${fmtTglShort(u.due_date)}`)
+        actions.push(`Tagih ${esc(u.name)} ${fmt(Number(u.sisa))} . jatuh ${fmtTglShort(u.due_date)}`)
     }
     for (const u of (utangPiutangTempo as any[]).filter((x: any) => x.kind === 'utang').slice(0, 1)) {
-        actions.push(`🏦 Bayar ${esc(u.name)} ${fmt(Number(u.sisa))} · jatuh ${fmtTglShort(u.due_date)}`)
+        actions.push(`Bayar ${esc(u.name)} ${fmt(Number(u.sisa))} . jatuh ${fmtTglShort(u.due_date)}`)
+    }
+
+    // 4. Marketing - ROAS per platform (BEP iklan ~ 2x)
+    for (const r of roasMap) {
+        if (r.roas == null) continue
+        if (r.roas < 2) {
+            actions.push(`Turunkan iklan ${esc(r.platform)} - ROAS ${r.roas}x (ad ${fmt(r.adSpend)}, di bawah BEP ~2x)`)
+        } else if (r.roas >= 4) {
+            actions.push(`Naikkan budget iklan ${esc(r.platform)} - ROAS ${r.roas}x (efisien)`)
+        }
+    }
+
+    // 5. Konten - fitur produk terlaris hari ini
+    const topKonten = (topProductsHariIni as any[])[0]
+    if (topKonten) {
+        actions.push(`Buat konten ${esc(topKonten.product_name)} (terlaris hari ini ${Number(topKonten.total_qty)} pcs)`)
     }
 
     const eksekusiLines = actions.length === 0
-        ? '  ✅ <i>Tidak ada aksi mendesak</i>'
-        : actions.slice(0, 3).map((a, i) => `  ${i + 1}. ${a}`).join('\n')
+        ? '  Tidak ada aksi mendesak'
+        : actions.slice(0, 10).map((a, i) => `  ${i + 1}. ${a}`).join('\n')
+
 
     // ─── Alert stok (dari stok kritis: minus / 0) ─────────────────────────
     // Batasi tampilan per kategori (jaga 1 chat Telegram) + "+N lainnya"
@@ -423,7 +466,7 @@ export async function buildDailyReport(): Promise<string> {
         pendingProductLines, ``,
 
         sep, ``,
-        `⚡ <b>1–3 EKSEKUSI BESOK</b>`, ``,
+        `⚡ <b>EKSEKUSI BESOK</b>`, ``,
         eksekusiLines, ``,
 
         ...stockSection,

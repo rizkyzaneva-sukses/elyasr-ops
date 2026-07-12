@@ -8,7 +8,7 @@ import { useState } from 'react'
 import {
   Sparkles, RefreshCw, Clock, TrendingUp, AlertTriangle,
   Package, BarChart3, MapPin, Loader2, ChevronDown, ChevronUp,
-  Brain, Zap
+  Brain, Zap, Wallet, Target, DollarSign, Megaphone
 } from 'lucide-react'
 
 // ── Format tanggal lokal ──
@@ -66,6 +66,7 @@ function DataCard({ icon: Icon, label, value, sub, color = 'emerald' }: {
     yellow:  'text-yellow-400 bg-yellow-900/20 border-yellow-800/40',
     red:     'text-red-400 bg-red-900/20 border-red-800/40',
     blue:    'text-blue-400 bg-blue-900/20 border-blue-800/40',
+    purple:  'text-purple-400 bg-purple-900/20 border-purple-800/40',
   }
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
@@ -255,35 +256,70 @@ export default function AiInsightsPage() {
                 Data yang digunakan AI
               </button>
               {showData && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-                  <DataCard
-                    icon={TrendingUp}
-                    label={`Omzet ${snapshot.periodLabel || '30 Hari'}`}
-                    value={formatRupiah(snapshot.omzetTotal ?? snapshot.omzet30 ?? 0, true)}
-                    sub={`GP: ${formatRupiah(snapshot.gpTotal ?? snapshot.gp30 ?? 0, true)}`}
-                    color="emerald"
-                  />
-                  <DataCard
-                    icon={BarChart3}
-                    label="Total Order"
-                    value={`${snapshot.orderCountTotal ?? snapshot.orderCount30 ?? 0} order`}
-                    sub={`~${snapshot.avgOrderPerDay ?? 0}/hari`}
-                    color="blue"
-                  />
-                  <DataCard
-                    icon={AlertTriangle}
-                    label="Stok Kritis"
-                    value={`${snapshot.stokKritis ?? 0} SKU`}
-                    sub="perlu restock"
-                    color="red"
-                  />
-                  <DataCard
-                    icon={Package}
-                    label="Aging Backlog"
-                    value={`${snapshot.agingBacklog?.total ?? 0} order`}
-                    sub={`>48 jam: ${snapshot.agingBacklog?.['>48 Jam'] ?? 0}`}
-                    color="yellow"
-                  />
+                <div className="space-y-3 mb-4">
+                  {/* Baris 1: Sales & Operational */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <DataCard
+                      icon={TrendingUp}
+                      label={`Omzet ${snapshot.periodLabel || '30 Hari'}`}
+                      value={formatRupiah(snapshot.omzetTotal ?? snapshot.omzet30 ?? 0, true)}
+                      sub={`GP: ${formatRupiah(snapshot.gpTotal ?? snapshot.gp30 ?? 0, true)}`}
+                      color="emerald"
+                    />
+                    <DataCard
+                      icon={BarChart3}
+                      label="Total Order"
+                      value={`${snapshot.orderCountTotal ?? snapshot.orderCount30 ?? 0} order`}
+                      sub={`~${snapshot.avgOrderPerDay ?? 0}/hari`}
+                      color="blue"
+                    />
+                    <DataCard
+                      icon={AlertTriangle}
+                      label="Stok Kritis"
+                      value={`${snapshot.stokKritis ?? 0} SKU`}
+                      sub="perlu restock"
+                      color="red"
+                    />
+                    <DataCard
+                      icon={Package}
+                      label="Aging Backlog"
+                      value={`${snapshot.agingBacklog?.total ?? 0} order`}
+                      sub={`>48 jam: ${snapshot.agingBacklog?.['>48 Jam'] ?? 0}`}
+                      color="yellow"
+                    />
+                  </div>
+
+                  {/* Baris 2: Finance & Marketing */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <DataCard
+                      icon={Wallet}
+                      label="Kas & Runway"
+                      value={formatRupiah(snapshot.kas?.saldoKas ?? 0, true)}
+                      sub={`Runway: ${snapshot.kas?.runwayHari ?? 0} hari`}
+                      color="emerald"
+                    />
+                    <DataCard
+                      icon={Target}
+                      label="Target Bulan Ini"
+                      value={snapshot.target?.pct ? `${snapshot.target.pct}%` : 'Belum di-set'}
+                      sub={snapshot.target?.omzet ? `hari ke-${snapshot.target.hariKe}/${snapshot.target.totalHari}` : undefined}
+                      color="purple"
+                    />
+                    <DataCard
+                      icon={DollarSign}
+                      label="Utang / Piutang"
+                      value={formatRupiah(snapshot.utangPiutang?.net ?? 0, true)}
+                      sub={`Net position`}
+                      color={(snapshot.utangPiutang?.net ?? 0) >= 0 ? 'emerald' : 'red'}
+                    />
+                    <DataCard
+                      icon={Megaphone}
+                      label="Ad Spend"
+                      value={formatRupiah(snapshot.marketingTotal ?? 0, true)}
+                      sub={`${snapshot.byPlatform?.length ?? 0} platform`}
+                      color="yellow"
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -312,7 +348,7 @@ export default function AiInsightsPage() {
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
               <p className="text-xs font-medium text-zinc-400 mb-3 flex items-center gap-1.5">
                 <MapPin size={12} />
-                Top Provinsi (30 hari terakhir)
+                Top Provinsi ({snapshot.periodLabel || '30 hari'})
               </p>
               <div className="space-y-1.5">
                 {snapshot.topProvinces.map((p: any, i: number) => (
@@ -322,6 +358,30 @@ export default function AiInsightsPage() {
                       <span className="text-xs text-zinc-400">{p.province}</span>
                     </div>
                     <span className="text-xs font-medium text-zinc-300">{p.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Top produk dari snapshot */}
+          {snapshot?.topProducts?.length > 0 && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+              <p className="text-xs font-medium text-zinc-400 mb-3 flex items-center gap-1.5">
+                <Package size={12} />
+                Top Produk ({snapshot.periodLabel || '30 hari'})
+              </p>
+              <div className="space-y-1.5">
+                {snapshot.topProducts.map((p: any, i: number) => (
+                  <div key={p.product + i} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-zinc-700 w-4">{i + 1}</span>
+                      <span className="text-xs text-zinc-400 truncate max-w-[180px]">{p.product}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] text-zinc-500">{p.qty} pcs</span>
+                      <span className="text-xs font-medium text-emerald-400">{formatRupiah(p.omzet, true)}</span>
+                    </div>
                   </div>
                 ))}
               </div>
