@@ -1,9 +1,20 @@
 /**
  * Daily report builder untuk Elyasr Ops.
  * Mengambil data dari DB dan memformat jadi pesan Telegram HTML.
+ *
+ * Versi CEO: snapshot operasional + lapisan keputusan
+ * (kas/runway, pacing target, ROAS, dan 1–3 Eksekusi Besok
+ * yang di-derive otomatis dari stok kritis, PO overdue, & piutang tempo).
  */
 
 import { prisma } from '@/lib/prisma'
+import {
+  getTotalCash,
+  getBurnRate,
+  getMonthlyTarget,
+  ymWIB,
+  monthPacing,
+} from '@/lib/dashboard-helpers'
 
 function fmt(n: number): string {
     return 'Rp ' + Math.round(n || 0).toLocaleString('id-ID')
@@ -42,6 +53,12 @@ function getMondayOfWeek(dateStr: string): string {
     return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
 }
 
+function fmtTglShort(d: any): string {
+    const dt = new Date(d)
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des']
+    return `${dt.getDate()} ${months[dt.getMonth()]}`
+}
+
 export async function buildDailyReport(): Promise<string> {
     const today      = todayWIBStr()
     const yesterday  = addDays(today, -1)
@@ -59,6 +76,10 @@ export async function buildDailyReport(): Promise<string> {
     const gteMonth    = new Date(`${monthStart}T00:00:00+07:00`)
     const gte10d      = new Date(`${addDays(today, -9)}T00:00:00+07:00`)
 
+    // ── Eksekusi Besok: jendela tempo ±7 hari (sedikit ke belakang utk yg lewat) ──
+    const tempoFrom = new Date(`${addDays(today, -3)}T00:00:00+07:00`)
+    const tempoTo   = new Date(`${addDays(today, 7)}T23:59:59+07:00`)
+
     const [
         todayRows,
         yesterdayRows,
@@ -67,8 +88,14 @@ export async function buildDailyReport(): Promise<string> {
         monthRows,
         platformRows,
         pendingRows,
-        zeroStockRows,
-        minusStockRows,
+        stockCriticalRows,
+        kasTotal,
+        burn,
+        target,
+        poOverdue,
+        utangPiutangTempo,
+        adSpendRows,
+        cashflowHariIni,
     ] = await Promise.all([
 
         // Hari ini — omzet, hpp, count (GROUP BY status)
@@ -158,10 +185,10 @@ export async function buildDailyReport(): Promise<string> {
             LIMIT 25
         `,
 
-        // Stok habis (SOH = 0), produk aktif
+        // Stok kritis: SOH ≤ ROP ATAU minus (gabungan alert 0/minus + ROP)
         prisma.$queryRaw<any[]>`
-            SELECT sku, product_name FROM (
-                SELECT p.sku, p.product_name,
+            SELECT sku, product_name, soh, rop FROM (
+                SELECT p.sku, p.product_name, p.rop,
                     p.stok_awal
                     + COALESCE(SUM(CASE WHEN l.direction = 'IN'  AND (p.last_opname_date IS NULL OR l.trx_date >= p.last_opname_date) THEN l.qty ELSE 0 END), 0)
                     - COALESCE(SUM(CASE WHEN l.direction = 'OUT' AND (p.last_opname_date IS NULL OR l.trx_date >= p.last_opname_date) THEN l.qty ELSE 0 END), 0)
@@ -169,25 +196,66 @@ export async function buildDailyReport(): Promise<string> {
                 FROM master_products p
                 LEFT JOIN inventory_ledger l ON l.sku = p.sku
                 WHERE p.is_active = true
-                GROUP BY p.sku, p.product_name, p.stok_awal, p.last_opname_date
-            ) x WHERE soh = 0
-            ORDER BY product_name ASC
+                GROUP BY p.sku, p.product_name, p.stok_awal, p.rop, p.last_opname_date
+            ) x WHERE soh <= rop OR soh < 0
+            ORDER BY soh ASC
         `,
 
-        // Stok minus (SOH < 0), produk aktif
+        // Saldo kas seluruh wallet aktif
+        getTotalCash(),
+
+        // Burn rate rata-rata (90 hari)
+        getBurnRate(90),
+
+        // Target omzet bulan ini (AppSetting)
+        getMonthlyTarget(ymWIB()),
+
+        // PO overdue (expected_date lewat, belum selesai)
         prisma.$queryRaw<any[]>`
-            SELECT sku, product_name, soh FROM (
-                SELECT p.sku, p.product_name,
-                    p.stok_awal
-                    + COALESCE(SUM(CASE WHEN l.direction = 'IN'  AND (p.last_opname_date IS NULL OR l.trx_date >= p.last_opname_date) THEN l.qty ELSE 0 END), 0)
-                    - COALESCE(SUM(CASE WHEN l.direction = 'OUT' AND (p.last_opname_date IS NULL OR l.trx_date >= p.last_opname_date) THEN l.qty ELSE 0 END), 0)
-                    AS soh
-                FROM master_products p
-                LEFT JOIN inventory_ledger l ON l.sku = p.sku
-                WHERE p.is_active = true
-                GROUP BY p.sku, p.product_name, p.stok_awal, p.last_opname_date
-            ) x WHERE soh < 0
-            ORDER BY soh ASC
+            SELECT po_number, vendor_name, expected_date
+            FROM purchase_orders
+            WHERE expected_date IS NOT NULL
+              AND expected_date < ${gteToday}
+              AND status NOT IN ('COMPLETED', 'CLOSED', 'CANCELLED')
+            ORDER BY expected_date ASC
+            LIMIT 5
+        `,
+
+        // Utang & Piutang jatuh tempo (±7 hari)
+        prisma.$queryRaw<any[]>`
+            SELECT 'piutang' AS kind, debtor_name AS name, due_date, (amount - amount_collected)::bigint AS sisa
+            FROM piutangs
+            WHERE due_date IS NOT NULL
+              AND due_date >= ${tempoFrom} AND due_date <= ${tempoTo}
+              AND status IN ('OUTSTANDING', 'PARTIAL')
+            UNION ALL
+            SELECT 'utang' AS kind, creditor_name AS name, due_date, (amount - amount_paid)::bigint AS sisa
+            FROM utangs
+            WHERE due_date IS NOT NULL
+              AND due_date >= ${tempoFrom} AND due_date <= ${tempoTo}
+              AND status IN ('OUTSTANDING', 'PARTIAL')
+            ORDER BY due_date ASC
+            LIMIT 5
+        `,
+
+        // Ad spend hari ini (iklan / ads / sample)
+        prisma.$queryRaw<any[]>`
+            SELECT category, COALESCE(SUM(ABS(amount)), 0)::bigint AS total
+            FROM wallet_ledger
+            WHERE trx_type = 'EXPENSE'
+              AND trx_date >= ${gteToday} AND trx_date <= ${lteToday}
+              AND category IS NOT NULL
+              AND (category ILIKE '%iklan%' OR category ILIKE '%ads%' OR category ILIKE '%sample%' OR category ILIKE '%ongkir sample%')
+            GROUP BY category
+        `,
+
+        // Kas masuk / keluar hari ini (wallet ledger)
+        prisma.$queryRaw<any[]>`
+            SELECT
+                COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0)::bigint AS inflow,
+                COALESCE(SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END), 0)::bigint AS outflow
+            FROM wallet_ledger
+            WHERE trx_date >= ${gteToday} AND trx_date <= ${lteToday}
         `,
     ])
 
@@ -209,6 +277,33 @@ export async function buildDailyReport(): Promise<string> {
     const omzetMinggu   = Number((weekRows as any[])[0]?.total_omzet ?? 0)
     const omzetBulan    = Number((monthRows as any[])[0]?.total_omzet ?? 0)
 
+    // ─── Kas & Runway ──────────────────────────────────────────────────────
+    const saldoKas   = Number(kasTotal ?? 0)
+    const burnHarian = Number(burn?.avgDailyBurn ?? 0)
+    const runwayHari = burnHarian > 0 ? Math.floor(saldoKas / burnHarian) : 0
+    const kasMasukHari  = Number((cashflowHariIni as any[])[0]?.inflow ?? 0)
+    const kasKeluarHari = Number((cashflowHariIni as any[])[0]?.outflow ?? 0)
+
+    // ─── Target pacing bulan ini ─────────────────────────────────────────────
+    const targetOmzet = target?.omzet ?? null
+    const pacing      = monthPacing(ymWIB())
+    const targetPct   = targetOmzet ? ((omzetBulan / targetOmzet) * 100).toFixed(0) : null
+
+    // ─── ROAS per platform (ad spend hari ini) ─────────────────────────────
+    const adByCat = (adSpendRows as any[]).map((a: any) => ({ cat: (a.category || '').toLowerCase(), total: Number(a.total) }))
+    const roasLines = (platformRows as any[]).length === 0
+        ? ''
+        : (platformRows as any[]).map((p: any) => {
+            const pn = (p.platform || '').toLowerCase()
+            const adSpend = adByCat
+                .filter(a => pn && a.cat.includes(pn))
+                .reduce((s: number, a) => s + a.total, 0)
+            const omzet = Number(p.total_omzet)
+            const roas = adSpend > 0 && omzet > 0 ? `${(omzet / adSpend).toFixed(1)}x` : '—'
+            const adStr = adSpend > 0 ? ` (ad ${fmt(adSpend)})` : ''
+            return `  ▪️ ${esc(p.platform)} — <b>${roas}</b>${adStr}`
+          }).join('\n')
+
     // ─── Waktu ───────────────────────────────────────────────────────────────
     const dateStr = new Date().toLocaleDateString('id-ID', {
         timeZone: 'Asia/Jakarta',
@@ -219,7 +314,10 @@ export async function buildDailyReport(): Promise<string> {
         hour: '2-digit', minute: '2-digit', hour12: false,
     })
 
-    // ─── Platform lines ───────────────────────────────────────────────────────
+    // ─── Separator (dipakai di banyak section) ────────────────────────────
+    const sep = '━━━━━━━━━━━━━━━━━━━━━'
+
+    // ─── Platform lines ───────────────────────────────────────────────────
     const medalEmoji = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣']
     const platformLines = (platformRows as any[]).length === 0
         ? '  <i>(belum ada data hari ini)</i>'
@@ -235,20 +333,49 @@ export async function buildDailyReport(): Promise<string> {
             `  • ${esc(r.product_name)} | ${Number(r.total_qty)}`
           ).join('\n')
 
-    // ─── Stock alert lines ────────────────────────────────────────────────────
-    const sep = '━━━━━━━━━━━━━━━━━━━━━━━'
+    // ─── 1–3 EKSEKUSI BESOK (derive otomatis) ──────────────────────────
+    const actions: string[] = []
 
-    const zeroLines = (zeroStockRows as any[]).length === 0 ? '' : [
-        `🔴 <b>Stok Habis (0) — ${(zeroStockRows as any[]).length} produk:</b>`,
-        ...(zeroStockRows as any[]).map((p: any) => `  • ${esc(p.product_name)}`),
+    // 1. Stok kritis (terburuk duluan) — top 2
+    for (const s of (stockCriticalRows as any[]).slice(0, 2)) {
+        actions.push(`🔴 Restock ${esc(s.product_name)} — stok ${Number(s.soh)} (ROP ${Number(s.rop)})`)
+    }
+
+    // 2. PO overdue (ETA lewat)
+    for (const po of (poOverdue as any[]).slice(0, 2)) {
+        actions.push(`📦 PO ${esc(po.po_number)} (${esc(po.vendor_name)}) lewat ETA ${fmtTglShort(po.expected_date)}`)
+    }
+
+    // 3. Piutang / Utang jatuh tempo
+    for (const u of (utangPiutangTempo as any[]).filter((x: any) => x.kind === 'piutang').slice(0, 1)) {
+        actions.push(`💰 Tagih ${esc(u.name)} ${fmt(Number(u.sisa))} · jatuh ${fmtTglShort(u.due_date)}`)
+    }
+    for (const u of (utangPiutangTempo as any[]).filter((x: any) => x.kind === 'utang').slice(0, 1)) {
+        actions.push(`🏦 Bayar ${esc(u.name)} ${fmt(Number(u.sisa))} · jatuh ${fmtTglShort(u.due_date)}`)
+    }
+
+    const eksekusiLines = actions.length === 0
+        ? '  ✅ <i>Tidak ada aksi mendesak</i>'
+        : actions.slice(0, 3).map((a, i) => `  ${i + 1}. ${a}`).join('\n')
+
+    // ─── Alert stok (dari stok kritis: minus / 0) ─────────────────────────
+    // Batasi tampilan per kategori (jaga 1 chat Telegram) + "+N lainnya"
+    const STOK_ALERT_LIMIT = 10
+    const minusRows = (stockCriticalRows as any[]).filter((r: any) => Number(r.soh) < 0)
+    const zeroRows  = (stockCriticalRows as any[]).filter((r: any) => Number(r.soh) === 0)
+    const minusShown  = minusRows.slice(0, STOK_ALERT_LIMIT)
+    const zeroShown   = zeroRows.slice(0, STOK_ALERT_LIMIT)
+    const minusLines = minusRows.length === 0 ? '' : [
+        `🚨 <b>Stok Minus — ${minusRows.length} produk:</b>`,
+        ...minusShown.map((p: any) => `  • ${esc(p.product_name)} | <b>${Number(p.soh)}</b>`),
+        ...(minusRows.length > minusShown.length ? [`  • <i>+${minusRows.length - minusShown.length} lainnya</i>`] : []),
     ].join('\n')
-
-    const minusLines = (minusStockRows as any[]).length === 0 ? '' : [
-        `🚨 <b>Stok Minus — ${(minusStockRows as any[]).length} produk:</b>`,
-        ...(minusStockRows as any[]).map((p: any) => `  • ${esc(p.product_name)} | <b>${Number(p.soh)}</b>`),
+    const zeroLines = zeroRows.length === 0 ? '' : [
+        `🔴 <b>Stok Habis (0) — ${zeroRows.length} produk:</b>`,
+        ...zeroShown.map((p: any) => `  • ${esc(p.product_name)}`),
+        ...(zeroRows.length > zeroShown.length ? [`  • <i>+${zeroRows.length - zeroShown.length} lainnya</i>`] : []),
     ].join('\n')
-
-    const hasStockAlert = (zeroStockRows as any[]).length > 0 || (minusStockRows as any[]).length > 0
+    const hasStockAlert = minusRows.length > 0 || zeroRows.length > 0
     const stockSection = hasStockAlert ? [
         sep, ``,
         `⚠️ <b>PERINGATAN STOK</b>`, ``,
@@ -256,7 +383,7 @@ export async function buildDailyReport(): Promise<string> {
         ...(minusLines ? [minusLines, ``] : []),
     ] : [
         sep, ``,
-        `✅ <b>STOK</b> · Semua produk aktif dalam kondisi normal`, ``,
+        `✅ <b>STOK</b> · Tidak ada stok minus/habis`, ``,
     ]
 
     // ─── Assemble ─────────────────────────────────────────────────────────────
@@ -276,14 +403,28 @@ export async function buildDailyReport(): Promise<string> {
         `💡 <b>PROFIT HARI INI</b>`,
         `├ HPP        · ${fmt(hppHari)}`,
         `└ Gross Profit · <b>${fmt(gpHari)}</b> (${marginHari}%)`, ``,
+
+        `🏦 <b>KAS & RUNAY</b>`, ``,
+        `💵 Saldo Kas    · <b>${fmt(saldoKas)}</b>`,
+        `🔥 Burn/hari    · ${fmt(burnHarian)}`,
+        `💚 Kas Masuk Hari Ini  · ${fmt(kasMasukHari)}`,
+        `💸 Kas Keluar Hari Ini · ${fmt(kasKeluarHari)}`,
+        `⏳ Runway       · <b>${runwayHari > 0 ? runwayHari + ' hari' : '—'}</b>`,
+        `🎯 Target Bulan  · ${targetOmzet ? `${fmt(targetOmzet)} (${targetPct}% · hari ke-${pacing.dayIndex}/${pacing.daysInMonth})` : '<i>belum di-set</i>'}`, ``,
+
         `🏪 <b>OMZET PER PLATFORM</b>`,
         platformLines, ``,
+        ...(roasLines ? [`📣 <b>ROAS IKLAN</b>`, roasLines, ``] : []),
 
         sep, ``,
         `📦 <b>OPERASIONAL</b>`, ``,
         `⏳ Order Pending  · <b>${pendingCount} paket</b>`, ``,
         `📋 <b>Detail Produk Pending :</b>`,
         pendingProductLines, ``,
+
+        sep, ``,
+        `⚡ <b>1–3 EKSEKUSI BESOK</b>`, ``,
+        eksekusiLines, ``,
 
         ...stockSection,
         sep,
