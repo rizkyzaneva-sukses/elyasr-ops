@@ -1,4 +1,4 @@
-/** GET /api/telegram/adye-models?secret=565228988 — cek model list dari semua AI provider */
+/** GET /api/telegram/ai-models?secret=565228988 — cek model list dari semua AI provider */
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest) {

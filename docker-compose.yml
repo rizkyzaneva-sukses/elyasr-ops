@@ -30,14 +30,14 @@ services:
       SESSION_SECRET: dev-secret-change-in-production-32chars
       NODE_ENV: production
       NEXT_PUBLIC_APP_NAME: ELYASR Business Operation
-      # AI Primary (Adye / Antigravity)
-      ADYE_API_KEY: ${ADYE_API_KEY:-}
-      ADYE_BASE_URL: ${ADYE_BASE_URL:-https://antigravity.u9uhfo.easypanel.host/v1}
-      ADYE_MODEL: ${ADYE_MODEL:-claude-sonnet-4-6}
-      # AI Backup (SumoPod — auto-failover jika Adye down)
-      SUMOPOD_API_KEY: ${SUMOPOD_API_KEY:-}
-      SUMOPOD_BASE_URL: ${SUMOPOD_BASE_URL:-https://ai.sumopod.com/v1}
-      SUMOPOD_MODEL: ${SUMOPOD_MODEL:-gpt-4o-mini}
+      # AI Default (Mimo)
+      ANTIGRAVITY_URL_1: ${ANTIGRAVITY_URL_1:-}
+      ANTIGRAVITY_KEY_1: ${ANTIGRAVITY_KEY_1:-}
+      ANTIGRAVITY_MODEL_1: ${ANTIGRAVITY_MODEL_1:-}
+      # AI Fallback (Mimo — auto-failover jika Default error)
+      ANTIGRAVITY_URL_2: ${ANTIGRAVITY_URL_2:-}
+      ANTIGRAVITY_KEY_2: ${ANTIGRAVITY_KEY_2:-}
+      ANTIGRAVITY_MODEL_2: ${ANTIGRAVITY_MODEL_2:-}
     depends_on:
       db:
         condition: service_healthy

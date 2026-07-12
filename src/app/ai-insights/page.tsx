@@ -185,7 +185,7 @@ export default function AiInsightsPage() {
               <h3 className="text-base font-semibold text-white">Generate Review {showConfirm === 'weekly' ? 'Mingguan' : 'Bulanan'}?</h3>
             </div>
             <p className="text-sm text-zinc-400 mb-4">
-              Ini akan menggunakan SumoPod API untuk menganalisis data {showConfirm === 'weekly' ? 'minggu ini' : '30 hari terakhir'}.
+              Ini akan menggunakan AI untuk menganalisis data {showConfirm === 'weekly' ? 'minggu ini' : '30 hari terakhir'}.
               Proses memakan waktu ~5-10 detik.
             </p>
             <div className="flex gap-2">
@@ -335,7 +335,7 @@ export default function AiInsightsPage() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-white">Analisis Performa Elyasr</p>
-                <p className="text-[10px] text-zinc-500">Periode: {insight.period} · Powered by SumoPod</p>
+                <p className="text-[10px] text-zinc-500">Periode: {insight.period} · Powered by Mimo</p>
               </div>
             </div>
             <div className="p-5">

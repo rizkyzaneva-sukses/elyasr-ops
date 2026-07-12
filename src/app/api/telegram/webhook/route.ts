@@ -6,7 +6,7 @@
  *
  * Hybrid mode:
  * - Command (/top10, /stok, /omzet, /laporan, /help) → langsung query DB
- * - Pesan bebas → Adye AI (Claude Sonnet) dengan tool calling
+ * - Pesan bebas → AI (Mimo) dengan tool calling
  *
  * Pattern: Respond 200 immediately, process in background (fire-and-forget).
  * Ini mencegah Telegram timeout & retry yang menyebabkan bot tidak responsif.
@@ -277,7 +277,7 @@ async function processMessage(chatId: number, text: string, threadId?: number) {
             // Unknown command
             reply = `❓ Perintah tidak dikenal. Kirim /help untuk lihat daftar perintah.`
         } else {
-            // Natural language → AI (Adye API)
+            // Natural language → AI (Mimo)
             reply = await processWithAI(text)
         }
 

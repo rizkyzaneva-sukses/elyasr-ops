@@ -98,20 +98,18 @@ NEXT_PUBLIC_APP_NAME=ELYASR Business Operation
 NODE_ENV=production
 
 # ──────────────────────────────────────────
-# AI PRIMARY — Adye / Antigravity
-# App akan mencoba provider ini pertama kali
+# AI DEFAULT — Mimo (provider utama)
 # ──────────────────────────────────────────
-ADYE_API_KEY=ISI_DENGAN_ADYE_API_KEY
-ADYE_BASE_URL=https://antigravity.u9uhfo.easypanel.host/v1
-ADYE_MODEL=claude-sonnet-4-6
+ANTIGRAVITY_URL_1=https://api.mimo.com/v1
+ANTIGRAVITY_KEY_1=ISI_DENGAN_API_KEY_DEFAULT
+ANTIGRAVITY_MODEL_1=mimo-v2.5-pro
 
 # ──────────────────────────────────────────
-# AI BACKUP — SumoPod (auto-failover)
-# Digunakan otomatis jika Adye gagal/timeout
+# AI FALLBACK — Mimo (auto-failover jika Default error)
 # ──────────────────────────────────────────
-SUMOPOD_API_KEY=sk-Am9_VYRlVdrdsdFxbxcvfw--
-SUMOPOD_BASE_URL=https://ai.sumopod.com/v1
-SUMOPOD_MODEL=gpt-4o-mini
+ANTIGRAVITY_URL_2=https://api.mimo.com/v1
+ANTIGRAVITY_KEY_2=GANTI_DENGAN_API_KEY_FALLBACK
+ANTIGRAVITY_MODEL_2=mimo-v2.5-pro
 
 # ──────────────────────────────────────────
 # WHATSAPP — WAHA (kirim PO ke vendor via WA)
@@ -254,15 +252,15 @@ Pastikan **Build Arguments** sudah diisi dengan benar, terutama `DATABASE_URL`.
 | `SESSION_SECRET`       | ✅    | Random string minimal 32 karakter hex                     |
 | `NEXT_PUBLIC_APP_NAME` | ✅    | `ELYASR Business Operation`                               |
 | `NODE_ENV`             | ✅    | `production`                                              |
-| `ADYE_API_KEY`         | ⚠️    | API key Adye/Antigravity (AI primary)                     |
-| `ADYE_BASE_URL`        | ⚠️    | `https://antigravity.u9uhfo.easypanel.host/v1`            |
-| `ADYE_MODEL`           | ⚠️    | `claude-sonnet-4-6`                                       |
-| `SUMOPOD_API_KEY`      | ⚠️    | API key SumoPod (AI backup/failover)                      |
-| `SUMOPOD_BASE_URL`     | ⚠️    | `https://ai.sumopod.com/v1`                               |
-| `SUMOPOD_MODEL`        | ⚠️    | `gpt-4o-mini`                                             |
+| `ANTIGRAVITY_URL_1`    | ⚠️    | URL API Default (Mimo)                                    |
+| `ANTIGRAVITY_KEY_1`    | ⚠️    | API key Default                                           |
+| `ANTIGRAVITY_MODEL_1`  | ⚠️    | `mimo-v2.5-pro`                                           |
+| `ANTIGRAVITY_URL_2`    | ⚠️    | URL API Fallback (Mimo)                                   |
+| `ANTIGRAVITY_KEY_2`    | ⚠️    | API key Fallback                                          |
+| `ANTIGRAVITY_MODEL_2`  | ⚠️    | `mimo-v2.5-pro`                                           |
 | `WAHA_URL`             | ⚠️    | URL server WAHA yang sudah running & session sudah login, contoh `http://waha-anda:3000` |
 
-> ⚠️ = Wajib jika menggunakan fitur AI Telegram Bot. Minimal satu dari Adye atau SumoPod harus diisi.
+> ⚠️ = Wajib jika menggunakan fitur AI. `_1` = Default, `_2` = Fallback jika Default error.
 > `WAHA_URL` wajib jika menggunakan fitur "Kirim PO ke Vendor via WhatsApp" — tidak perlu setting webhook, fitur ini hanya mengirim (bukan menerima pesan).
 
 ---
