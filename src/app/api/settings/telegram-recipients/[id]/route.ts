@@ -52,10 +52,11 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
     if (!row) return NextResponse.json({ success: false, error: 'Recipient tidak ditemukan' }, { status: 404 })
 
     const now = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short' })
+    const topicInfo = row.threadId ? `\n📌 Topic ID: <code>${row.threadId}</code>` : ''
     try {
         await sendTelegramTest(
             row.chatId,
-            `✅ <b>Test Koneksi Elyasr Ops</b>\n\nHalo <b>${row.name}</b>! Koneksi berhasil.\n📅 ${now} WIB\n\n<i>Laporan harian akan dikirim ke sini sesuai jadwal.</i>`,
+            `✅ <b>Test Koneksi Elyasr Ops</b>\n\nHalo <b>${row.name}</b>! Koneksi berhasil.${topicInfo}\n📅 ${now} WIB\n\n<i>Pesan ini dikirim ke topic yang benar? Berarti Topic ID sudah sesuai.</i>`,
             row.threadId  // kirim ke topic jika threadId diset
         )
         return NextResponse.json({ success: true, message: `Test terkirim ke ${row.name}` })

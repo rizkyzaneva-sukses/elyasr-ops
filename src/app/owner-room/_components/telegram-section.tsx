@@ -233,7 +233,7 @@ export function TelegramSection() {
       const res = await fetch(`/api/settings/telegram-recipients/${id}?action=test`, { method: 'POST' })
       const json = await res.json()
       if (!json.success) throw new Error(json.error)
-      toast({ title: `✅ Test terkirim ke ${name}!`, type: 'success' })
+      toast({ title: `✅ Test terkirim ke ${name}! Cek apakah pesan masuk di topic yang benar.`, type: 'success' })
     } catch (err: any) {
       toast({ title: `❌ ${err.message}`, type: 'error' })
     } finally { setTestingId(null) }
@@ -796,6 +796,10 @@ export function TelegramSection() {
                         placeholder="Thread/Topic ID (angka di akhir link topic)"
                         className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-sm text-zinc-200 font-mono focus:outline-none focus:border-sky-600"
                       />
+                      <p className="text-[10px] text-zinc-600">
+                        Buka topic di grup → klik ⋮ → Copy Link → angka di akhir URL.<br/>
+                        Setelah simpan, klik <strong className="text-sky-400">✉ Test</strong> untuk cek pesan masuk di topic yang benar.
+                      </p>
                       <div>
                         <p className="text-[10px] text-zinc-500 mb-1.5">Laporan ke sini:</p>
                         <div className="flex flex-wrap gap-1.5">
@@ -875,10 +879,10 @@ export function TelegramSection() {
                           type="button"
                           onClick={() => handleTestRecipient(r.id, r.name)}
                           disabled={testingId === r.id}
-                          title="Test kirim pesan"
-                          className="text-[10px] text-zinc-500 hover:text-sky-400 px-1.5 py-1 rounded transition-colors disabled:opacity-40"
+                          title="Kirim pesan test ke topic ini"
+                          className="text-[10px] text-sky-400 hover:text-sky-300 bg-sky-900/30 border border-sky-700/40 px-2 py-1 rounded transition-colors disabled:opacity-40"
                         >
-                          {testingId === r.id ? <Loader2 size={11} className="animate-spin" /> : 'Test'}
+                          {testingId === r.id ? <Loader2 size={10} className="animate-spin inline" /> : '✉'} Test
                         </button>
                         <button
                           type="button"
