@@ -442,16 +442,37 @@ export async function POST(req: NextRequest) {
 
     if (!text) return NextResponse.json({ ok: true })
 
-    // ─── Filter: di grup dengan topics, hanya respon command, mention, atau reply ke bot ───
-    const isGroup = chatId < 0 // grup/chat ID negatif
-    const isCommand = text.startsWith('/')
-    const botUsername = await getBotUsername()
-    const isMention = botUsername && text.toLowerCase().includes(`@${botUsername.toLowerCase()}`)
-    const isReplyToBot = message.reply_to_message?.from?.is_bot === true
+    const isGroup = chatId < 0
 
-    if (isGroup && !isCommand && !isMention && !isReplyToBot) {
-        // Di grup: abaikan pesan biasa yang bukan command/mention/reply ke bot
-        return NextResponse.json({ ok: true })
+    // ─── Filter: bot hanya aktif di topic yang sudah di-assign sebagai recipient ───
+    if (isGroup) {
+        try {
+            const { prisma } = await import('@/lib/prisma')
+            const recipients = await prisma.telegramRecipient.findMany({
+                where: { isActive: true, chatId: String(chatId) },
+                select: { threadId: true },
+            })
+
+            // Tidak ada recipient untuk grup ini → abaikan semua pesan
+            if (recipients.length === 0) {
+                return NextResponse.json({ ok: true })
+            }
+
+            // Ada threadId di pesan → cek apakah topic ini di-assign
+            if (threadId) {
+                const isAssigned = recipients.some(r => r.threadId === String(threadId))
+                if (!isAssigned) {
+                    return NextResponse.json({ ok: true })
+                }
+            }
+            // Pesan tanpa threadId di grup → abaikan (bot hanya aktif di topic yang di-assign)
+            if (!threadId) {
+                return NextResponse.json({ ok: true })
+            }
+        } catch {
+            // DB error → abaikan pesan daripada spam
+            return NextResponse.json({ ok: true })
+        }
     }
 
     console.log(`[webhook] Pesan dari owner: "${text.slice(0, 100)}" (from=${fromId}, chat=${chatId}, thread=${threadId ?? 'none'})`)
