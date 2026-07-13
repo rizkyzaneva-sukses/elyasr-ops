@@ -23,6 +23,9 @@ import { getMenuByKey, type InlineKeyboard } from '@/lib/telegram-menu'
 // Chat ID yang diizinkan (owner + group IDs, comma-separated)
 const OWNER_CHAT_ID = process.env.TELEGRAM_OWNER_CHAT_ID || '565228988'
 
+// Cache bot username (diambil sekali dari getMe)
+let cachedBotUsername: string | null = null
+
 // ─────────────────────────────────────────────
 // Kirim pesan balik ke Telegram
 // ─────────────────────────────────────────────
@@ -34,6 +37,21 @@ async function getBotToken(): Promise<string | null> {
     } catch {
         return process.env.TELEGRAM_BOT_TOKEN || null
     }
+}
+
+async function getBotUsername(): Promise<string> {
+    if (cachedBotUsername) return cachedBotUsername
+    const token = await getBotToken()
+    if (!token) return ''
+    try {
+        const res = await fetch(`https://api.telegram.org/bot${token}/getMe`)
+        const json = await res.json()
+        if (json.ok && json.result?.username) {
+            cachedBotUsername = String(json.result.username)
+            return cachedBotUsername
+        }
+    } catch { }
+    return ''
 }
 
 async function sendReply(
@@ -424,7 +442,19 @@ export async function POST(req: NextRequest) {
 
     if (!text) return NextResponse.json({ ok: true })
 
-    console.log(`[webhook] Pesan dari owner: "${text.slice(0, 100)}" (from=${fromId}, chat=${chatId})`)
+    // ─── Filter: di grup dengan topics, hanya respon command, mention, atau reply ke bot ───
+    const isGroup = chatId < 0 // grup/chat ID negatif
+    const isCommand = text.startsWith('/')
+    const botUsername = await getBotUsername()
+    const isMention = botUsername && text.toLowerCase().includes(`@${botUsername.toLowerCase()}`)
+    const isReplyToBot = message.reply_to_message?.from?.is_bot === true
+
+    if (isGroup && !isCommand && !isMention && !isReplyToBot) {
+        // Di grup: abaikan pesan biasa yang bukan command/mention/reply ke bot
+        return NextResponse.json({ ok: true })
+    }
+
+    console.log(`[webhook] Pesan dari owner: "${text.slice(0, 100)}" (from=${fromId}, chat=${chatId}, thread=${threadId ?? 'none'})`)
 
     // ─── Fire-and-forget: respond 200 immediately, process in background ───
     processMessage(chatId, text, threadId).catch(err => {
