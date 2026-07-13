@@ -50,7 +50,7 @@ export function PengaturanTab() {
   }
 
   return (
-    <div className="max-w-lg">
+    <div className="max-w-4xl">
       <div className="flex items-center gap-2 mb-4">
         <Settings size={16} className="text-emerald-400" />
         <h2 className="text-sm font-semibold text-zinc-200">Biaya Admin Platform</h2>

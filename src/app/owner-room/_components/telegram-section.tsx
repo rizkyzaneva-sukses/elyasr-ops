@@ -479,215 +479,205 @@ export function TelegramSection() {
         ) : null}
       </div>
 
-      {/* How to get Chat ID */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-5 text-xs text-zinc-400 space-y-1.5">
-        <p className="text-zinc-300 font-medium mb-2">📋 Cara dapat Chat ID &amp; Bot Token:</p>
-        <p>1. Buat bot baru: chat ke <span className="text-sky-400 font-mono">@BotFather</span> → /newbot → ikuti instruksi → copy <strong className="text-zinc-200">Bot Token</strong></p>
-        <p>2. Chat ke bot kamu, lalu buka: <span className="font-mono text-sky-400">https://api.telegram.org/bot[TOKEN]/getUpdates</span></p>
-        <p>3. Lihat <span className="font-mono text-zinc-300">"chat":{'{'}"id": 12345678{'}'}</span> → itu <strong className="text-zinc-200">Chat ID</strong> kamu</p>
-        <p className="text-zinc-500 italic">Atau bisa juga pakai <span className="text-sky-400">@userinfobot</span> — forward pesan ke sana untuk dapat Chat ID.</p>
-      </div>
+      {/* 2-column grid: Config (kiri) + Auto Report (kanan) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-      <form onSubmit={handleSave} className="space-y-4">
-        <div>
-          <label className="block text-xs text-zinc-500 mb-1">Bot Token</label>
-          <div className="relative">
-            <input
-              type={showToken ? 'text' : 'password'}
-              value={botToken}
-              onChange={e => setBotToken(e.target.value)}
-              placeholder="1234567890:ABCdef..."
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 pr-9 text-sm text-zinc-200 focus:outline-none focus:border-sky-600 font-mono"
-            />
-            <button
-              type="button"
-              onClick={() => setShowToken(v => !v)}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
-            >
-              {showToken ? <EyeOff size={13} /> : <Eye size={13} />}
-            </button>
+        {/* ── Kiri: Konfigurasi Bot + Penerima ── */}
+        <div className="space-y-5">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-xs text-zinc-400 space-y-1.5">
+            <p className="text-zinc-300 font-medium mb-2">Cara dapat Chat ID &amp; Bot Token:</p>
+            <p>1. Buat bot: chat <span className="text-sky-400 font-mono">@BotFather</span> → /newbot → copy <strong className="text-zinc-200">Bot Token</strong></p>
+            <p>2. Chat ke bot, buka <span className="font-mono text-sky-400">https://api.telegram.org/bot[TOKEN]/getUpdates</span></p>
+            <p>3. Lihat <span className="font-mono text-zinc-300">"chat":{'{'}"id": 12345678{'}'}</span> → itu <strong className="text-zinc-200">Chat ID</strong> kamu</p>
+            <p className="text-zinc-500 italic">Atau pakai <span className="text-sky-400">@userinfobot</span> — forward pesan ke sana.</p>
           </div>
-        </div>
-        <div>
-          <label className="block text-xs text-zinc-500 mb-1">Chat ID (nomor negatif untuk grup)</label>
-          <input
-            type="text"
-            value={chatId}
-            onChange={e => setChatId(e.target.value)}
-            placeholder="123456789 atau -100123456789"
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-sky-600 font-mono"
-          />
-        </div>
 
-        <div className="flex flex-wrap gap-2 pt-1">
-          <button
-            type="submit"
-            disabled={saving}
-            className="flex items-center gap-2 bg-sky-700 hover:bg-sky-600 disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-          >
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Settings size={14} />}
-            {saving ? 'Menyimpan...' : 'Simpan Konfigurasi'}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleTest}
-            disabled={testing || !botToken || !chatId}
-            className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 disabled:opacity-40 text-zinc-200 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-          >
-            {testing ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} className="text-emerald-400" />}
-            {testing ? 'Mengirim...' : 'Test Koneksi'}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSendNow}
-            disabled={sending || !hasTelegramTarget}
-            className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-          >
-            {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-            {sending ? 'Mengirim Laporan...' : 'Kirim Laporan Sekarang'}
-          </button>
-        </div>
-      </form>
-
-      {/* Auto Report */}
-      <div className="mt-6 pt-6 border-t border-zinc-800 space-y-4">
-
-        {/* Toggle aktif/nonaktif */}
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-zinc-200">⏰ Auto Report Harian</span>
-              <span className={`text-[10px] rounded px-2 py-0.5 ${autoEnabled ? 'bg-emerald-900/40 border border-emerald-700/50 text-emerald-300' : 'bg-zinc-800 border border-zinc-700 text-zinc-500'}`}>
-                {autoEnabled ? 'AKTIF' : 'NONAKTIF'}
-              </span>
+          <form onSubmit={handleSave} className="space-y-4">
+            <div>
+              <label className="block text-xs text-zinc-500 mb-1">Bot Token</label>
+              <div className="relative">
+                <input
+                  type={showToken ? 'text' : 'password'}
+                  value={botToken}
+                  onChange={e => setBotToken(e.target.value)}
+                  placeholder="1234567890:ABCdef..."
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 pr-9 text-sm text-zinc-200 focus:outline-none focus:border-sky-600 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowToken(v => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                >
+                  {showToken ? <EyeOff size={13} /> : <Eye size={13} />}
+                </button>
+              </div>
             </div>
-            <p className="text-xs text-zinc-500 mt-1">
-              Dikirim otomatis oleh server setiap hari — tidak perlu buka aplikasi.
-            </p>
+            <div>
+              <label className="block text-xs text-zinc-500 mb-1">Chat ID (nomor negatif untuk grup)</label>
+              <input
+                type="text"
+                value={chatId}
+                onChange={e => setChatId(e.target.value)}
+                placeholder="123456789 atau -100123456789"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-sky-600 font-mono"
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-2 pt-1">
+              <button
+                type="submit"
+                disabled={saving}
+                className="flex items-center gap-2 bg-sky-700 hover:bg-sky-600 disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+              >
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Settings size={14} />}
+                {saving ? 'Menyimpan...' : 'Simpan Konfigurasi'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleTest}
+                disabled={testing || !botToken || !chatId}
+                className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 disabled:opacity-40 text-zinc-200 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+              >
+                {testing ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} className="text-emerald-400" />}
+                {testing ? 'Mengirim...' : 'Test Koneksi'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSendNow}
+                disabled={sending || !hasTelegramTarget}
+                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+              >
+                {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                {sending ? 'Mengirim Laporan...' : 'Kirim Laporan Sekarang'}
+              </button>
+            </div>
+          </form>
+
+        </div>
+
+        {/* ── Kanan: Auto Report Schedule ── */}
+        <div className="space-y-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-zinc-200">Auto Report Harian</span>
+                <span className={`text-[10px] rounded px-2 py-0.5 ${autoEnabled ? 'bg-emerald-900/40 border border-emerald-700/50 text-emerald-300' : 'bg-zinc-800 border border-zinc-700 text-zinc-500'}`}>
+                  {autoEnabled ? 'AKTIF' : 'NONAKTIF'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleToggleAuto}
+                disabled={togglingAuto || !hasTelegramTarget}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-40 ${autoEnabled ? 'bg-emerald-600' : 'bg-zinc-700'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${autoEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
             {lastSent && (
-              <p className="text-[10px] text-zinc-600 mt-1">
+              <p className="text-[10px] text-zinc-600 mb-3">
                 Terakhir dikirim: {new Date(lastSent).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short' })}
               </p>
             )}
-          </div>
-          <button
-            type="button"
-            onClick={handleToggleAuto}
-            disabled={togglingAuto || !hasTelegramTarget}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-40 ${autoEnabled ? 'bg-emerald-600' : 'bg-zinc-700'}`}
-          >
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${autoEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-          </button>
-        </div>
-
-        {/* Jam picker — bisa diubah tanpa restart server */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-          <p className="text-xs text-zinc-400 font-medium mb-3">🕐 Jam Kirim Laporan (WIB)</p>
-          <div className="flex items-center gap-3">
-            <select
-              value={schedHour}
-              onChange={e => setSchedHour(Number(e.target.value))}
-              className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-sky-600"
-            >
-              {Array.from({ length: 24 }, (_, i) => (
-                <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
-              ))}
-            </select>
-            <span className="text-zinc-400 font-bold">:</span>
-            <select
-              value={schedMinute}
-              onChange={e => setSchedMinute(Number(e.target.value))}
-              className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-sky-600"
-            >
-              {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map(m => (
-                <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
-              ))}
-            </select>
-            <span className="text-xs text-zinc-500">WIB</span>
-            <button
-              type="button"
-              onClick={handleSaveSchedule}
-              disabled={savingSched}
-              className="flex items-center gap-1.5 bg-sky-700 hover:bg-sky-600 disabled:opacity-50 text-white rounded-lg px-3 py-2 text-xs font-medium transition-colors"
-            >
-              {savingSched ? <Loader2 size={12} className="animate-spin" /> : null}
-              {savingSched ? 'Menyimpan...' : 'Simpan Jadwal'}
-            </button>
-          </div>
-          <p className="text-[10px] text-zinc-600 mt-2">
-            Perubahan langsung aktif tanpa perlu restart server.
-          </p>
-        </div>
-
-        <div className="flex items-center justify-between pt-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-zinc-200">Auto Report Mingguan</span>
-              <span className={`text-[10px] rounded px-2 py-0.5 ${weeklyAutoEnabled ? 'bg-emerald-900/40 border border-emerald-700/50 text-emerald-300' : 'bg-zinc-800 border border-zinc-700 text-zinc-500'}`}>
-                {weeklyAutoEnabled ? 'AKTIF' : 'NONAKTIF'}
-              </span>
+            <p className="text-xs text-zinc-400 font-medium mb-2">Jam Kirim (WIB)</p>
+            <div className="flex items-center gap-3">
+              <select
+                value={schedHour}
+                onChange={e => setSchedHour(Number(e.target.value))}
+                className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-sky-600"
+              >
+                {Array.from({ length: 24 }, (_, i) => (
+                  <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
+                ))}
+              </select>
+              <span className="text-zinc-400 font-bold">:</span>
+              <select
+                value={schedMinute}
+                onChange={e => setSchedMinute(Number(e.target.value))}
+                className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-sky-600"
+              >
+                {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map(m => (
+                  <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                ))}
+              </select>
+              <span className="text-xs text-zinc-500">WIB</span>
+              <button
+                type="button"
+                onClick={handleSaveSchedule}
+                disabled={savingSched}
+                className="flex items-center gap-1.5 bg-sky-700 hover:bg-sky-600 disabled:opacity-50 text-white rounded-lg px-3 py-2 text-xs font-medium transition-colors"
+              >
+                {savingSched ? <Loader2 size={12} className="animate-spin" /> : null}
+                {savingSched ? 'Menyimpan...' : 'Simpan'}
+              </button>
             </div>
-            <p className="text-xs text-zinc-500 mt-1">
-              Dikirim otomatis setiap hari Senin oleh server.
-            </p>
+            <p className="text-[10px] text-zinc-600 mt-2">Langsung aktif tanpa restart server.</p>
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-zinc-200">Auto Report Mingguan</span>
+                <span className={`text-[10px] rounded px-2 py-0.5 ${weeklyAutoEnabled ? 'bg-emerald-900/40 border border-emerald-700/50 text-emerald-300' : 'bg-zinc-800 border border-zinc-700 text-zinc-500'}`}>
+                  {weeklyAutoEnabled ? 'AKTIF' : 'NONAKTIF'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleToggleWeeklyAuto}
+                disabled={togglingWeeklyAuto || !hasTelegramTarget}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-40 ${weeklyAutoEnabled ? 'bg-emerald-600' : 'bg-zinc-700'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${weeklyAutoEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
             {lastWeeklySent && (
-              <p className="text-[10px] text-zinc-600 mt-1">
+              <p className="text-[10px] text-zinc-600 mb-3">
                 Terakhir dikirim: {new Date(lastWeeklySent).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'medium', timeStyle: 'short' })}
               </p>
             )}
+            <p className="text-xs text-zinc-400 font-medium mb-2">Jam Kirim (Senin, WIB)</p>
+            <div className="flex items-center gap-3">
+              <select
+                value={weeklySchedHour}
+                onChange={e => setWeeklySchedHour(Number(e.target.value))}
+                className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-sky-600"
+              >
+                {Array.from({ length: 24 }, (_, i) => (
+                  <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
+                ))}
+              </select>
+              <span className="text-zinc-400 font-bold">:</span>
+              <select
+                value={weeklySchedMinute}
+                onChange={e => setWeeklySchedMinute(Number(e.target.value))}
+                className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-sky-600"
+              >
+                {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map(m => (
+                  <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                ))}
+              </select>
+              <span className="text-xs text-zinc-500">WIB</span>
+              <button
+                type="button"
+                onClick={handleSaveWeeklySchedule}
+                disabled={savingWeeklySched}
+                className="flex items-center gap-1.5 bg-sky-700 hover:bg-sky-600 disabled:opacity-50 text-white rounded-lg px-3 py-2 text-xs font-medium transition-colors"
+              >
+                {savingWeeklySched ? <Loader2 size={12} className="animate-spin" /> : null}
+                {savingWeeklySched ? 'Menyimpan...' : 'Simpan'}
+              </button>
+            </div>
+            <p className="text-[10px] text-zinc-600 mt-2">Selalu dikirim hari Senin.</p>
           </div>
-          <button
-            type="button"
-            onClick={handleToggleWeeklyAuto}
-            disabled={togglingWeeklyAuto || !hasTelegramTarget}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-40 ${weeklyAutoEnabled ? 'bg-emerald-600' : 'bg-zinc-700'}`}
-          >
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${weeklyAutoEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-          </button>
         </div>
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-          <p className="text-xs text-zinc-400 font-medium mb-3">Jam Kirim Laporan Mingguan (Senin, WIB)</p>
-          <div className="flex items-center gap-3">
-            <select
-              value={weeklySchedHour}
-              onChange={e => setWeeklySchedHour(Number(e.target.value))}
-              className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-sky-600"
-            >
-              {Array.from({ length: 24 }, (_, i) => (
-                <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
-              ))}
-            </select>
-            <span className="text-zinc-400 font-bold">:</span>
-            <select
-              value={weeklySchedMinute}
-              onChange={e => setWeeklySchedMinute(Number(e.target.value))}
-              className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-sky-600"
-            >
-              {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map(m => (
-                <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
-              ))}
-            </select>
-            <span className="text-xs text-zinc-500">WIB</span>
-            <button
-              type="button"
-              onClick={handleSaveWeeklySchedule}
-              disabled={savingWeeklySched}
-              className="flex items-center gap-1.5 bg-sky-700 hover:bg-sky-600 disabled:opacity-50 text-white rounded-lg px-3 py-2 text-xs font-medium transition-colors"
-            >
-              {savingWeeklySched ? <Loader2 size={12} className="animate-spin" /> : null}
-              {savingWeeklySched ? 'Menyimpan...' : 'Simpan Jadwal'}
-            </button>
-          </div>
-          <p className="text-[10px] text-zinc-600 mt-2">
-            Laporan mingguan selalu dikirim hari Senin pada jam yang kamu atur.
-          </p>
-        </div>
+      </div>{/* end 2-column grid */}
 
-        {/* Daftar Penerima Laporan */}
-        <div className="mt-4 pt-4 border-t border-zinc-800">
+      {/* Daftar Penerima Laporan — full width di bawah grid */}
+      <div className="mt-5 pt-5 border-t border-zinc-800">
           <div className="flex items-center justify-between mb-3">
             <div>
               <p className="text-xs text-zinc-400 font-medium">
@@ -903,7 +893,6 @@ export function TelegramSection() {
               })}
             </div>
           )}
-        </div>
       </div>
     </div>
   )
