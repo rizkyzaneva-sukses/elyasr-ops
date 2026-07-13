@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     // ── Build & kirim laporan ─────────────────────────────────────────────────
     try {
         const report           = await buildDailyReport()
-        const { sent, failed } = await broadcastTelegramReport(report)
+        const { sent, failed } = await broadcastTelegramReport(report, 'daily')
 
         if (sent === 0) {
             return NextResponse.json({

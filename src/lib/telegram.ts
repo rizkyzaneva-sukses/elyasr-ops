@@ -38,11 +38,20 @@ async function sendToChat(botToken: string, chatId: string, text: string, thread
     }
 }
 
+export type ReportType = 'daily' | 'weekly' | 'monthly'
+
 /**
- * Broadcast laporan ke semua recipient aktif.
+ * Broadcast laporan ke recipient aktif yang cocok dengan tipe laporan.
+ * - reportType kosong/null → kirim ke semua recipient aktif (fallback lama).
+ * - recipient.reportTypes kosong/null → menerima SEMUA tipe laporan.
+ * - recipient.reportTypes diisi (misal "daily,weekly") → hanya menerima tipe tersebut.
+ *
  * Fallback ke AppSetting / env jika tabel kosong.
  */
-export async function broadcastTelegramReport(text: string): Promise<{ sent: number; failed: number }> {
+export async function broadcastTelegramReport(
+    text: string,
+    reportType?: ReportType,
+): Promise<{ sent: number; failed: number }> {
     const botToken = await getBotToken()
     if (!botToken) {
         console.error('[telegram] Bot token belum dikonfigurasi')
@@ -53,10 +62,17 @@ export async function broadcastTelegramReport(text: string): Promise<{ sent: num
     let recipients: { chatId: string; name: string; threadId?: string | null }[] = []
     try {
         const rows = await prisma.telegramRecipient.findMany({ where: { isActive: true } })
-        recipients = rows.map(r => ({ chatId: r.chatId, name: r.name, threadId: r.threadId }))
+        recipients = rows
+            .filter(r => {
+                if (!reportType) return true
+                if (!r.reportTypes) return true // kosong = semua tipe
+                const types = r.reportTypes.split(',').map(t => t.trim().toLowerCase())
+                return types.includes(reportType)
+            })
+            .map(r => ({ chatId: r.chatId, name: r.name, threadId: r.threadId }))
     } catch { /* tabel belum ada / error DB — gunakan fallback */ }
 
-    // Fallback ke AppSetting / env jika tabel kosong
+    // Fallback ke AppSetting / env jika tabel kosong (atau tidak ada yang cocok)
     if (recipients.length === 0) {
         const fallbackId = (await getSetting('telegram_chat_id')) || process.env.TELEGRAM_CHAT_ID
         if (!fallbackId) {

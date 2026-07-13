@@ -91,7 +91,7 @@ export async function register() {
                 console.log(`[daily-report] 🚀 ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')} WIB — kirim laporan harian (jadwal: ${hour}:${String(minute).padStart(2,'0')})...`)
 
                 const report           = await buildDailyReport()
-                const { sent, failed } = await broadcastTelegramReport(report)
+                const { sent, failed } = await broadcastTelegramReport(report, 'daily')
 
                 console.log(`[daily-report] ✅ Selesai — terkirim: ${sent}, gagal: ${failed}`)
 
@@ -141,7 +141,7 @@ export async function register() {
                 console.log(`[weekly-report] 🚀 ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')} WIB — kirim laporan mingguan (jadwal: ${hour}:${String(minute).padStart(2,'0')})...`)
 
                 const report = await buildWeeklyReport()
-                const { sent, failed } = await broadcastTelegramReport(report)
+                const { sent, failed } = await broadcastTelegramReport(report, 'weekly')
                 console.log(`[weekly-report] ✅ Selesai — terkirim: ${sent}, gagal: ${failed}`)
                 if (sent > 0) {
                     lastWeeklySent = today
@@ -186,7 +186,7 @@ export async function register() {
                 console.log(`[monthly-report] 🚀 ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')} WIB — kirim laporan bulanan...`)
 
                 const report = await buildMonthlyReport()
-                const { sent, failed } = await broadcastTelegramReport(report)
+                const { sent, failed } = await broadcastTelegramReport(report, 'monthly')
                 console.log(`[monthly-report] ✅ Selesai — terkirim: ${sent}, gagal: ${failed}`)
                 if (sent > 0) {
                     lastMonthlySent = today

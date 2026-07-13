@@ -21,6 +21,12 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     if (body.name      !== undefined) data.name      = String(body.name).trim()
     if (body.chatId    !== undefined) data.chatId    = String(body.chatId).trim()
     if (body.threadId  !== undefined) data.threadId  = body.threadId?.toString().trim() || null
+    if (body.reportTypes !== undefined) {
+        const rt = body.reportTypes
+        data.reportTypes = Array.isArray(rt)
+            ? rt.map((t: string) => String(t).trim().toLowerCase()).filter(Boolean).join(',') || null
+            : (typeof rt === 'string' ? rt.trim() || null : undefined)
+    }
 
     const row = await prisma.telegramRecipient.update({ where: { id }, data })
     return NextResponse.json({ success: true, data: row })

@@ -17,21 +17,22 @@ export async function GET() {
 /** POST /api/settings/telegram-recipients — tambah recipient baru */
 export async function POST(req: NextRequest) {
     if (!await requireOwner()) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    const { name, chatId, threadId } = await req.json()
+    const { name, chatId, threadId, reportTypes } = await req.json()
 
     if (!name?.trim() || !chatId?.trim())
         return NextResponse.json({ success: false, error: 'Name dan Chat ID wajib diisi' }, { status: 400 })
 
-    // Cek duplikat
-    const existing = await prisma.telegramRecipient.findUnique({ where: { chatId: chatId.trim() } })
-    if (existing)
-        return NextResponse.json({ success: false, error: 'Chat ID sudah terdaftar' }, { status: 409 })
+    // Normalisasi reportTypes → comma-separated lowercase
+    const normalizedTypes = Array.isArray(reportTypes)
+        ? reportTypes.map((t: string) => String(t).trim().toLowerCase()).filter(Boolean).join(',')
+        : (typeof reportTypes === 'string' ? reportTypes.trim() : '')
 
     const row = await prisma.telegramRecipient.create({
         data: {
             name: name.trim(),
             chatId: chatId.trim(),
             threadId: threadId?.trim() || null,
+            reportTypes: normalizedTypes || null,
         },
     })
     return NextResponse.json({ success: true, data: row }, { status: 201 })

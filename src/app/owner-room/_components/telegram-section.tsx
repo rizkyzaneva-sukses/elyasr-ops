@@ -5,7 +5,16 @@ import { useToast } from '@/components/ui/toaster'
 import { Loader2, Settings, CheckCircle2, Send, Bell, Eye, EyeOff, Activity, RefreshCw, AlertTriangle } from 'lucide-react'
 
 export function TelegramSection() {
-  type Recipient = { id: string; name: string; chatId: string; threadId?: string | null; isActive: boolean }
+  type Recipient = { id: string; name: string; chatId: string; threadId?: string | null; reportTypes?: string | null; isActive: boolean }
+
+  // Tipe laporan yang bisa dirutekan ke topic berbeda
+  const REPORT_TYPES: { key: 'daily' | 'weekly' | 'monthly'; label: string }[] = [
+    { key: 'daily', label: 'Harian' },
+    { key: 'weekly', label: 'Mingguan' },
+    { key: 'monthly', label: 'Bulanan' },
+  ]
+  const parseTypes = (rt?: string | null): string[] =>
+    rt ? rt.split(',').map(t => t.trim().toLowerCase()).filter(Boolean) : []
   type ScheduleData = { hour: number; minute: number; isActive: boolean } | null
   type HealthData = {
     scheduler: {
@@ -49,6 +58,7 @@ export function TelegramSection() {
   const [newName, setNewName] = useState('')
   const [newChatId, setNewChatId] = useState('')
   const [newThreadId, setNewThreadId] = useState('')
+  const [newReportTypes, setNewReportTypes] = useState<string[]>([])
   const [addingRecipient, setAddingRecipient] = useState(false)
   const [testingId, setTestingId] = useState<string | null>(null)
   const [health, setHealth] = useState<HealthData | null>(null)
@@ -135,16 +145,69 @@ export function TelegramSection() {
       const res = await fetch('/api/settings/telegram-recipients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName, chatId: newChatId, threadId: newThreadId || null }),
+        body: JSON.stringify({
+          name: newName,
+          chatId: newChatId,
+          threadId: newThreadId || null,
+          reportTypes: newReportTypes,
+        }),
       })
       const json = await res.json()
       if (!json.success) throw new Error(json.error)
-      setNewName(''); setNewChatId(''); setNewThreadId(''); setShowAddForm(false)
+      setNewName(''); setNewChatId(''); setNewThreadId(''); setNewReportTypes([]); setShowAddForm(false)
       loadRecipients()
       toast({ title: `✅ ${newName} ditambahkan sebagai penerima laporan`, type: 'success' })
     } catch (err: any) {
       toast({ title: err.message || 'Gagal menambah recipient', type: 'error' })
     } finally { setAddingRecipient(false) }
+  }
+
+  // ── Edit recipient (ubah topic ID / tipe laporan dengan mudah) ──
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editChatId, setEditChatId] = useState('')
+  const [editThreadId, setEditThreadId] = useState('')
+  const [editReportTypes, setEditReportTypes] = useState<string[]>([])
+  const [savingEdit, setSavingEdit] = useState(false)
+
+  const startEdit = (r: Recipient) => {
+    setEditingId(r.id)
+    setEditName(r.name)
+    setEditChatId(r.chatId)
+    setEditThreadId(r.threadId ?? '')
+    setEditReportTypes(parseTypes(r.reportTypes))
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditName(''); setEditChatId(''); setEditThreadId(''); setEditReportTypes([])
+  }
+
+  const toggleReportType = (list: string[], key: string, set: (v: string[]) => void) => {
+    set(list.includes(key) ? list.filter(t => t !== key) : [...list, key])
+  }
+
+  const handleSaveEdit = async (id: string) => {
+    setSavingEdit(true)
+    try {
+      const res = await fetch(`/api/settings/telegram-recipients/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editName,
+          chatId: editChatId,
+          threadId: editThreadId || null,
+          reportTypes: editReportTypes,
+        }),
+      })
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error)
+      cancelEdit()
+      loadRecipients()
+      toast({ title: '✅ Penerima diperbarui', type: 'success' })
+    } catch (err: any) {
+      toast({ title: err.message || 'Gagal memperbarui', type: 'error' })
+    } finally { setSavingEdit(false) }
   }
 
   const handleToggleRecipient = async (id: string, current: boolean) => {
@@ -635,7 +698,9 @@ export function TelegramSection() {
                   </span>
                 )}
               </p>
-              <p className="text-[10px] text-zinc-600 mt-0.5">Laporan dikirim ke semua penerima aktif. Grup pakai Chat ID negatif.</p>
+              <p className="text-[10px] text-zinc-600 mt-0.5">
+                1 grup bisa punya beberapa penerima dengan <strong>Topic ID</strong> berbeda. Pilih tipe laporan tiap penerima supaya Harian / Mingguan / Bulanan tidak tercampur.
+              </p>
             </div>
             <button
               type="button"
@@ -677,6 +742,27 @@ export function TelegramSection() {
                   Cara dapat Thread ID: buka topic di grup → klik kanan → Copy Link → angka di akhir URL
                 </p>
               </div>
+              <div>
+                <p className="text-[10px] text-zinc-500 mb-1.5">Laporan yang dikirim ke sini:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {REPORT_TYPES.map(t => {
+                    const active = newReportTypes.includes(t.key)
+                    return (
+                      <button
+                        key={t.key}
+                        type="button"
+                        onClick={() => toggleReportType(newReportTypes, t.key, setNewReportTypes)}
+                        className={`text-[10px] rounded-full px-2.5 py-1 border transition-colors ${active ? 'bg-sky-700 border-sky-600 text-white' : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-600'}`}
+                      >
+                        {t.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="text-[10px] text-zinc-600 mt-1">
+                  Kosong = terima semua laporan. Pilih supaya laporan tidak tercampur antar topic.
+                </p>
+              </div>
               <button
                 type="submit"
                 disabled={addingRecipient}
@@ -700,48 +786,121 @@ export function TelegramSection() {
             </div>
           ) : (
             <div className="space-y-2">
-              {recipients.map(r => (
-                <div key={r.id} className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5">
-                  {/* Status dot */}
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${r.isActive ? 'bg-emerald-500' : 'bg-zinc-600'}`} />
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-zinc-200 truncate">{r.name}</p>
-                    <p className="text-[10px] text-zinc-500 font-mono truncate">
-                      {r.chatId}
-                      {r.threadId && <span className="text-zinc-600"> · topic:{r.threadId}</span>}
-                    </p>
-                  </div>
-                  {/* Actions */}
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handleTestRecipient(r.id, r.name)}
-                      disabled={testingId === r.id}
-                      title="Test kirim pesan"
-                      className="text-[10px] text-zinc-500 hover:text-sky-400 px-1.5 py-1 rounded transition-colors disabled:opacity-40"
-                    >
-                      {testingId === r.id ? <Loader2 size={11} className="animate-spin" /> : 'Test'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleRecipient(r.id, r.isActive)}
-                      title={r.isActive ? 'Nonaktifkan' : 'Aktifkan'}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${r.isActive ? 'bg-emerald-600' : 'bg-zinc-700'}`}
-                    >
-                      <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${r.isActive ? 'translate-x-5' : 'translate-x-1'}`} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteRecipient(r.id, r.name)}
-                      title="Hapus"
-                      className="text-zinc-600 hover:text-red-400 px-1 py-1 rounded transition-colors"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-                    </button>
-                  </div>
+              {recipients.map(r => {
+                const types = parseTypes(r.reportTypes)
+                const isEditing = editingId === r.id
+                return (
+                <div key={r.id} className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5">
+                  {isEditing ? (
+                    <div className="space-y-2">
+                      <input
+                        type="text" value={editName} onChange={e => setEditName(e.target.value)} placeholder="Nama"
+                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-sky-600"
+                      />
+                      <input
+                        type="text" value={editChatId} onChange={e => setEditChatId(e.target.value)} placeholder="Chat ID"
+                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-sm text-zinc-200 font-mono focus:outline-none focus:border-sky-600"
+                      />
+                      <input
+                        type="text" value={editThreadId} onChange={e => setEditThreadId(e.target.value)}
+                        placeholder="Thread/Topic ID (angka di akhir link topic)"
+                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-sm text-zinc-200 font-mono focus:outline-none focus:border-sky-600"
+                      />
+                      <div>
+                        <p className="text-[10px] text-zinc-500 mb-1.5">Laporan ke sini:</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {REPORT_TYPES.map(t => {
+                            const active = editReportTypes.includes(t.key)
+                            return (
+                              <button
+                                key={t.key} type="button"
+                                onClick={() => toggleReportType(editReportTypes, t.key, setEditReportTypes)}
+                                className={`text-[10px] rounded-full px-2.5 py-1 border transition-colors ${active ? 'bg-sky-700 border-sky-600 text-white' : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-600'}`}
+                              >
+                                {t.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          type="button" onClick={() => handleSaveEdit(r.id)} disabled={savingEdit}
+                          className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-lg px-3 py-1.5 text-xs font-medium"
+                        >
+                          {savingEdit ? <Loader2 size={11} className="animate-spin" /> : null}
+                          {savingEdit ? 'Menyimpan...' : 'Simpan'}
+                        </button>
+                        <button
+                          type="button" onClick={cancelEdit}
+                          className="text-xs bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 rounded-lg px-3 py-1.5"
+                        >
+                          Batal
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      {/* Status dot */}
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${r.isActive ? 'bg-emerald-500' : 'bg-zinc-600'}`} />
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-zinc-200 truncate">{r.name}</p>
+                        <p className="text-[10px] text-zinc-500 font-mono truncate">
+                          {r.chatId}
+                          {r.threadId && <span className="text-zinc-600"> · topic:{r.threadId}</span>}
+                        </p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {types.length === 0 ? (
+                            <span className="text-[9px] bg-zinc-800 border border-zinc-700 text-zinc-500 rounded-full px-1.5 py-0.5">semua laporan</span>
+                          ) : (
+                            REPORT_TYPES.filter(t => types.includes(t.key)).map(t => (
+                              <span key={t.key} className="text-[9px] bg-sky-900/40 border border-sky-700/50 text-sky-300 rounded-full px-1.5 py-0.5">{t.label}</span>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                      {/* Actions */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleTestRecipient(r.id, r.name)}
+                          disabled={testingId === r.id}
+                          title="Test kirim pesan"
+                          className="text-[10px] text-zinc-500 hover:text-sky-400 px-1.5 py-1 rounded transition-colors disabled:opacity-40"
+                        >
+                          {testingId === r.id ? <Loader2 size={11} className="animate-spin" /> : 'Test'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => startEdit(r)}
+                          title="Edit (ubah Topic ID / tipe laporan)"
+                          className="text-zinc-500 hover:text-sky-400 px-1 py-1 rounded transition-colors"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleRecipient(r.id, r.isActive)}
+                          title={r.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${r.isActive ? 'bg-emerald-600' : 'bg-zinc-700'}`}
+                        >
+                          <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${r.isActive ? 'translate-x-5' : 'translate-x-1'}`} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRecipient(r.id, r.name)}
+                          title="Hapus"
+                          className="text-zinc-600 hover:text-red-400 px-1 py-1 rounded transition-colors"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
