@@ -838,9 +838,28 @@ export function TelegramSection() {
                         <p className="text-xs font-medium text-zinc-200 truncate">{r.name}</p>
                         <p className="text-[10px] text-zinc-500 font-mono truncate">
                           {r.chatId}
-                          {r.threadId && <span className="text-zinc-600"> · topic:{r.threadId}</span>}
                         </p>
-                        <div className="flex flex-wrap gap-1 mt-1">
+                        {r.threadId ? (
+                          <button
+                            type="button"
+                            onClick={() => startEdit(r)}
+                            className="mt-1 inline-flex items-center gap-1 text-[10px] font-mono bg-sky-900/30 border border-sky-700/40 text-sky-300 rounded px-2 py-0.5 hover:bg-sky-800/40 transition-colors cursor-pointer"
+                            title="Klik untuk ubah Topic ID"
+                          >
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
+                            Topic: {r.threadId}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => startEdit(r)}
+                            className="mt-1 inline-flex items-center gap-1 text-[10px] text-zinc-500 hover:text-sky-400 border border-dashed border-zinc-700 rounded px-2 py-0.5 transition-colors cursor-pointer"
+                            title="Klik untuk set Topic ID"
+                          >
+                            + Set Topic
+                          </button>
+                        )}
+                        <div className="flex flex-wrap gap-1 mt-1.5">
                           {types.length === 0 ? (
                             <span className="text-[9px] bg-zinc-800 border border-zinc-700 text-zinc-500 rounded-full px-1.5 py-0.5">semua laporan</span>
                           ) : (
@@ -860,14 +879,6 @@ export function TelegramSection() {
                           className="text-[10px] text-zinc-500 hover:text-sky-400 px-1.5 py-1 rounded transition-colors disabled:opacity-40"
                         >
                           {testingId === r.id ? <Loader2 size={11} className="animate-spin" /> : 'Test'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => startEdit(r)}
-                          title="Edit (ubah Topic ID / tipe laporan)"
-                          className="text-zinc-500 hover:text-sky-400 px-1 py-1 rounded transition-colors"
-                        >
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
                         </button>
                         <button
                           type="button"
