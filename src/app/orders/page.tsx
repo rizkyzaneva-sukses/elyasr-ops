@@ -50,7 +50,7 @@ function ExportModal({
   onClose: () => void
 }) {
   const { toast } = useToast()
-  const [mode,    setMode]    = useState<'order_date' | 'payout_date'>('order_date')
+  const [mode,    setMode]    = useState<'created_at' | 'order_date' | 'payout_date'>('created_at')
   const [from,    setFrom]    = useState(defaultFrom)
   const [to,      setTo]      = useState(defaultTo)
   const [loading, setLoading] = useState(false)
@@ -97,6 +97,7 @@ function ExportModal({
           {/* Mode selector */}
           <div className="space-y-2">
             {[
+              { val: 'created_at', label: 'Tanggal Order', desc: 'Filter berdasarkan Tanggal Pesanan Dibuat (Shopee) / Created Time (TikTok)' },
               { val: 'order_date',  label: 'Tanggal Cair', desc: 'Filter berdasarkan Waktu Dana Dilepaskan (Shopee) / Order settled time (TikTok)' },
               { val: 'payout_date', label: 'Tanggal Pencairan', desc: 'Semua order yang order_no-nya cair di range ini' },
             ].map(opt => (

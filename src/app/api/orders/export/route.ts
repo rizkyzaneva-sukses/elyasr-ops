@@ -38,7 +38,7 @@ function statusWhere(status: string) {
 }
 
 // GET /api/orders/export
-// Query: mode=order_date|payout_date, dateFrom, dateTo, platform, status
+// Query: mode=created_at|order_date|payout_date, dateFrom, dateTo, platform, status
 export async function GET(request: NextRequest) {
   const session = await getSession()
   if (!session.isLoggedIn) {
@@ -76,8 +76,26 @@ export async function GET(request: NextRequest) {
       orderBy: { payout: { releasedDate: 'asc' } },
     })
 
+  } else if (mode === 'created_at') {
+    // Mode created_at — filter pakai orderCreatedAt (String, tanggal pesanan dibuat di marketplace)
+    const where: any = {}
+    if (dateFrom || dateTo) {
+      const f: any = {}
+      if (dateFrom) f.gte = dateFrom
+      if (dateTo)   f.lte = dateTo + ' 23:59:59'
+      where.orderCreatedAt = f
+    }
+    if (platform) where.platform = platform
+    if (status)   Object.assign(where, statusClause)
+
+    orders = await prisma.order.findMany({
+      where,
+      include: { payout: { select: { releasedDate: true, totalIncome: true } } },
+      orderBy: { orderCreatedAt: 'asc' },
+    })
+
   } else {
-    // Mode order_date — filter pakai trxDate (DateTime, lebih akurat)
+    // Mode order_date — filter pakai trxDate (DateTime, Waktu Dana Dilepaskan / Order settled time)
     const where: any = {}
     if (dateFrom || dateTo) {
       const f: any = {}

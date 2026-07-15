@@ -312,6 +312,13 @@ export default function DashboardPage() {
       {/* Row 2 — Operations */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
         <KpiCard
+          label="Total Order"
+          value={String(data?.orders?.valid ?? 0)}
+          sub={`${data?.orders?.terkirim ?? 0} terkirim · ${data?.orders?.perluDikirim ?? 0} pending`}
+          icon={ShoppingCart}
+          color="blue"
+        />
+        <KpiCard
           label="Perlu Dikirim"
           value={String(data?.orders?.perluDikirim ?? 0)}
           sub="order pending kirim"
@@ -327,28 +334,13 @@ export default function DashboardPage() {
           delta={cancelRateDelta}
           deltaInvert
         />
-        <KpiCard
-          label="Stok Kritis"
-          value={String(data?.stock?.lowStockCount ?? 0)}
-          sub="produk perlu restock"
-          icon={AlertTriangle}
-          color="orange"
-        />
-        {isOwnerOrFinance ? (
+        {isOwnerOrFinance && (
           <KpiCard
             label="Total Saldo Kas"
             value={formatRupiah(data?.wallet?.totalSaldo ?? 0, true)}
             sub={`${data?.wallet?.wallets?.length ?? 0} wallet aktif`}
             icon={Wallet}
             color="cyan"
-          />
-        ) : (
-          <KpiCard
-            label="Total Order"
-            value={String(data?.orders?.valid ?? 0)}
-            sub="terkirim + pending"
-            icon={ShoppingCart}
-            color="blue"
           />
         )}
       </div>
