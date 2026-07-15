@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
     piutangOutstanding,
   ] = await Promise.all([  // omzetByPlatform sekarang raw SQL (hpp*qty)
 
-    // Count orders per status group — gunakan trx_date untuk filter
+    // Count orders per status group — COUNT(DISTINCT order_no) agar order multi-SKU dihitung 1x
     gteDate && lteDate
       ? prisma.$queryRaw<{ group_key: string; cnt: bigint; total_omzet: bigint }[]>`
           SELECT
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
               WHEN status ILIKE '%batal%' OR status ILIKE '%cancel%' OR status ILIKE '%dibatalkan%' THEN 'batal'
               ELSE 'perlu_dikirim'
             END AS group_key,
-            COUNT(*) AS cnt,
+            COUNT(DISTINCT order_no) AS cnt,
             COALESCE(SUM(real_omzet), 0) AS total_omzet
           FROM orders
           WHERE trx_date >= ${gteDate} AND trx_date <= ${lteDate}
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
               WHEN status ILIKE '%batal%' OR status ILIKE '%cancel%' OR status ILIKE '%dibatalkan%' THEN 'batal'
               ELSE 'perlu_dikirim'
             END AS group_key,
-            COUNT(*) AS cnt,
+            COUNT(DISTINCT order_no) AS cnt,
             COALESCE(SUM(real_omzet), 0) AS total_omzet
           FROM orders
           GROUP BY group_key
@@ -262,7 +262,7 @@ export async function GET(request: NextRequest) {
             AND COALESCE(w.is_ads_budget, false) = false
         `,
 
-    // ── PERIODE PEMBANDING (delta KPI) ──
+    // ── PERIODE PEMBANDING (delta KPI) — COUNT(DISTINCT order_no) ──
     prevGte && prevLte
       ? prisma.$queryRaw<{ group_key: string; cnt: bigint; total_omzet: bigint }[]>`
           SELECT
@@ -270,7 +270,7 @@ export async function GET(request: NextRequest) {
               WHEN status ILIKE '%batal%' OR status ILIKE '%cancel%' OR status ILIKE '%dibatalkan%' THEN 'batal'
               ELSE 'valid'
             END AS group_key,
-            COUNT(*) AS cnt,
+            COUNT(DISTINCT order_no) AS cnt,
             COALESCE(SUM(real_omzet), 0) AS total_omzet
           FROM orders
           WHERE trx_date >= ${prevGte} AND trx_date <= ${prevLte}
@@ -326,8 +326,8 @@ export async function GET(request: NextRequest) {
             TO_CHAR((trx_date AT TIME ZONE 'Asia/Jakarta')::date, 'YYYY-MM-DD') AS day,
             COALESCE(SUM(CASE WHEN status NOT ILIKE '%batal%' AND status NOT ILIKE '%cancel%' AND status NOT ILIKE '%dibatalkan%' THEN real_omzet ELSE 0 END), 0) AS omzet,
             COALESCE(SUM(CASE WHEN status NOT ILIKE '%batal%' AND status NOT ILIKE '%cancel%' AND status NOT ILIKE '%dibatalkan%' THEN CAST(hpp AS bigint) * CAST(qty AS bigint) ELSE 0 END), 0) AS hpp,
-            COALESCE(SUM(CASE WHEN status NOT ILIKE '%batal%' AND status NOT ILIKE '%cancel%' AND status NOT ILIKE '%dibatalkan%' THEN 1 ELSE 0 END), 0) AS orders_valid,
-            COALESCE(SUM(CASE WHEN status ILIKE '%batal%' OR status ILIKE '%cancel%' OR status ILIKE '%dibatalkan%' THEN 1 ELSE 0 END), 0) AS orders_batal
+            COUNT(DISTINCT CASE WHEN status NOT ILIKE '%batal%' AND status NOT ILIKE '%cancel%' AND status NOT ILIKE '%dibatalkan%' THEN order_no END) AS orders_valid,
+            COUNT(DISTINCT CASE WHEN status ILIKE '%batal%' OR status ILIKE '%cancel%' OR status ILIKE '%dibatalkan%' THEN order_no END) AS orders_batal
           FROM orders
           WHERE trx_date >= ${gteDate} AND trx_date <= ${lteDate}
           GROUP BY day
