@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { formatRupiah, formatDate } from '@/lib/utils'
+import { formatRupiah } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
 import {
   ArrowDownToLine, TrendingUp, Megaphone, RefreshCw, Clock,
@@ -374,7 +374,8 @@ export function IklanTab() {
                   </thead>
                   <tbody>
                     {(ledgerData?.entries ?? []).map((e: any) => {
-                      const isPositive = e.amount >= 0
+                      const amt = Number(e.amount) || 0
+                      const isPositive = amt >= 0
                       return (
                         <tr key={e.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
                           <td className="py-2 px-2 text-zinc-400 whitespace-nowrap">
@@ -396,7 +397,7 @@ export function IklanTab() {
                             {e.category || '—'}
                           </td>
                           <td className={`py-2 px-2 text-right font-medium whitespace-nowrap ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {isPositive ? '+' : ''}{formatRupiah(e.amount, true)}
+                            {isPositive ? '+' : ''}{formatRupiah(amt, true)}
                           </td>
                           <td className="py-2 px-2 text-zinc-600 truncate max-w-[200px] hidden sm:table-cell">
                             {e.note || '—'}
