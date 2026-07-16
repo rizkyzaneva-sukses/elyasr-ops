@@ -2,9 +2,12 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { formatRupiah } from '@/lib/utils'
+import { formatRupiah, formatDate } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
-import { ArrowDownToLine, TrendingUp, Megaphone, RefreshCw } from 'lucide-react'
+import {
+  ArrowDownToLine, TrendingUp, Megaphone, RefreshCw, Clock,
+  ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, History
+} from 'lucide-react'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -54,6 +57,23 @@ export function IklanTab() {
   const { data: dashData } = useQuery({
     queryKey: ['dashboard-stats-iklan', monthStart],
     queryFn: () => fetch(`/api/dashboard/stats?dateFrom=${monthStart}&dateTo=${todayStr()}`).then(r => r.json()).then(d => d.data),
+  })
+
+  // Riwayat ledger untuk wallet iklan yang dipilih
+  const [historyPage, setHistoryPage] = useState(1)
+  const [histDateFrom, setHistDateFrom] = useState('')
+  const [histDateTo, setHistDateTo] = useState('')
+  const { data: ledgerData, isLoading: ledgerLoading } = useQuery({
+    queryKey: ['wallet-ledger', adsWalletId, historyPage, histDateFrom, histDateTo],
+    queryFn: () => {
+      if (!adsWalletId) return { entries: [], total: 0 }
+      const p = new URLSearchParams({ walletId: adsWalletId, page: String(historyPage), limit: '15' })
+      if (histDateFrom) p.set('dateFrom', histDateFrom)
+      if (histDateTo) p.set('dateTo', histDateTo)
+      return fetch(`/api/wallet/ledger?${p}`).then(r => r.json()).then(d => d.data ?? { entries: [], total: 0 })
+    },
+    enabled: !!adsWalletId,
+    staleTime: 15_000,
   })
 
   // Map platform → adSpend + roas dari dashboard
@@ -297,6 +317,120 @@ export function IklanTab() {
                 : <><ArrowDownToLine size={14} /> Simpan Deposit</>
             }
           </button>
+        </div>
+      )}
+
+      {/* ── Riwayat Transaksi ────────────────────────────────────────────── */}
+      {adsWalletId && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+              <History size={15} className="text-zinc-400" />
+              Riwayat Transaksi
+              {selectedAds && <span className="text-zinc-600 font-normal">· {selectedAds.linkedPlatform}</span>}
+            </h3>
+          </div>
+
+          {/* Filter tanggal */}
+          <div className="flex items-center gap-2 mb-4">
+            <input type="date" value={histDateFrom} onChange={e => { setHistDateFrom(e.target.value); setHistoryPage(1) }}
+              placeholder="Dari tanggal"
+              className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 [&::-webkit-calendar-picker-indicator]:invert-[0.6]" />
+            <span className="text-zinc-600 text-xs">s/d</span>
+            <input type="date" value={histDateTo} onChange={e => { setHistDateTo(e.target.value); setHistoryPage(1) }}
+              placeholder="Sampai tanggal"
+              className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 [&::-webkit-calendar-picker-indicator]:invert-[0.6]" />
+            {(histDateFrom || histDateTo) && (
+              <button onClick={() => { setHistDateFrom(''); setHistDateTo(''); setHistoryPage(1) }}
+                className="text-[10px] text-zinc-600 hover:text-zinc-300 transition-colors">
+                Reset
+              </button>
+            )}
+          </div>
+
+          {ledgerLoading ? (
+            <div className="flex items-center justify-center py-8 gap-2 text-zinc-600">
+              <RefreshCw size={14} className="animate-spin" />
+              <span className="text-xs">Memuat riwayat...</span>
+            </div>
+          ) : (ledgerData?.entries?.length ?? 0) === 0 ? (
+            <div className="text-center py-8">
+              <Clock size={24} className="text-zinc-700 mx-auto mb-2" />
+              <p className="text-xs text-zinc-600">Belum ada transaksi</p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-zinc-800">
+                      <th className="text-left py-2 px-2 text-zinc-500 font-medium">Tanggal</th>
+                      <th className="text-left py-2 px-2 text-zinc-500 font-medium">Tipe</th>
+                      <th className="text-left py-2 px-2 text-zinc-500 font-medium">Kategori</th>
+                      <th className="text-right py-2 px-2 text-zinc-500 font-medium">Jumlah</th>
+                      <th className="text-left py-2 px-2 text-zinc-500 font-medium hidden sm:table-cell">Catatan</th>
+                      <th className="text-left py-2 px-2 text-zinc-500 font-medium hidden md:table-cell">Oleh</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(ledgerData?.entries ?? []).map((e: any) => {
+                      const isPositive = e.amount >= 0
+                      return (
+                        <tr key={e.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
+                          <td className="py-2 px-2 text-zinc-400 whitespace-nowrap">
+                            {new Date(e.trxDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta' })}
+                          </td>
+                          <td className="py-2 px-2">
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                              e.trxType === 'TRANSFER'
+                                ? 'bg-blue-900/30 text-blue-400'
+                                : e.trxType === 'EXPENSE'
+                                  ? 'bg-red-900/30 text-red-400'
+                                  : 'bg-emerald-900/30 text-emerald-400'
+                            }`}>
+                              {e.trxType === 'EXPENSE' ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
+                              {e.trxType}
+                            </span>
+                          </td>
+                          <td className="py-2 px-2 text-zinc-400 truncate max-w-[160px]">
+                            {e.category || '—'}
+                          </td>
+                          <td className={`py-2 px-2 text-right font-medium whitespace-nowrap ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {isPositive ? '+' : ''}{formatRupiah(e.amount, true)}
+                          </td>
+                          <td className="py-2 px-2 text-zinc-600 truncate max-w-[200px] hidden sm:table-cell">
+                            {e.note || '—'}
+                          </td>
+                          <td className="py-2 px-2 text-zinc-600 hidden md:table-cell">
+                            {e.createdBy || '—'}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              {ledgerData && ledgerData.total > 15 && (
+                <div className="flex items-center justify-between mt-4 pt-3 border-t border-zinc-800">
+                  <p className="text-[10px] text-zinc-600">
+                    {ledgerData.total} transaksi · Hal {historyPage} / {Math.ceil(ledgerData.total / 15)}
+                  </p>
+                  <div className="flex gap-1">
+                    <button onClick={() => setHistoryPage(p => Math.max(1, p - 1))} disabled={historyPage === 1}
+                      className="p-1.5 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white disabled:opacity-30 transition-colors">
+                      <ChevronLeft size={14} />
+                    </button>
+                    <button onClick={() => setHistoryPage(p => p + 1)} disabled={historyPage >= Math.ceil(ledgerData.total / 15)}
+                      className="p-1.5 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white disabled:opacity-30 transition-colors">
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 
