@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
     csvEscape(o.productName || ''),
     o.qty ?? 0,
     csvEscape(o.orderCreatedAt ? String(o.orderCreatedAt).slice(0, 10) : ''),
-    o.trxDate ? String(o.trxDate).slice(0, 10) : '',
+    fmtDate(o.trxDate),
     csvEscape(o.airwaybill || ''),
     csvEscape(o.receiverName || ''),
     csvEscape(o.phone || ''),
@@ -152,7 +152,7 @@ export async function GET(request: NextRequest) {
     csvEscape(o.status || ''),
     o.realOmzet ?? 0,
     o.hpp ?? 0,
-    o.payout?.releasedDate ? String(o.payout.releasedDate).slice(0, 10) : '',
+    fmtDate(o.payout?.releasedDate),
   ].join(','))
 
   const csv = BOM + [header, ...rows].join('\n')
@@ -173,4 +173,10 @@ function csvEscape(val: string): string {
     return `"${val.replace(/"/g, '""')}"`
   }
   return val
+}
+
+function fmtDate(d: Date | string | null | undefined): string {
+  if (!d) return ''
+  const date = typeof d === 'string' ? new Date(d) : d
+  return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
 }

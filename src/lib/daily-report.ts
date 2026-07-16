@@ -99,14 +99,14 @@ export async function buildDailyReport(): Promise<string> {
         topProductsHariIni,
     ] = await Promise.all([
 
-        // Hari ini — omzet, hpp, count (GROUP BY status)
+        // Hari ini — omzet, hpp, count (COUNT DISTINCT order_no agar multi-SKU dihitung 1x)
         prisma.$queryRaw<any[]>`
             SELECT
                 CASE
                     WHEN status ILIKE '%batal%' OR status ILIKE '%cancel%' OR status ILIKE '%dibatalkan%' THEN 'batal'
                     ELSE 'valid'
                 END AS grp,
-                COUNT(*)::int AS cnt,
+                COUNT(DISTINCT order_no)::int AS cnt,
                 COALESCE(SUM(real_omzet), 0)::bigint AS total_omzet,
                 COALESCE(SUM(hpp * qty), 0)::bigint AS total_hpp
             FROM orders
@@ -158,7 +158,7 @@ export async function buildDailyReport(): Promise<string> {
         prisma.$queryRaw<any[]>`
             SELECT
                 COALESCE(platform, 'Unknown') AS platform,
-                COUNT(*)::int AS cnt,
+                COUNT(DISTINCT order_no)::int AS cnt,
                 COALESCE(SUM(real_omzet), 0)::bigint AS total_omzet
             FROM orders
             WHERE trx_date >= ${gteToday} AND trx_date <= ${lteToday}
