@@ -39,7 +39,7 @@ export async function POST(
       data: {
         entityType: 'WALLET_LEDGER',
         entityId: editRequest.ledgerId,
-        action: 'EDIT_REJECT',
+        action: 'UPDATE',
         performedBy: session.username,
         detail: `Reject edit request dari ${editRequest.requestedBy}: ${rejectNote || 'Tidak ada catatan'}`,
       },
