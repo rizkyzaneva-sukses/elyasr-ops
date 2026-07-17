@@ -10,6 +10,7 @@ import { KategoriTab } from './_components/kategori-tab'
 import { KesehatanTab } from './_components/kesehatan-tab'
 import { BackupTab } from './_components/backup-tab'
 import { PengaturanTab } from './_components/pengaturan-tab'
+import { EditRequestsTab } from './_components/edit-requests-tab'
 import { TABS } from './_components/constants'
 
 function OwnerRoomContent() {
@@ -39,6 +40,7 @@ function OwnerRoomContent() {
       </div>
 
       {activeTab === 'Users' && <UsersTab />}
+      {activeTab === 'Edit Requests' && <EditRequestsTab />}
       {activeTab === 'Audit Log' && <AuditTab />}
       {activeTab === 'Kategori' && <KategoriTab />}
       {activeTab === 'Kesehatan' && <KesehatanTab />}

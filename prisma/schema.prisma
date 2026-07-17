@@ -931,3 +931,27 @@ model AiInsight {
   @@index([periodType, createdAt])
   @@map("ai_insights")
 }
+
+// ─────────────────────────────────────────────
+// Ledger Edit Requests (workflow approval)
+// ─────────────────────────────────────────────
+model LedgerEditRequest {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  ledgerId       String  @map("ledger_id")
+  walletName     String? @map("wallet_name")
+  requestedBy    String  @map("requested_by")
+  currentSnapshot Json  @map("current_snapshot") // snapshot data saat ini
+  changes        Json    // [{field, oldValue, newValue}]
+  reason         String
+
+  status     String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  reviewedBy String?   @map("reviewed_by")
+  reviewedAt DateTime? @map("reviewed_at")
+  rejectNote String?   @map("reject_note")
+
+  @@index([status])
+  @@index([requestedBy])
+  @@map("ledger_edit_requests")
+}

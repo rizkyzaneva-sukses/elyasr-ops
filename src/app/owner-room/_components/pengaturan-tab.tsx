@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useToast } from '@/components/ui/toaster'
-import { Settings, Loader2 } from 'lucide-react'
+import { Settings, Loader2, AlertTriangle, Trash2, X, Shield } from 'lucide-react'
 import { TelegramSection } from './telegram-section'
 
 export function PengaturanTab() {
@@ -106,6 +106,95 @@ export function PengaturanTab() {
 
       {/* Telegram Notification Settings */}
       <TelegramSection />
+
+      {/* Reset Keuangan — DANGER ZONE */}
+      <ResetKeuanganSection />
+    </div>
+  )
+}
+
+function ResetKeuanganSection() {
+  const { toast } = useToast()
+  const [open, setOpen] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<any>(null)
+
+  const handleReset = async () => {
+    if (confirmText !== 'RESET') return
+    setLoading(true)
+    try {
+      const res = await fetch('/api/wallet/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: 'RESET' }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      setResult(json.data)
+      toast({ title: 'Keuangan berhasil di-reset ✅', type: 'success' })
+    } catch (err: any) {
+      toast({ title: err.message || 'Gagal reset', type: 'error' })
+    } finally { setLoading(false) }
+  }
+
+  return (
+    <div className="mt-8 border-t border-zinc-800 pt-6">
+      <div className="flex items-center gap-2 mb-2">
+        <AlertTriangle size={16} className="text-red-400" />
+        <h2 className="text-sm font-semibold text-red-400">Danger Zone — Reset Keuangan</h2>
+      </div>
+      <p className="text-xs text-zinc-500 mb-4">
+        Reset semua transaksi wallet_ledger ke saldo awal (modal_awal). SEMUA data transaksi (expense, transfer, payout, vendor payment) akan dihapus permanen.
+      </p>
+
+      {!open ? (
+        <button onClick={() => setOpen(true)}
+          className="flex items-center gap-2 bg-red-900/40 hover:bg-red-900/60 text-red-400 border border-red-800/50 rounded-lg px-4 py-2 text-sm font-medium transition-colors">
+          <Trash2 size={14} /> Reset Keuangan
+        </button>
+      ) : (
+        <div className="bg-red-900/10 border border-red-800/30 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-red-300">Konfirmasi Reset</h3>
+            <button onClick={() => { setOpen(false); setConfirmText(''); setResult(null) }}
+              className="text-zinc-500 hover:text-zinc-300"><X size={14} /></button>
+          </div>
+
+          {result ? (
+            <div className="space-y-2">
+              <p className="text-sm text-emerald-400 font-medium">Reset berhasil!</p>
+              <p className="text-xs text-zinc-400">{result.deletedCount} transaksi dihapus</p>
+              <div className="space-y-1">
+                {result.wallets.map((w: any, i: number) => (
+                  <p key={i} className="text-xs text-zinc-500">• {w.wallet}: modal awal {w.amount.toLocaleString('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 })}</p>
+                ))}
+              </div>
+              <button onClick={() => { setOpen(false); setResult(null); setConfirmText('') }}
+                className="text-xs text-zinc-400 hover:text-white mt-2">Tutup</button>
+            </div>
+          ) : (
+            <>
+              <div className="bg-red-900/20 rounded-lg px-3 py-2">
+                <p className="text-xs text-red-300">
+                  Semua transaksi akan dihapus. Saldo setiap wallet akan dikembalikan ke modal awal yang sudah di-setup.
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-500 mb-1">Ketik <b className="text-red-400">RESET</b> untuk konfirmasi</label>
+                <input type="text" value={confirmText} onChange={e => setConfirmText(e.target.value)}
+                  placeholder="Ketik RESET"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-red-600" />
+              </div>
+              <button onClick={handleReset} disabled={loading || confirmText !== 'RESET'}
+                className="flex items-center gap-2 bg-red-700 hover:bg-red-600 disabled:opacity-30 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors">
+                {loading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                {loading ? 'Meriset...' : 'Ya, Reset Sekarang'}
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }
