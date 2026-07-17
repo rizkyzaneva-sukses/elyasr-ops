@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useToast } from '@/components/ui/toaster'
-import { Settings, Loader2, AlertTriangle, Trash2, X, Shield } from 'lucide-react'
+import { Settings, Loader2, AlertTriangle, Trash2, X, Wallet, Plus } from 'lucide-react'
 import { TelegramSection } from './telegram-section'
 
 export function PengaturanTab() {
@@ -107,6 +107,9 @@ export function PengaturanTab() {
       {/* Telegram Notification Settings */}
       <TelegramSection />
 
+      {/* Setup Saldo Awal — sebelum reset */}
+      <SaldoAwalSection />
+
       {/* Reset Keuangan — DANGER ZONE */}
       <ResetKeuanganSection />
     </div>
@@ -192,6 +195,109 @@ function ResetKeuanganSection() {
                 {loading ? 'Meriset...' : 'Ya, Reset Sekarang'}
               </button>
             </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SaldoAwalSection() {
+  const { toast } = useToast()
+  const [wallets, setWallets] = useState<any[]>([])
+  const [modals, setModals] = useState<Record<string, any>>({})
+  const [inputs, setInputs] = useState<Record<string, string>>({})
+  const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10))
+  const [loading, setLoading] = useState(true)
+  const [savingId, setSavingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/modal-awal').then(r => r.json()),
+      fetch('/api/wallet').then(r => r.json()),
+    ]).then(([modalRes, walletRes]) => {
+      const modalMap: Record<string, any> = {}
+      ;(modalRes.data?.modals ?? []).forEach((m: any) => {
+        modalMap[m.walletId] = m
+        setInputs(prev => ({ ...prev, [m.walletId]: String(m.jumlah) }))
+      })
+      setModals(modalMap)
+      setWallets(walletRes.data ?? [])
+      if (Object.keys(modalMap).length > 0) {
+        const first = Object.values(modalMap)[0] as any
+        setTanggal(first.tanggalSetup?.slice(0, 10) ?? tanggal)
+      }
+    }).finally(() => setLoading(false))
+  }, [])
+
+  const handleSave = async (walletId: string) => {
+    const jumlah = parseInt(inputs[walletId] ?? '0')
+    if (!jumlah || jumlah <= 0) return toast({ title: 'Isi saldo awal dengan benar', type: 'error' })
+    setSavingId(walletId)
+    try {
+      const res = await fetch('/api/modal-awal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([{ walletId, jumlah, tanggalSetup: tanggal, note: 'Setup saldo awal' }]),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      toast({ title: `Saldo awal ${wallets.find(w => w.id === walletId)?.name} disimpan`, type: 'success' })
+      setModals(prev => ({ ...prev, [walletId]: { ...prev[walletId], jumlah, tanggalSetup: tanggal } }))
+    } catch (err: any) {
+      toast({ title: err.message || 'Gagal menyimpan', type: 'error' })
+    } finally { setSavingId(null) }
+  }
+
+  return (
+    <div className="mt-8 border-t border-zinc-800 pt-6">
+      <div className="flex items-center gap-2 mb-2">
+        <Wallet size={16} className="text-emerald-400" />
+        <h2 className="text-sm font-semibold text-zinc-200">Setup Saldo Awal (Modal Awal)</h2>
+      </div>
+      <p className="text-xs text-zinc-500 mb-4">
+        Isi saldo awal tiap dompet terlebih dahulu, lalu klik <b>Reset Keuangan</b> di bawah untuk
+        mengembalikan semua saldo ke nilai ini. Reset akan menghapus seluruh transaksi.
+      </p>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-zinc-500 text-sm">
+          <Loader2 size={14} className="animate-spin" /> Memuat dompet...
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1">Tanggal Setup Saldo Awal</label>
+            <input type="date" value={tanggal} onChange={e => setTanggal(e.target.value)}
+              className="w-full sm:w-56 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none [&::-webkit-calendar-picker-indicator]:invert-[0.6]" />
+          </div>
+          {wallets.length === 0 ? (
+            <p className="text-sm text-zinc-500">Belum ada dompet aktif.</p>
+          ) : (
+            wallets.map((w: any) => (
+              <div key={w.id} className="flex flex-col sm:flex-row sm:items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-white">{w.name}</p>
+                  {modals[w.id] ? (
+                    <p className="text-xs text-zinc-500">
+                      Saldo awal saat ini: {Number(modals[w.id].jumlah).toLocaleString('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 })}
+                      {' '}· {modals[w.id].tanggalSetup?.slice(0, 10)}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-400/80">Belum di-setup</p>
+                  )}
+                </div>
+                <input type="number" min="0" placeholder="Rp"
+                  value={inputs[w.id] ?? ''}
+                  onChange={e => setInputs(prev => ({ ...prev, [w.id]: e.target.value }))}
+                  className="w-full sm:w-44 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none" />
+                <button onClick={() => handleSave(w.id)} disabled={savingId === w.id}
+                  className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors">
+                  {savingId === w.id ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                  {modals[w.id] ? 'Update' : 'Set'}
+                </button>
+              </div>
+            ))
           )}
         </div>
       )}
