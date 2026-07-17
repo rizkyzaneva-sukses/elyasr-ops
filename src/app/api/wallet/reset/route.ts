@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       data: {
         entityType: 'WALLET_LEDGER',
         entityId: 'RESET',
-        action: 'RESET',
+        action: 'DELETE',
         performedBy: session.username,
         note: `Reset keuangan: menghapus ${deleted.count} transaksi, recreate ${recreated.length} modal awal`,
       },
