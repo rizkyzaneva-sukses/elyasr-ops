@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
         entityId: ledgerId,
         action: 'UPDATE',
         performedBy: session.username,
-        detail: `Edit langsung (Owner): ${auditChanges.join(', ')}`,
+        note: `Edit langsung (Owner): ${auditChanges.join(', ')}`,
       },
     })
 

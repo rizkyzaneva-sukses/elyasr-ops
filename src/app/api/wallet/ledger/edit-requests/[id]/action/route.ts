@@ -41,7 +41,7 @@ export async function POST(
         entityId: editRequest.ledgerId,
         action: 'UPDATE',
         performedBy: session.username,
-        detail: `Reject edit request dari ${editRequest.requestedBy}: ${rejectNote || 'Tidak ada catatan'}`,
+        note: `Reject edit request dari ${editRequest.requestedBy}: ${rejectNote || 'Tidak ada catatan'}`,
       },
     })
 
@@ -88,7 +88,7 @@ export async function POST(
         entityId: editRequest.ledgerId,
         action: 'UPDATE',
         performedBy: `${session.username} (ACC dari ${editRequest.requestedBy})`,
-        detail: `Edit disetujui: ${auditChanges.join(', ')}`,
+        note: `Edit disetujui: ${auditChanges.join(', ')}`,
       },
     }),
   ])
