@@ -72,7 +72,7 @@ function isTikTokCancel(status: string): boolean {
 /**
  * Cek apakah SKU dikecualikan dari perhitungan omzet (harga = 0).
  * Produk ini tidak menanggung voucher — bebannya dialihkan ke produk lain.
- * Contoh: Kaos/T-shirt bonus, Miki Hat / Peci Uas
+ * Contoh: Kaos/T-shirt bonus, Mikihat, Atlas
  */
 function isKaosSku(sku: string): boolean {
   const lower = sku.toLowerCase()
@@ -80,8 +80,8 @@ function isKaosSku(sku: string): boolean {
     lower.includes('kaos') ||
     lower.includes('t-shirt') ||
     lower.includes('tshirt') ||
-    lower.includes('peci') ||
-    lower.includes('miki hat')
+    lower.includes('mikihat') ||
+    lower.includes('atlas')
   )
 }
 
@@ -180,7 +180,7 @@ export function parseShopeeOrders(
           expandedItems.push({ sourceRow: row, rowNumber, sku, hargaPerUnit, qty })
         })
       } else {
-        // Produk dikecualikan (kaos/hat/peci) → harga 0, tidak menanggung voucher
+        // Produk dikecualikan (kaos/mikihat/atlas) → harga 0, tidak menanggung voucher
         const hargaPerUnit = isKaosSku(rawSku) ? 0 : parseShopeeNum(row['Harga Setelah Diskon'])
         expandedItems.push({ sourceRow: row, rowNumber, sku: rawSku, hargaPerUnit, qty })
       }

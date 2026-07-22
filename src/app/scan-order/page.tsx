@@ -60,7 +60,7 @@ function getKresekInfo(items: { sku: string; qty: number; productName: string }[
   items.forEach(item => {
     const name = (item.productName || '').toLowerCase()
     const sku = (item.sku || '').toLowerCase()
-    if (!name.includes('miki hat') && !name.includes('peci uas') && !sku.includes('miki hat') && !sku.includes('peci uas')) {
+    if (!name.includes('mikihat') && !name.includes('atlas') && !sku.includes('mikihat') && !sku.includes('atlas')) {
       kresekQty += item.qty
     }
   })
