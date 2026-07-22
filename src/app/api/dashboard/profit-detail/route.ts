@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
         SUM(o.hpp * o.qty)::bigint AS hpp_total,
         (SUM(o.real_omzet) - SUM(o.hpp * o.qty))::bigint AS gp,
         CASE WHEN SUM(o.real_omzet) > 0
-          THEN ROUND((((SUM(o.real_omzet) - SUM(o.hpp * o.qty))::float8) / SUM(o.real_omzet)::float8) * 100, 2)
+          THEN ROUND((((SUM(o.real_omzet) - SUM(o.hpp * o.qty))::numeric) / SUM(o.real_omzet)::numeric) * 100, 2)
           ELSE 0
         END AS margin_pct
       FROM orders o
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
         SUM(o.hpp * o.qty)::bigint AS hpp_total,
         (SUM(o.real_omzet) - SUM(o.hpp * o.qty))::bigint AS gp,
         CASE WHEN SUM(o.real_omzet) > 0
-          THEN ROUND((((SUM(o.real_omzet) - SUM(o.hpp * o.qty))::float8) / SUM(o.real_omzet)::float8) * 100, 2)
+          THEN ROUND((((SUM(o.real_omzet) - SUM(o.hpp * o.qty))::numeric) / SUM(o.real_omzet)::numeric) * 100, 2)
           ELSE 0
         END AS margin_pct
       FROM orders o
@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
         SUM(real_omzet)::bigint AS omzet,
         SUM(hpp * qty)::bigint AS hpp,
         CASE WHEN SUM(real_omzet) > 0
-          THEN ROUND((((SUM(real_omzet) - SUM(hpp * qty))::float8) / SUM(real_omzet)::float8) * 100, 2)
+          THEN ROUND((((SUM(real_omzet) - SUM(hpp * qty))::numeric) / SUM(real_omzet)::numeric) * 100, 2)
           ELSE 0
         END AS margin_pct
       FROM orders
