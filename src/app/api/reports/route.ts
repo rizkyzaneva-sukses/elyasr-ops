@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { apiSuccess, apiError } from '@/lib/utils'
+import { getReturnRatioByOrderNo } from '@/lib/pnl-helpers'
 
 export async function GET(request: NextRequest) {
   const session = await getSession()
@@ -16,20 +17,40 @@ export async function GET(request: NextRequest) {
   const toDate = dateTo ? new Date(dateTo) : null
   if (toDate) toDate.setHours(23, 59, 59, 999)
 
-  // Join manual berdasarkan orderNo (bukan relasi payout.orderId): satu order
-  // bisa multi-SKU per orderNo, sedangkan Payout.orderId hanya ke-assign ke
-  // satu row saja saat import, jadi filter via relasi melewatkan sebagian row.
-  let paidOrderNoFilter: any = {}
-  if (fromDate && toDate) {
-    const payoutsInRange = await prisma.payout.findMany({
-      where: { releasedDate: { gte: fromDate, lte: toDate } },
-      select: { orderNo: true },
-    })
-    paidOrderNoFilter = { orderNo: { in: payoutsInRange.map(p => p.orderNo) } }
-  }
-
   if (type === 'summary') {
-    const [paidOrders, payoutData, expenseData] = await Promise.all([
+    // Payout individual (bukan aggregate) — perlu detail per orderNo agar porsi
+    // order yang RETUR bisa dikeluarkan dari Pencairan (proporsional, karena
+    // satu orderNo bisa multi-SKU dan hanya sebagian yang di-retur).
+    const payoutRows = await prisma.payout.findMany({
+      where: fromDate && toDate
+        ? { releasedDate: { gte: fromDate, lte: toDate } }
+        : {},
+      select: { orderNo: true, totalIncome: true, omzet: true, platformFee: true, amsFee: true },
+    })
+    const returnRatioMap = await getReturnRatioByOrderNo(payoutRows.map(p => p.orderNo))
+
+    let payoutTotalIncome = 0
+    let payoutOmzet       = 0
+    let payoutPlatformFee = 0
+    let payoutAmsFee      = 0
+    for (const p of payoutRows) {
+      const keepRatio = 1 - (returnRatioMap.get(p.orderNo) ?? 0)
+      payoutTotalIncome += (p.totalIncome ?? 0) * keepRatio
+      payoutOmzet       += (p.omzet ?? 0) * keepRatio
+      payoutPlatformFee += p.platformFee ?? 0
+      payoutAmsFee      += p.amsFee ?? 0
+    }
+    payoutTotalIncome = Math.round(payoutTotalIncome)
+    payoutOmzet       = Math.round(payoutOmzet)
+
+    // Join manual berdasarkan orderNo (bukan relasi payout.orderId): satu order
+    // bisa multi-SKU per orderNo, sedangkan Payout.orderId hanya ke-assign ke
+    // satu row saja saat import, jadi filter via relasi melewatkan sebagian row.
+    const paidOrderNoFilter = fromDate && toDate
+      ? { orderNo: { in: payoutRows.map(p => p.orderNo) } }
+      : {}
+
+    const [paidOrders, expenseData] = await Promise.all([
       prisma.order.findMany({
         where: {
           ...paidOrderNoFilter,
@@ -49,14 +70,6 @@ export async function GET(request: NextRequest) {
           hpp: true,
           realOmzet: true,
         },
-      }),
-      // Payout summary
-      prisma.payout.aggregate({
-        where: fromDate && toDate
-          ? { releasedDate: { gte: fromDate, lte: toDate } }
-          : {},
-        _sum: { totalIncome: true, omzet: true, platformFee: true, amsFee: true },
-        _count: { id: true },
       }),
 
       // Expense dari wallet ledger
@@ -128,16 +141,16 @@ export async function GET(request: NextRequest) {
         ? (((totalOmzet - totalHpp) / totalOmzet) * 100).toFixed(1)
         : '0',
       payout: {
-        count: payoutData._count.id,
-        totalIncome: payoutData._sum.totalIncome ?? 0,
-        platformFee: payoutData._sum.platformFee ?? 0,
-        amsFee: payoutData._sum.amsFee ?? 0,
+        count: payoutRows.length,
+        totalIncome: payoutTotalIncome,
+        platformFee: payoutPlatformFee,
+        amsFee: payoutAmsFee,
       },
       expense: {
         total: totalExpense,
         count: expenseData._count.id,
       },
-      netCashflow: (payoutData._sum.totalIncome ?? 0) - totalExpense,
+      netCashflow: payoutTotalIncome - totalExpense,
       topSkus: topSkus.map(s => ({
         sku: s.sku,
         omzet: s.omzet,

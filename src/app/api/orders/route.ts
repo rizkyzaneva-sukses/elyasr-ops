@@ -153,6 +153,11 @@ export async function GET(request: NextRequest) {
     const payout = payoutMap.get(o.orderNo)
     if (!payout || !payout.totalIncome) return { ...o, payoutAllocated: null, payoutReleasedDate: null }
 
+    // Order yang sudah RETUR tidak dihitung sebagai Pencairan
+    if (/retur|return|dikembalikan/i.test(o.status ?? '')) {
+      return { ...o, payoutAllocated: 0, payoutReleasedDate: payout.releasedDate }
+    }
+
     const totalOmzet = omzetSumMap.get(o.orderNo) ?? 0
     const proportion = totalOmzet > 0 ? o.realOmzet / totalOmzet : 0
     const payoutAllocated = Math.round(payout.totalIncome * proportion)

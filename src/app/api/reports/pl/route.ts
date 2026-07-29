@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { apiSuccess, apiError } from '@/lib/utils'
+import { getReturnRatioByOrderNo } from '@/lib/pnl-helpers'
 
 // GET /api/reports/pl?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD
 export async function GET(request: NextRequest) {
@@ -18,11 +19,15 @@ export async function GET(request: NextRequest) {
   const toDate   = new Date(dateTo)
   toDate.setHours(23, 59, 59, 999)
 
-  // ── 1. Payout aggregate — basis tanggal cair (releasedDate) ─────────────
-  const payoutBySource = await prisma.payout.groupBy({
-    by: ['source'],
+  // ── 1. Payout — basis tanggal cair (releasedDate) ──────────────────────
+  // Order yang sudah RETUR dikeluarkan dari Pencairan meski data Payout mentah
+  // dari marketplace masih menunjukkan nilai penuh. Proporsional per orderNo
+  // karena satu orderNo bisa multi-SKU dan hanya sebagian yang di-retur.
+  const payoutsInPeriod = await prisma.payout.findMany({
     where: { releasedDate: { gte: fromDate, lte: toDate } },
-    _sum: {
+    select: {
+      orderNo:          true,
+      source:           true,
       totalIncome:      true,
       omzet:            true,
       platformFee:      true,
@@ -31,27 +36,31 @@ export async function GET(request: NextRequest) {
       bebanOngkir:      true,
     },
   })
+  const returnRatioMap = await getReturnRatioByOrderNo(payoutsInPeriod.map(p => p.orderNo))
 
-  let pencairanBersih = 0   // SUM(totalIncome) — actual cash masuk
-  let omzetKotor      = 0   // SUM(omzet) — gross sebelum fee
+  let pencairanBersih = 0   // SUM(totalIncome) — actual cash masuk, porsi retur dikeluarkan
+  let omzetKotor      = 0   // SUM(omzet) — gross sebelum fee, porsi retur dikeluarkan
   let feeShopee       = 0
   let feeTikTok       = 0
   let feeAms          = 0
   let feeLainnya      = 0
   let bebanKerugianTikTok = 0
 
-  for (const row of payoutBySource) {
-    pencairanBersih += row._sum.totalIncome      ?? 0
-    omzetKotor      += row._sum.omzet            ?? 0
-    feeAms          += row._sum.amsFee           ?? 0
-    feeLainnya      += row._sum.platformFeeOther ?? 0
-    if (row.source === 'shopee_income') {
-      feeShopee += row._sum.platformFee ?? 0
+  for (const p of payoutsInPeriod) {
+    const keepRatio = 1 - (returnRatioMap.get(p.orderNo) ?? 0)
+    pencairanBersih += (p.totalIncome ?? 0) * keepRatio
+    omzetKotor      += (p.omzet ?? 0) * keepRatio
+    feeAms          += p.amsFee ?? 0
+    feeLainnya      += p.platformFeeOther ?? 0
+    if (p.source === 'shopee_income') {
+      feeShopee += p.platformFee ?? 0
     } else {
-      feeTikTok += row._sum.platformFee ?? 0
-      bebanKerugianTikTok += row._sum.bebanOngkir ?? 0
+      feeTikTok += p.platformFee ?? 0
+      bebanKerugianTikTok += p.bebanOngkir ?? 0
     }
   }
+  pencairanBersih = Math.round(pencairanBersih)
+  omzetKotor      = Math.round(omzetKotor)
   const totalFee = feeShopee + feeTikTok + feeAms + feeLainnya
 
   // ── 2. HPP — dari Order yang payoutnya cair di periode ini ──
@@ -61,11 +70,7 @@ export async function GET(request: NextRequest) {
   // sebagian row dan membuat HPP undercount dibanding pencairanBersih.
   // Order.hpp di-set saat upload order CSV (lookup dari masterProduct saat itu).
   // Order berstatus RETUR dikeluarkan — barangnya sudah kembali ke stok.
-  const paidPayouts = await prisma.payout.findMany({
-    where: { releasedDate: { gte: fromDate, lte: toDate } },
-    select: { orderNo: true },
-  })
-  const paidOrderNos = paidPayouts.map(p => p.orderNo)
+  const paidOrderNos = payoutsInPeriod.map(p => p.orderNo)
 
   const paidOrders = await prisma.order.findMany({
     where: {
