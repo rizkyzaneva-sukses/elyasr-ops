@@ -55,14 +55,27 @@ export async function GET(request: NextRequest) {
   const totalFee = feeShopee + feeTikTok + feeAms + feeLainnya
 
   // ── 2. HPP — dari Order yang payoutnya cair di periode ini ──
-  // Filter via relasi payout.releasedDate agar sejajar dengan pencairanBersih di atas.
+  // Join manual berdasarkan orderNo (bukan relasi payout.orderId): satu order
+  // bisa multi-SKU per orderNo, sedangkan Payout.orderId hanya ke-assign ke
+  // satu row saja saat import, jadi relasi payout.releasedDate melewatkan
+  // sebagian row dan membuat HPP undercount dibanding pencairanBersih.
   // Order.hpp di-set saat upload order CSV (lookup dari masterProduct saat itu).
+  // Order berstatus RETUR dikeluarkan — barangnya sudah kembali ke stok.
+  const paidPayouts = await prisma.payout.findMany({
+    where: { releasedDate: { gte: fromDate, lte: toDate } },
+    select: { orderNo: true },
+  })
+  const paidOrderNos = paidPayouts.map(p => p.orderNo)
+
   const paidOrders = await prisma.order.findMany({
     where: {
       sku: { not: null },
-      payout: {
-        releasedDate: { gte: fromDate, lte: toDate },
-      },
+      orderNo: { in: paidOrderNos },
+      NOT: [
+        { status: { contains: 'retur', mode: 'insensitive' } },
+        { status: { contains: 'return', mode: 'insensitive' } },
+        { status: { contains: 'dikembalikan', mode: 'insensitive' } },
+      ],
     },
     select: { sku: true, qty: true, hpp: true },
   })

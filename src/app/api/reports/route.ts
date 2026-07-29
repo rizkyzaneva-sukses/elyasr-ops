@@ -16,21 +16,30 @@ export async function GET(request: NextRequest) {
   const toDate = dateTo ? new Date(dateTo) : null
   if (toDate) toDate.setHours(23, 59, 59, 999)
 
-  const payoutDateFilter = fromDate && toDate ? {
-    payout: {
-      releasedDate: { gte: fromDate, lte: toDate }
-    }
-  } : {}
+  // Join manual berdasarkan orderNo (bukan relasi payout.orderId): satu order
+  // bisa multi-SKU per orderNo, sedangkan Payout.orderId hanya ke-assign ke
+  // satu row saja saat import, jadi filter via relasi melewatkan sebagian row.
+  let paidOrderNoFilter: any = {}
+  if (fromDate && toDate) {
+    const payoutsInRange = await prisma.payout.findMany({
+      where: { releasedDate: { gte: fromDate, lte: toDate } },
+      select: { orderNo: true },
+    })
+    paidOrderNoFilter = { orderNo: { in: payoutsInRange.map(p => p.orderNo) } }
+  }
 
   if (type === 'summary') {
     const [paidOrders, payoutData, expenseData] = await Promise.all([
       prisma.order.findMany({
         where: {
-          ...payoutDateFilter,
+          ...paidOrderNoFilter,
           NOT: [
             { status: { contains: 'batal' } },
             { status: { contains: 'Cancel' } },
             { status: { contains: 'Dibatalkan' } },
+            { status: { contains: 'retur', mode: 'insensitive' } },
+            { status: { contains: 'return', mode: 'insensitive' } },
+            { status: { contains: 'dikembalikan', mode: 'insensitive' } },
           ],
         },
         select: {

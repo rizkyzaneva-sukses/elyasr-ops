@@ -59,22 +59,35 @@ export async function GET(request: NextRequest) {
   let orders: any[] = []
 
   if (mode === 'payout_date') {
-    // Filter order yang terhubung ke payout.releasedDate dalam rentang
+    // Filter berdasarkan payout.releasedDate — cari orderNo yang payout-nya
+    // cair dalam rentang, lalu ambil SEMUA order row dengan orderNo tsb.
+    // (Tidak pakai relasi payout.orderId: order bisa multi-SKU per orderNo,
+    // sedangkan Payout.orderId hanya di-assign ke salah satu row saja saat import.)
     const dateFilter: any = {}
     if (dateFrom) dateFilter.gte = new Date(dateFrom)
     if (dateTo)   dateFilter.lte = new Date(`${dateTo}T23:59:59.999Z`)
 
-    orders = await prisma.order.findMany({
+    const matchingPayouts = await prisma.payout.findMany({
+      where: Object.keys(dateFilter).length ? { releasedDate: dateFilter } : {},
+      select: { orderNo: true, releasedDate: true, totalIncome: true },
+    })
+    const payoutMap = new Map(matchingPayouts.map(p => [p.orderNo, p]))
+
+    const matchedOrders = await prisma.order.findMany({
       where: {
-        payout: {
-          ...(Object.keys(dateFilter).length ? { releasedDate: dateFilter } : {}),
-        },
+        orderNo: { in: [...payoutMap.keys()] },
         ...(platform && { platform }),
         ...statusClause,
       },
-      include: { payout: { select: { releasedDate: true, totalIncome: true } } },
-      orderBy: { payout: { releasedDate: 'asc' } },
     })
+
+    orders = matchedOrders
+      .map(o => ({ ...o, payout: payoutMap.get(o.orderNo) ?? null }))
+      .sort((a, b) => {
+        const da = a.payout?.releasedDate ? new Date(a.payout.releasedDate).getTime() : 0
+        const db = b.payout?.releasedDate ? new Date(b.payout.releasedDate).getTime() : 0
+        return da - db
+      })
 
   } else if (mode === 'created_at') {
     // Mode created_at — filter pakai orderCreatedAt (String, tanggal pesanan dibuat di marketplace)
@@ -88,11 +101,11 @@ export async function GET(request: NextRequest) {
     if (platform) where.platform = platform
     if (status)   Object.assign(where, statusClause)
 
-    orders = await prisma.order.findMany({
+    const matchedOrders = await prisma.order.findMany({
       where,
-      include: { payout: { select: { releasedDate: true, totalIncome: true } } },
       orderBy: { orderCreatedAt: 'asc' },
     })
+    orders = await attachPayouts(matchedOrders)
 
   } else {
     // Mode order_date — filter pakai trxDate (DateTime, Waktu Dana Dilepaskan / Order settled time)
@@ -106,26 +119,26 @@ export async function GET(request: NextRequest) {
     if (platform) where.platform = platform
     if (status)   Object.assign(where, statusClause)
 
-    orders = await prisma.order.findMany({
+    let matchedOrders = await prisma.order.findMany({
       where,
-      include: { payout: { select: { releasedDate: true, totalIncome: true } } },
       orderBy: { trxDate: 'asc' },
     })
 
     // Fallback: jika trxDate belum diisi (data lama), coba filter orderCreatedAt (String)
-    if (orders.length === 0 && (dateFrom || dateTo)) {
+    if (matchedOrders.length === 0 && (dateFrom || dateTo)) {
       const fw: any = {}
       if (dateFrom) fw.orderCreatedAt = { gte: dateFrom }
       if (dateTo)   fw.orderCreatedAt = { ...fw.orderCreatedAt, lte: dateTo + ' 23:59:59' }
       if (platform) fw.platform = platform
       if (status)   Object.assign(fw, statusClause)
 
-      orders = await prisma.order.findMany({
+      matchedOrders = await prisma.order.findMany({
         where: fw,
-        include: { payout: { select: { releasedDate: true, totalIncome: true } } },
         orderBy: { orderCreatedAt: 'asc' },
       })
     }
+
+    orders = await attachPayouts(matchedOrders)
   }
 
   // BOM agar Excel buka tanpa garbled
@@ -165,6 +178,21 @@ export async function GET(request: NextRequest) {
       'Content-Disposition': `attachment; filename="${filename}"`,
     },
   })
+}
+
+// Join manual berdasarkan orderNo (bukan relasi payout.orderId) — order bisa
+// multi-SKU per orderNo, sedangkan Payout.orderId hanya di-assign ke satu row.
+async function attachPayouts(orders: any[]): Promise<any[]> {
+  const orderNos = [...new Set(orders.map(o => o.orderNo).filter(Boolean))]
+  if (orderNos.length === 0) return orders.map(o => ({ ...o, payout: null }))
+
+  const payouts = await prisma.payout.findMany({
+    where: { orderNo: { in: orderNos } },
+    select: { orderNo: true, releasedDate: true, totalIncome: true },
+  })
+  const payoutMap = new Map(payouts.map(p => [p.orderNo, p]))
+
+  return orders.map(o => ({ ...o, payout: payoutMap.get(o.orderNo) ?? null }))
 }
 
 function csvEscape(val: string): string {
