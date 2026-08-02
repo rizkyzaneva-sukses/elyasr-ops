@@ -242,15 +242,17 @@ export async function buildWeeklyReport(): Promise<string> {
             LIMIT 5
         `,
 
-        // Ad spend minggu lalu (iklan / ads / sample)
+        // Ad spend minggu lalu — wallet is_ads_budget (sama dashboard / Laba Rugi)
         prisma.$queryRaw<any[]>`
-            SELECT category, COALESCE(SUM(ABS(amount)), 0)::bigint AS total
-            FROM wallet_ledger
-            WHERE trx_type = 'EXPENSE'
-              AND trx_date >= ${lastWeekStart} AND trx_date <= ${lastWeekEnd}
-              AND category IS NOT NULL
-              AND (category ILIKE '%iklan%' OR category ILIKE '%ads%' OR category ILIKE '%sample%' OR category ILIKE '%ongkir sample%')
-            GROUP BY category
+            SELECT
+                COALESCE(w.linked_platform, l.category, 'Iklan') AS category,
+                COALESCE(SUM(ABS(l.amount)), 0)::bigint AS total
+            FROM wallet_ledger l
+            JOIN wallets w ON w.id = l.wallet_id
+            WHERE w.is_ads_budget = true
+              AND l.trx_type = 'EXPENSE'
+              AND l.trx_date >= ${lastWeekStart} AND l.trx_date <= ${lastWeekEnd}
+            GROUP BY COALESCE(w.linked_platform, l.category, 'Iklan')
         `,
 
         // Omzet bulan ini (progress target)
