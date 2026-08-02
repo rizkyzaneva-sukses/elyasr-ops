@@ -435,7 +435,7 @@ export async function buildDailyReport(): Promise<string> {
         `📅 ${esc(dateStr)} · ${timeStr} WIB`,
         sep, ``,
 
-        `💰 <b>FINANSIAL</b>`, ``,
+        `💰 <b>OPS — ORDER MASUK</b> <i>(bukan Laba Rugi / pencairan)</i>`, ``,
         `🛒 Order Masuk   · <b>${totalOrder} paket</b>`,
         `💵 Nilai Order   · <b>${fmt(omzetHari)}</b>`, ``,
         `📊 Omset Hari Ini    · <b>${fmt(omzetHari)}</b>`,
@@ -443,9 +443,9 @@ export async function buildDailyReport(): Promise<string> {
         `📆 Omset Bulan Ini   · <b>${fmt(omzetBulan)}</b>`, ``,
         `${trendIcon(omzetHari, omzetKemarin)} vs Kemarin     · <b>${pctChange(omzetHari, omzetKemarin)}</b>  <i>(${fmt(omzetKemarin)})</i>`,
         `${trendIcon(omzetHari, omzetH7)} vs Minggu Lalu · <b>${pctChange(omzetHari, omzetH7)}</b>  <i>(${fmt(omzetH7)})</i>`, ``,
-        `💡 <b>PROFIT HARI INI</b>`,
+        `💡 <b>GROSS PROFIT OPS (estimasi)</b>`,
         `├ HPP        · ${fmt(hppHari)}`,
-        `└ Gross Profit · <b>${fmt(gpHari)}</b> (${marginHari}%)`, ``,
+        `└ GP ops     · <b>${fmt(gpHari)}</b> (${marginHari}%)`, ``,
 
         `🏦 <b>KAS & RUNAY</b>`, ``,
         `💵 Saldo Kas    · <b>${fmt(saldoKas)}</b>`,
@@ -457,7 +457,16 @@ export async function buildDailyReport(): Promise<string> {
 
         `🏪 <b>OMZET PER PLATFORM</b>`,
         platformLines, ``,
-        ...(roasLines ? [`📣 <b>ROAS IKLAN</b>`, roasLines, ``] : []),
+        ...(roasLines ? (() => {
+            const totalAd = adByCat.reduce((s, a) => s + a.total, 0)
+            const adPct = omzetHari > 0 ? ((totalAd / omzetHari) * 100).toFixed(1) : '0'
+            return [
+                `📣 <b>IKLAN &amp; ROAS</b> <i>(% thd omzet ops hari ini)</i>`,
+                `  Total iklan · <b>${fmt(totalAd)}</b> (${adPct}% omzet ops)`,
+                roasLines,
+                ``,
+            ]
+        })() : []),
 
         sep, ``,
         `📦 <b>OPERASIONAL</b>`, ``,

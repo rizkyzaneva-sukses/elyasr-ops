@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError } from '@/lib/utils'
+import { apiSuccess, apiError, wibDateRange } from '@/lib/utils'
 import { getReturnRatioByOrderNo } from '@/lib/pnl-helpers'
 
 export async function GET(request: NextRequest) {
@@ -13,9 +13,13 @@ export async function GET(request: NextRequest) {
   const dateFrom = searchParams.get('dateFrom') || ''
   const dateTo = searchParams.get('dateTo') || ''
   const type = searchParams.get('type') || 'summary'
-  const fromDate = dateFrom ? new Date(dateFrom) : null
-  const toDate = dateTo ? new Date(dateTo) : null
-  if (toDate) toDate.setHours(23, 59, 59, 999)
+  let fromDate: Date | null = null
+  let toDate: Date | null = null
+  if (dateFrom && dateTo) {
+    const r = wibDateRange(dateFrom, dateTo)
+    fromDate = r.fromDate
+    toDate = r.toDate
+  }
 
   if (type === 'summary') {
     // Payout individual (bukan aggregate) — perlu detail per orderNo agar porsi

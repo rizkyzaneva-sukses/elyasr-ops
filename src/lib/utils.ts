@@ -26,6 +26,16 @@ export function todayWIBStr(): string {
   return formatTz(nowWIB(), 'yyyy-MM-dd', { timeZone: WIB })
 }
 
+/** Range tanggal filter keuangan (WIB eksplisit, hindari geser UTC). */
+export function wibDateRange(dateFrom: string, dateTo: string): { fromDate: Date; toDate: Date } {
+  const from = dateFrom.slice(0, 10)
+  const to = dateTo.slice(0, 10)
+  return {
+    fromDate: new Date(`${from}T00:00:00+07:00`),
+    toDate: new Date(`${to}T23:59:59.999+07:00`),
+  }
+}
+
 // ── Format currency (IDR) ──────────────────────────────
 // Parameter `short` dipertahankan agar tidak perlu ubah semua call site,
 // tapi mode singkat DINONAKTIFKAN — semua angka selalu ditampilkan penuh

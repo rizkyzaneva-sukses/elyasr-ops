@@ -155,7 +155,8 @@ export function LaporanTab() {
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
               <h2 className="text-lg font-bold text-white mb-1 text-center">Laporan Laba Rugi</h2>
               <p className="text-sm text-zinc-400 text-center mb-1">{dateFrom} s/d {dateTo}</p>
-              <p className="text-[11px] text-zinc-600 text-center mb-6">Basis kas (cash basis) — berdasarkan tanggal payout cair</p>
+              <p className="text-[11px] text-zinc-600 text-center mb-1">Basis kas — PENJUALAN = order yang <b className="text-zinc-500">dicairkan</b> di periode ini (bukan tanggal order masuk)</p>
+              <p className="text-[11px] text-zinc-600 text-center mb-6">HPP exclude status retur · Bayar Vendor bukan OPEX · Fee platform sudah net di pencairan</p>
               <div className="space-y-4 max-w-3xl mx-auto text-sm">
 
                 {/* ── Pencairan Bersih (basis utama) ── */}
@@ -227,6 +228,13 @@ export function LaporanTab() {
                     <div key={g.group} className="flex justify-between pl-8 text-zinc-400 text-xs mt-1"><span>- {g.group}</span><span>{formatRupiah(g.amount,true)}</span></div>
                   ))}
                 </div>
+
+                {(data.iklanTotal ?? 0) > 0 && (
+                  <div className="flex justify-between pl-4 text-xs text-amber-400/90 -mt-2 mb-1">
+                    <span>↳ di antaranya Iklan</span>
+                    <span>{formatRupiah(data.iklanTotal, true)} ({data.iklanPctPencairan ?? 0}% thd pencairan)</span>
+                  </div>
+                )}
 
                 <div className="flex justify-between pt-4 border-t border-zinc-800 font-bold text-lg text-blue-400">
                   <span>Laba Bersih Operasional</span>

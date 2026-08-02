@@ -4,7 +4,7 @@
  * Schedules:
  * 1. Daily report — jadwal dari DB (default 17:30 WIB)
  * 2. Weekly report — Senin 08:00 WIB (recap minggu lalu)
- * 3. Monthly report — Tanggal 1 jam 09:00 WIB (recap bulan lalu)
+ * 3. Monthly report — Tanggal 2 jam 09:00 WIB (recap Laba Rugi bulan lalu)
  *
  * Fix:
  * - Guard double-send pakai DB (bukan hanya in-memory) → tahan restart container
@@ -156,7 +156,8 @@ export async function register() {
 
         console.log('[weekly-report] 🟢 Scheduler aktif — jadwal dari DB/settings, hari Senin, catch-up window 30 menit')
 
-        // ─── Monthly Report Scheduler — Tanggal 1, 09:00 WIB ─────────────
+        // ─── Monthly Report Scheduler — Tanggal 2, 09:00 WIB ─────────────
+        // tgl 2 agar settlement akhir bulan sempat masuk Laba Rugi kas
         let lastMonthlySent: string | null = null
         let monthlySending = false
 
@@ -166,8 +167,8 @@ export async function register() {
                 const d      = new Date(nowJkt)
                 const today  = d.toLocaleDateString('en-CA')
 
-                // Hanya tanggal 1
-                if (d.getDate() !== 1) return
+                // Hanya tanggal 2 (Laba Rugi bulan sebelumnya)
+                if (d.getDate() !== 2) return
                 if (lastMonthlySent === today) return
                 if (monthlySending) return
 
@@ -183,7 +184,7 @@ export async function register() {
                 }
 
                 monthlySending = true
-                console.log(`[monthly-report] 🚀 ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')} WIB — kirim laporan bulanan...`)
+                console.log(`[monthly-report] 🚀 ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')} WIB — kirim Laba Rugi bulanan...`)
 
                 const report = await buildMonthlyReport()
                 const { sent, failed } = await broadcastTelegramReport(report, 'monthly')
@@ -199,7 +200,7 @@ export async function register() {
             }
         }, { timezone: 'Asia/Jakarta' })
 
-        console.log('[monthly-report] 🟢 Scheduler aktif — Tanggal 1 jam 09:00 WIB, catch-up window 30 menit')
+        console.log('[monthly-report] 🟢 Scheduler aktif — Tanggal 2 jam 09:00 WIB (Laba Rugi kas), catch-up 30 menit')
 
     } catch (err) {
         console.error('[instrumentation] ❌ Gagal start scheduler:', err)

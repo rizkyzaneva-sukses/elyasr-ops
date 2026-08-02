@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError } from '@/lib/utils'
+import { apiSuccess, apiError, wibDateRange } from '@/lib/utils'
 
 // GET /api/reports/cash-flow?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD
 export async function GET(request: NextRequest) {
@@ -14,9 +14,7 @@ export async function GET(request: NextRequest) {
   const dateTo = searchParams.get('dateTo')
   if (!dateFrom || !dateTo) return apiError('dateFrom dan dateTo wajib diisi')
 
-  const fromDate = new Date(dateFrom)
-  const toDate = new Date(dateTo)
-  toDate.setHours(23, 59, 59, 999)
+  const { fromDate, toDate } = wibDateRange(dateFrom, dateTo)
 
   const prevDate = new Date(fromDate)
   prevDate.setMilliseconds(-1)

@@ -1,12 +1,10 @@
 /**
- * Monthly report builder — laporan komprehensif bulan lalu.
- * Dikirim setiap tanggal 1 pagi (recap bulan sebelumnya).
- *
- * Mencakup: P&L summary, top/bottom products, growth metrics,
- * outstanding utang/piutang, dan ringkasan operasional.
+ * Monthly report — Laba Rugi basis kas (pencairan) + cuplikan ops.
+ * Dikirim setiap tanggal 2 pagi (recap bulan sebelumnya).
  */
 
 import { prisma } from '@/lib/prisma'
+import { computeProfitLoss } from '@/lib/pnl-helpers'
 
 function fmt(n: number): string {
     return 'Rp ' + Math.round(n || 0).toLocaleString('id-ID')
@@ -35,12 +33,10 @@ function getPrevMonthRange(): { start: string; end: string; label: string; prevS
     const today = todayWIBStr()
     const [yearStr, monthStr] = today.split('-')
     let year = parseInt(yearStr)
-    let month = parseInt(monthStr) // 1-12, current month
-    // bulan lalu
+    let month = parseInt(monthStr)
     let lastMonth = month - 1
     let lastYear = year
     if (lastMonth === 0) { lastMonth = 12; lastYear = year - 1 }
-    // bulan sebelum bulan lalu (untuk perbandingan)
     let prevMonth = lastMonth - 1
     let prevYear = lastYear
     if (prevMonth === 0) { prevMonth = 12; prevYear = lastYear - 1 }
@@ -50,7 +46,6 @@ function getPrevMonthRange(): { start: string; end: string; label: string; prevS
     const lastMonthStr = String(lastMonth).padStart(2, '0')
     const prevMonthStr = String(prevMonth).padStart(2, '0')
 
-    // Last day of last month
     const lastDay = new Date(lastYear, lastMonth, 0).getDate()
     const prevLastDay = new Date(prevYear, prevMonth, 0).getDate()
 
@@ -67,11 +62,13 @@ function getPrevMonthRange(): { start: string; end: string; label: string; prevS
 export async function buildMonthlyReport(): Promise<string> {
     const r = getPrevMonthRange()
     const monthStart = new Date(`${r.start}T00:00:00+07:00`)
-    const monthEnd = new Date(`${r.end}T23:59:59+07:00`)
+    const monthEnd = new Date(`${r.end}T23:59:59.999+07:00`)
     const prevMonthStart = new Date(`${r.prevStart}T00:00:00+07:00`)
-    const prevMonthEnd = new Date(`${r.prevEnd}T23:59:59+07:00`)
+    const prevMonthEnd = new Date(`${r.prevEnd}T23:59:59.999+07:00`)
 
     const [
+        pl,
+        plPrev,
         monthStats,
         prevMonthStats,
         topProducts,
@@ -79,18 +76,18 @@ export async function buildMonthlyReport(): Promise<string> {
         platformBreakdown,
         platformBreakdownPrev,
         expenseBreakdown,
-        payoutSummary,
         utangPiutang,
         topCities,
     ] = await Promise.all([
-        // Bulan lalu — order stats
+        computeProfitLoss(monthStart, monthEnd),
+        computeProfitLoss(prevMonthStart, prevMonthEnd),
         prisma.$queryRaw<any[]>`
             SELECT
                 CASE
                     WHEN status ILIKE '%batal%' OR status ILIKE '%cancel%' OR status ILIKE '%dibatalkan%' THEN 'batal'
                     ELSE 'valid'
                 END AS grp,
-                COUNT(*)::int AS cnt,
+                COUNT(DISTINCT order_no)::int AS cnt,
                 SUM(qty)::int AS total_qty,
                 COALESCE(SUM(real_omzet), 0)::bigint AS total_omzet,
                 COALESCE(SUM(hpp * qty), 0)::bigint AS total_hpp
@@ -98,21 +95,19 @@ export async function buildMonthlyReport(): Promise<string> {
             WHERE trx_date >= ${monthStart} AND trx_date <= ${monthEnd}
             GROUP BY grp
         `,
-        // Bulan sebelumnya
         prisma.$queryRaw<any[]>`
             SELECT
                 CASE
                     WHEN status ILIKE '%batal%' OR status ILIKE '%cancel%' OR status ILIKE '%dibatalkan%' THEN 'batal'
                     ELSE 'valid'
                 END AS grp,
-                COUNT(*)::int AS cnt,
+                COUNT(DISTINCT order_no)::int AS cnt,
                 COALESCE(SUM(real_omzet), 0)::bigint AS total_omzet,
                 COALESCE(SUM(hpp * qty), 0)::bigint AS total_hpp
             FROM orders
             WHERE trx_date >= ${prevMonthStart} AND trx_date <= ${prevMonthEnd}
             GROUP BY grp
         `,
-        // Top 10 produk
         prisma.$queryRaw<any[]>`
             SELECT
                 COALESCE(product_name, sku, '-') AS product_name,
@@ -127,7 +122,6 @@ export async function buildMonthlyReport(): Promise<string> {
             ORDER BY total_qty DESC
             LIMIT 10
         `,
-        // Bottom 5 produk dari yang ada penjualan (dead-ish)
         prisma.$queryRaw<any[]>`
             SELECT
                 COALESCE(product_name, sku, '-') AS product_name,
@@ -142,11 +136,10 @@ export async function buildMonthlyReport(): Promise<string> {
             ORDER BY total_qty ASC
             LIMIT 5
         `,
-        // Platform breakdown
         prisma.$queryRaw<any[]>`
             SELECT
                 COALESCE(platform, 'Unknown') AS platform,
-                COUNT(*)::int AS cnt,
+                COUNT(DISTINCT order_no)::int AS cnt,
                 COALESCE(SUM(real_omzet), 0)::bigint AS total_omzet
             FROM orders
             WHERE trx_date >= ${monthStart} AND trx_date <= ${monthEnd}
@@ -167,7 +160,7 @@ export async function buildMonthlyReport(): Promise<string> {
               AND status NOT ILIKE '%dibatalkan%'
             GROUP BY platform
         `,
-        // Expense breakdown bulan lalu
+        // OPEX breakdown — exclude Bayar Vendor (bukan OPEX, sudah di HPP)
         prisma.$queryRaw<any[]>`
             SELECT
                 COALESCE(category, '(Tanpa Kategori)') AS category,
@@ -176,21 +169,11 @@ export async function buildMonthlyReport(): Promise<string> {
             WHERE trx_type = 'EXPENSE'
               AND trx_date >= ${monthStart}
               AND trx_date <= ${monthEnd}
+              AND (category IS NULL OR category NOT ILIKE 'Bayar Vendor%')
             GROUP BY category
             ORDER BY total_amount DESC
             LIMIT 8
         `,
-        // Payout summary
-        prisma.$queryRaw<any[]>`
-            SELECT
-                COALESCE(SUM(omzet), 0)::bigint AS total_omzet,
-                COALESCE(SUM(platform_fee + ams_fee + platform_fee_other + beban_ongkir), 0)::bigint AS total_fees,
-                COALESCE(SUM(total_income), 0)::bigint AS total_income,
-                COUNT(*)::int AS payout_count
-            FROM payouts
-            WHERE released_date >= ${monthStart} AND released_date <= ${monthEnd}
-        `,
-        // Utang piutang
         prisma.$queryRaw<any[]>`
             SELECT
                 'utang' AS kind,
@@ -206,11 +189,10 @@ export async function buildMonthlyReport(): Promise<string> {
             FROM piutangs
             WHERE status IN ('OUTSTANDING', 'PARTIAL')
         `,
-        // Top 5 cities
         prisma.$queryRaw<any[]>`
             SELECT
                 COALESCE(NULLIF(TRIM(city), ''), '(Tidak Diketahui)') AS city,
-                COUNT(*)::int AS order_count,
+                COUNT(DISTINCT order_no)::int AS order_count,
                 COALESCE(SUM(real_omzet), 0)::bigint AS total_omzet
             FROM orders
             WHERE trx_date >= ${monthStart} AND trx_date <= ${monthEnd}
@@ -223,19 +205,18 @@ export async function buildMonthlyReport(): Promise<string> {
         `,
     ])
 
-    // Hitung
     const mMap = Object.fromEntries(monthStats.map((row: any) => [
         row.grp,
         { cnt: Number(row.cnt), qty: Number(row.total_qty || 0), omzet: Number(row.total_omzet), hpp: Number(row.total_hpp) }
     ]))
     const mValid = mMap['valid'] ?? { cnt: 0, qty: 0, omzet: 0, hpp: 0 }
     const mBatal = mMap['batal'] ?? { cnt: 0, qty: 0, omzet: 0, hpp: 0 }
-    const omzet = mValid.omzet
-    const hpp = mValid.hpp
-    const gp = omzet - hpp
-    const margin = omzet > 0 ? ((gp / omzet) * 100).toFixed(1) : '0'
+    const omzetOps = mValid.omzet
+    const hppOps = mValid.hpp
+    const gpOps = omzetOps - hppOps
+    const marginOps = omzetOps > 0 ? ((gpOps / omzetOps) * 100).toFixed(1) : '0'
     const totalOrder = mValid.cnt + mBatal.cnt
-    const aov = mValid.cnt > 0 ? omzet / mValid.cnt : 0
+    const aov = mValid.cnt > 0 ? omzetOps / mValid.cnt : 0
 
     const pmMap = Object.fromEntries(prevMonthStats.map((row: any) => [
         row.grp,
@@ -243,22 +224,17 @@ export async function buildMonthlyReport(): Promise<string> {
     ]))
     const pmValid = pmMap['valid'] ?? { cnt: 0, omzet: 0, hpp: 0 }
     const pmOmzet = pmValid.omzet
-    const pmGp = pmValid.omzet - pmValid.hpp
 
     const pmPlatformMap = Object.fromEntries(
         platformBreakdownPrev.map((row: any) => [row.platform, Number(row.total_omzet)])
     )
 
     const expenseTotal = expenseBreakdown.reduce((s: number, row: any) => s + Number(row.total_amount), 0)
-    const netProfit = gp - expenseTotal // operating profit estimate
-
-    const payout = payoutSummary[0] || { total_omzet: 0, total_fees: 0, total_income: 0, payout_count: 0 }
 
     const upMap = Object.fromEntries(utangPiutang.map((row: any) => [row.kind, { cnt: Number(row.cnt), total: Number(row.total) }]))
     const utangData = upMap['utang'] ?? { cnt: 0, total: 0 }
     const piutangData = upMap['piutang'] ?? { cnt: 0, total: 0 }
 
-    // Format
     const sep = '━━━━━━━━━━━━━━━━━━━━━━━'
     const medalEmoji = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
 
@@ -279,7 +255,7 @@ export async function buildMonthlyReport(): Promise<string> {
         : platformBreakdown.map((p: any) => {
             const cur = Number(p.total_omzet)
             const prev = pmPlatformMap[p.platform] ?? 0
-            const share = omzet > 0 ? ((cur / omzet) * 100).toFixed(1) : '0'
+            const share = omzetOps > 0 ? ((cur / omzetOps) * 100).toFixed(1) : '0'
             return `  ▪️ ${esc(p.platform)} — <b>${fmt(cur)}</b> (${share}%) ${trendIcon(cur, prev)} ${pctChange(cur, prev)}`
           }).join('\n')
 
@@ -297,51 +273,57 @@ export async function buildMonthlyReport(): Promise<string> {
             `  ${medalEmoji[i] ?? '▪️'} ${esc(c.city)} — <b>${Number(c.order_count)} order</b> (${fmt(Number(c.total_omzet))})`
           ).join('\n')
 
+    const plMargin = pl.pencairanBersih > 0
+        ? ((pl.labaKotor / pl.pencairanBersih) * 100).toFixed(1)
+        : '0'
+
     const lines = [
         `📊 <b>LAPORAN BULANAN — ELYASR</b>`,
         `🗓️ ${esc(r.label)} (vs ${esc(r.prevLabel)})`,
+        `📌 <i>Laba Rugi = basis pencairan · Ops = order masuk</i>`,
         sep, ``,
 
-        `💰 <b>P&amp;L SUMMARY</b>`, ``,
-        `🛒 Total Order  · <b>${totalOrder} paket</b> (valid: ${mValid.cnt}, batal: ${mBatal.cnt})`,
-        `📦 Total Qty     · <b>${mValid.qty} pcs</b>`,
-        `💵 Omzet         · <b>${fmt(omzet)}</b>`,
-        `🏷️ HPP            · ${fmt(hpp)}`,
-        `💎 Gross Profit · <b>${fmt(gp)}</b> (${margin}%)`,
-        `📊 AOV           · ${fmt(aov)}`, ``,
+        `💰 <b>LABA RUGI (basis pencairan)</b>`, ``,
+        `💵 Pencairan Bersih · <b>${fmt(pl.pencairanBersih)}</b>  <i>(${pl.totalOrdersPaid} order cair)</i>`,
+        `🏷️ HPP (order cair, non-retur) · ${fmt(pl.hpp)}`,
+        `💎 Laba Kotor     · <b>${fmt(pl.labaKotor)}</b> (${plMargin}%)`,
+        `💸 Beban OPEX     · <b>${fmt(pl.bebanOperasional)}</b>`,
+        `📣 Iklan (bagian OPEX) · ${fmt(pl.iklanTotal)}  <b>(${pl.iklanPctPencairan}% thd pencairan)</b>`,
+        `📈 Laba Bersih Ops · <b>${fmt(pl.labaBersihOperasional)}</b>`,
+        `➕ Pendapatan lain · ${fmt(pl.otherIncome)}`,
+        `✅ <b>LABA BERSIH · ${fmt(pl.labaBersih)}</b>`,
+        pl.totalBayarVendor > 0
+            ? `ℹ️ Bayar Vendor · ${fmt(pl.totalBayarVendor)} <i>(bukan OPEX — sudah di HPP)</i>`
+            : '',
+        ``,
 
-        `💸 <b>OPERATING EXPENSE</b>`,
-        `  Total Expense · <b>${fmt(expenseTotal)}</b>`,
-        `  Net (GP - Exp) · <b>${fmt(netProfit)}</b>`, ``,
-
-        `📈 <b>GROWTH vs ${esc(r.prevLabel)}</b>`,
-        `${trendIcon(omzet, pmOmzet)} Omzet         · <b>${pctChange(omzet, pmOmzet)}</b>  <i>(${fmt(pmOmzet)})</i>`,
-        `${trendIcon(gp, pmGp)} Gross Profit · <b>${pctChange(gp, pmGp)}</b>  <i>(${fmt(pmGp)})</i>`,
-        `${trendIcon(mValid.cnt, pmValid.cnt)} Order Valid · <b>${pctChange(mValid.cnt, pmValid.cnt)}</b>  <i>(${pmValid.cnt})</i>`, ``,
+        `📈 <b>GROWTH LABA RUGI vs ${esc(r.prevLabel)}</b>`,
+        `${trendIcon(pl.pencairanBersih, plPrev.pencairanBersih)} Pencairan · <b>${pctChange(pl.pencairanBersih, plPrev.pencairanBersih)}</b>  <i>(${fmt(plPrev.pencairanBersih)})</i>`,
+        `${trendIcon(pl.labaBersih, plPrev.labaBersih)} Laba Bersih · <b>${pctChange(pl.labaBersih, plPrev.labaBersih)}</b>  <i>(${fmt(plPrev.labaBersih)})</i>`, ``,
 
         sep, ``,
-        `🏪 <b>OMZET PER PLATFORM</b>`,
+        `🛒 <b>CUPLIKAN OPS (order masuk · trx_date)</b>`,
+        `  Order  · <b>${totalOrder} paket</b> (valid: ${mValid.cnt}, batal: ${mBatal.cnt})`,
+        `  Qty    · <b>${mValid.qty} pcs</b>`,
+        `  Omzet ops · <b>${fmt(omzetOps)}</b>  ${trendIcon(omzetOps, pmOmzet)} ${pctChange(omzetOps, pmOmzet)}`,
+        `  GP ops · ${fmt(gpOps)} (${marginOps}%) · AOV ${fmt(aov)}`, ``,
+
+        sep, ``,
+        `🏪 <b>OMZET OPS PER PLATFORM</b>`,
         platformLines, ``,
 
         sep, ``,
-        `💰 <b>PAYOUT MARKETPLACE</b>`,
-        `  Payout count · <b>${Number(payout.payout_count)}</b>`,
-        `  Gross omzet  · ${fmt(Number(payout.total_omzet))}`,
-        `  Fees & ongkir · ${fmt(Number(payout.total_fees))}`,
-        `  Net income   · <b>${fmt(Number(payout.total_income))}</b>`, ``,
-
-        sep, ``,
-        `🏆 <b>TOP 10 PRODUK</b>`,
+        `🏆 <b>TOP 10 PRODUK (ops)</b>`,
         topProductLines, ``,
-        `🐢 <b>5 PRODUK TER-LAMBAT (yang ada penjualan)</b>`,
+        `🔻 <b>5 PRODUK TER-LAMBAT</b>`,
         bottomProductLines, ``,
 
         sep, ``,
-        `📍 <b>TOP 5 KOTA</b>`,
+        `📍 <b>TOP 5 KOTA (ops)</b>`,
         cityLines, ``,
 
         sep, ``,
-        `💼 <b>BREAKDOWN PENGELUARAN</b>`,
+        `💼 <b>BREAKDOWN OPEX (tanpa Bayar Vendor)</b>`,
         expenseLines, ``,
 
         sep, ``,
@@ -351,8 +333,8 @@ export async function buildMonthlyReport(): Promise<string> {
         `  ⚖️ Net Position · <b>${fmt(piutangData.total - utangData.total)}</b>`, ``,
 
         sep,
-        `🤖 <i>Auto monthly report · Elyasr Ops</i>`,
-    ]
+        `🤖 <i>Auto monthly · tgl 2 · Laba Rugi kas · Elyasr Ops</i>`,
+    ].filter(line => line !== '')
 
     return lines.join('\n')
 }

@@ -421,7 +421,7 @@ export async function POST(request: NextRequest) {
   })
   const existingSet = new Set(existingPayouts.map(e => e.orderNo))
 
-  // ── Pre-fetch matching orders for orderId link + trxDate update ─────
+  // Pre-fetch matching orders for orderId link (trx_date tidak diubah)
   const existingOrders = await prisma.order.findMany({
     where: { orderNo: { in: allOrderNos } },
     select: { id: true, orderNo: true },
@@ -431,8 +431,9 @@ export async function POST(request: NextRequest) {
 
   const allPayoutInserts: any[] = []
   const allLedgerInserts: any[] = []
-  // Map orderNo → releasedDate, to patch orders.trx_date after insert
-  const orderDateUpdates: { orderNo: string; releasedDate: Date }[] = []
+  // JANGAN overwrite orders.trx_date dengan releasedDate —
+  // trx_date = tanggal order masuk (ops); cair hanya di payouts.released_date
+  let netZeroCount = 0
   const seenOrderNos = new Set<string>()
 
   // Process rows
@@ -459,7 +460,8 @@ export async function POST(request: NextRequest) {
       }
       const settlement = calc.yangDiterima
 
-      if (settlement === 0) { returCount++; continue }
+      // Net 0: fee/promo offset penuh — bukan otomatis retur fisik; skip dari total cair
+      if (settlement === 0) { netZeroCount++; continue }
       if (settlement < 0) {
         bebanCount++
         totalBeban += settlement
@@ -517,10 +519,6 @@ export async function POST(request: NextRequest) {
         createdBy:        session.username,
         orderId:          orderIdMap.get(orderNo) ?? null,
       })
-      // Track for trxDate update
-      if (orderIdMap.has(orderNo)) {
-        orderDateUpdates.push({ orderNo, releasedDate })
-      }
       allLedgerInserts.push({
         walletId,
         trxDate:  releasedDate,
@@ -555,10 +553,9 @@ export async function POST(request: NextRequest) {
       }
       const settlement = calc.yangDiterima
 
-      // settlement === 0: order processed but net = 0 (fully offset by fees/promos)
-      // Report as invalid so user can investigate — don't silently count as "retur"
+      // settlement === 0: net nol (fee/promo offset) — bukan retur fisik; skip total cair
       if (settlement === 0) {
-        returCount++
+        netZeroCount++
         continue
       }
       // TikTok: transaksi negatif MENGURANGI total pencairan (saling mengurangi dengan order positif)
@@ -621,10 +618,6 @@ export async function POST(request: NextRequest) {
         createdBy:        session.username,
         orderId:          orderIdMap.get(orderNo) ?? null,
       })
-      // Track for trxDate update
-      if (orderIdMap.has(orderNo)) {
-        orderDateUpdates.push({ orderNo, releasedDate })
-      }
       allLedgerInserts.push({
         walletId,
         trxDate:  releasedDate,
@@ -649,6 +642,7 @@ export async function POST(request: NextRequest) {
     totalBarisData:      filteredRows.length,
     normal:              normalCount,
     retur:               returCount,
+    netZero:             netZeroCount,
     bebanOngkir:         bebanCount,
     duplikat:            duplikatCount,
     totalMasuk:          Math.round(totalMasuk),
@@ -685,22 +679,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // ── Sync trx_date on matched orders ────────────────────────────────────
-  // Update orders.trx_date = payout.releasedDate for every matched order
-  if (orderDateUpdates.length > 0) {
-    const UPDATE_CHUNK = 100
-    for (let i = 0; i < orderDateUpdates.length; i += UPDATE_CHUNK) {
-      const chunk = orderDateUpdates.slice(i, i + UPDATE_CHUNK)
-      await Promise.all(
-        chunk.map(({ orderNo, releasedDate }) =>
-          prisma.order.updateMany({
-            where: { orderNo },
-            data: { trxDate: releasedDate },
-          })
-        )
-      )
-    }
-  }
+  // orders.trx_date TIDAK diubah — tanggal cair hanya di payouts.released_date
 
   return apiSuccess({ isPreview: false, ...summaryResult }, 201)
 }

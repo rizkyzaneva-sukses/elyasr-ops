@@ -147,7 +147,7 @@ const OWNER_SECRET_FEATURES: OwnerSecretFeature[] = [
     details: [
       'Platform fee: Shopee %, TikTok % (otomatis hitung net omzet)',
       'Telegram bot config: chat ID, thread ID, schedule laporan',
-      'Report frequency: daily 14:00, weekly Senin 08:00, monthly tgl 1',
+      'Report frequency: daily (jadwal DB), weekly Senin, monthly tgl 2 09:00 (Laba Rugi kas)',
       'Master categories: expense categories untuk profit calculation',
       'ROP (Reorder Point): minimum stok default per kategori',
       'HPP default: untuk produk baru',
@@ -888,12 +888,114 @@ function WorkflowCard({ step, index }: { step: WorkflowStep; index: number }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+const FAQ_ITEMS: { q: string; a: string[] }[] = [
+  {
+    q: 'Apa beda Omzet Ops vs Laba Rugi (PENJUALAN)?',
+    a: [
+      'Omzet Ops (Telegram harian/mingguan, dashboard): order masuk berdasarkan trx_date / tanggal order — estimasi real_omzet.',
+      'Laba Rugi PENJUALAN: order yang DICAIRKAN di periode itu (payouts.released_date), pakai totalIncome aktual marketplace.',
+      'Contoh: order Juni yang cair Juli masuk Laba Rugi Juli, bukan Juni.',
+    ],
+  },
+  {
+    q: 'Kapan HPP dihitung di Laba Rugi?',
+    a: [
+      'HPP dihitung dari orderNos yang punya payout cair di periode Laba Rugi.',
+      'Baris order berstatus RETUR / return / dikembalikan dikeluarkan dari HPP (stok kembali gudang).',
+      'Retur sebelum diterima konsumen biasanya tidak masuk settlement → tidak masuk pencairan & tidak pakai HPP di L/R.',
+      'Retur setelah diterima: fee/ongkir retur sudah net di settlement (bisa minus); HPP tidak dihitung karena status retur.',
+    ],
+  },
+  {
+    q: 'Settlement negatif vs settlement 0?',
+    a: [
+      'Settlement < 0: masuk payout negatif, mengurangi total pencairan & saldo wallet. Bisa retur fee, adjustment, claim.',
+      'HPP hanya dibalik/dikeluarkan jika status order = retur (stok kembali), bukan otomatis setiap settlement negatif.',
+      'Settlement = 0: net nol (fee/promo offset). Dilewati dari total cair; BUKAN otomatis berarti retur fisik.',
+    ],
+  },
+  {
+    q: 'Fee platform & retur double-count?',
+    a: [
+      'Tidak. Fee komisi/AMS sudah ter-net di totalIncome (pencairan bersih). Di L/R baris fee hanya info.',
+      'Biaya retur platform ikut mengurangi settlement — jangan catat lagi sebagai OPEX terpisah.',
+    ],
+  },
+  {
+    q: 'Bayar Vendor masuk OPEX?',
+    a: [
+      'Tidak. HPP sudah membebankan harga pokok per transaksi. Bayar vendor = pelunasan hutang dagang (arus kas).',
+      'Di Laba Rugi & Telegram bulanan, Bayar Vendor ditampilkan sebagai info saja, tidak mengurangi laba.',
+    ],
+  },
+  {
+    q: 'Iklan bagaimana dihitung?',
+    a: [
+      'Laba Rugi: iklan = bagian OPEX (kategori EXPENSE mengandung iklan/ads/sample). Ditampilkan juga % thd pencairan.',
+      'Telegram harian: % iklan thd omzet ops hari itu + ROAS per platform.',
+      'Pakai kategori ledger yang jelas (mengandung "iklan" / "ads") agar terdeteksi konsisten.',
+    ],
+  },
+  {
+    q: 'Tanggal order: masuk, kirim, cair, retur',
+    a: [
+      'trx_date order = tanggal order masuk (ops). TIDAK diganti saat import payout.',
+      'Tanggal cair = payouts.released_date — hanya untuk Laba Rugi & ringkasan payout.',
+      'Status retur di order menentukan HPP keluar dari L/R; rekap retur stok di modul retur/status order.',
+    ],
+  },
+  {
+    q: 'Jadwal Telegram bulanan',
+    a: [
+      'Otomatis setiap tanggal 2 jam 09:00 WIB — Laba Rugi kas bulan sebelumnya + cuplikan ops.',
+      'Test manual: Owner Room → Telegram section (tombol test / menu bot Laporan Bulanan).',
+      'Harian & mingguan tetap basis order masuk (ops), bukan pencairan.',
+    ],
+  },
+]
+
+function FaqSection() {
+  const [openIdx, setOpenIdx] = useState<number | null>(0)
+  return (
+    <div className="space-y-2 max-w-3xl">
+      <p className="text-sm text-zinc-400 mb-4">
+        Definisi perhitungan profit, retur, HPP, iklan, dan tanggal — agar angka Laba Rugi & Telegram tidak salah dibaca.
+      </p>
+      {FAQ_ITEMS.map((item, i) => {
+        const open = openIdx === i
+        return (
+          <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setOpenIdx(open ? null : i)}
+              className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-zinc-800/50"
+            >
+              <span className="text-sm font-semibold text-zinc-200">{item.q}</span>
+              {open ? <ChevronDown size={14} className="text-zinc-500 shrink-0" /> : <ChevronRight size={14} className="text-zinc-600 shrink-0" />}
+            </button>
+            {open && (
+              <ul className="px-4 pb-4 space-y-2 border-t border-zinc-800/60 pt-3">
+                {item.a.map((line, j) => (
+                  <li key={j} className="text-sm text-zinc-400 flex items-start gap-2">
+                    <Info size={12} className="text-emerald-500 shrink-0 mt-1" />
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function DocumentationPage() {
-  const [activeRole, setActiveRole] = useState<RoleKey>('OWNER')
+  const [activeRole, setActiveRole] = useState<RoleKey | 'FAQ'>('OWNER')
   const [showOwnerSecrets, setShowOwnerSecrets] = useState(false)
   const [userRole, setUserRole] = useState<RoleKey | null>(null)
   const { user } = useAuth()
-  const role = ROLES.find(r => r.key === activeRole)!
+  const role = activeRole === 'FAQ' ? null : ROLES.find(r => r.key === activeRole)!
 
   useEffect(() => {
     setUserRole(user?.userRole ?? null)
@@ -914,7 +1016,7 @@ export default function DocumentationPage() {
       </div>
 
       {/* Role Tab Selector */}
-      <div className="flex gap-1.5 mb-6 bg-zinc-900/60 border border-zinc-800 rounded-xl p-1.5 w-fit">
+      <div className="flex gap-1.5 mb-6 bg-zinc-900/60 border border-zinc-800 rounded-xl p-1.5 w-fit flex-wrap">
         {ROLES.map(r => (
           <button
             key={r.key}
@@ -928,12 +1030,33 @@ export default function DocumentationPage() {
             {r.label}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => setActiveRole('FAQ')}
+          className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+            activeRole === 'FAQ'
+              ? 'bg-amber-900/30 text-amber-400 border border-amber-800/50 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60'
+          }`}
+        >
+          FAQ
+        </button>
       </div>
 
+      {activeRole === 'FAQ' ? (
+        <div className="mb-10">
+          <div className="flex items-center gap-2 mb-4">
+            <Lightbulb size={14} className="text-amber-500" />
+            <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">FAQ Perhitungan &amp; Profit</h2>
+          </div>
+          <FaqSection />
+        </div>
+      ) : role && (
+      <>
       {/* Role Hero */}
       <div className={`${role.bg} border ${role.border} rounded-2xl p-6 mb-6`}>
         <div className="flex items-start gap-4">
-          <div className={`px-3 py-1.5 rounded-lg border ${ROLE_BADGE[activeRole]} text-sm font-bold shrink-0`}>
+          <div className={`px-3 py-1.5 rounded-lg border ${ROLE_BADGE[activeRole as RoleKey]} text-sm font-bold shrink-0`}>
             {role.label.toUpperCase()}
           </div>
           <div>
@@ -1094,10 +1217,12 @@ export default function DocumentationPage() {
           )}
         </div>
       )}
+      </>
+      )}
 
       {/* Footer */}
       <div className="mt-10 pt-6 border-t border-zinc-800 flex items-center justify-between">
-        <p className="text-xs text-zinc-600">ELYASR Management System · Panduan diperbarui 17 Juni 2026 · {userRole === 'OWNER' && <span className="text-emerald-600">✓ Owner Access</span>}</p>
+        <p className="text-xs text-zinc-600">ELYASR Management System · Panduan diperbarui 02 Agu 2026 · {userRole === 'OWNER' && <span className="text-emerald-600">✓ Owner Access</span>}</p>
         <div className="flex gap-2">
           {ROLES.map(r => (
             <span key={r.key} className={`text-[10px] font-bold px-2 py-0.5 rounded border ${ROLE_BADGE[r.key]}`}>

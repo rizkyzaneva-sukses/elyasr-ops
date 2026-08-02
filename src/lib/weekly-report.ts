@@ -435,11 +435,11 @@ export async function buildWeeklyReport(): Promise<string> {
         `🗓️ ${esc(periodLabel)} (vs ${esc(prevPeriodLabel)})`,
         sep, ``,
 
-        `💰 <b>FINANSIAL MINGGU LALU</b>`, ``,
+        `💰 <b>OPS — ORDER MASUK (minggu lalu)</b> <i>(bukan Laba Rugi / pencairan)</i>`, ``,
         `🛒 Total Order  · <b>${lwTotalOrder} paket</b> (valid: ${lwValid.cnt}, batal: ${lwBatal.cnt})`,
         `💵 Omzet         · <b>${fmt(lwOmzet)}</b>`,
         `🏷️ HPP            · ${fmt(lwHpp)}`,
-        `💎 Gross Profit · <b>${fmt(lwGp)}</b> (${lwMargin}%)`, ``,
+        `💎 GP ops (estimasi) · <b>${fmt(lwGp)}</b> (${lwMargin}%)`, ``,
 
         `🏦 <b>KAS & RUNWAY</b>`, ``,
         `💵 Saldo Kas    · <b>${fmt(saldoKas)}</b>`,
@@ -453,7 +453,7 @@ export async function buildWeeklyReport(): Promise<string> {
         `${trendIcon(lwValid.cnt, pwValid.cnt)} Order Valid · <b>${pctChange(lwValid.cnt, pwValid.cnt)}</b>  <i>(${pwValid.cnt})</i>`, ``,
 
         sep, ``,
-        `🏪 <b>OMZET PER PLATFORM</b>`,
+        `🏪 <b>OMZET OPS PER PLATFORM</b>`,
         platformLines, ``,
         ...(roasLines ? [`📣 <b>ROAS IKLAN (MINGGU LALU)</b>`, roasLines, ``] : []),
 
