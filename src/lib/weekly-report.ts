@@ -457,7 +457,16 @@ export async function buildWeeklyReport(): Promise<string> {
         sep, ``,
         `🏪 <b>OMZET OPS PER PLATFORM</b>`,
         platformLines, ``,
-        ...(roasLines ? [`📣 <b>ROAS IKLAN (MINGGU LALU)</b>`, roasLines, ``] : []),
+        ...(roasLines ? (() => {
+            const totalAd = (adSpendRows as any[]).reduce((s: number, a: any) => s + Number(a.total), 0)
+            const adPct = lwOmzet > 0 ? ((totalAd / lwOmzet) * 100).toFixed(1) : '0'
+            return [
+                `📣 <b>IKLAN &amp; ROAS (MINGGU LALU)</b> <i>(% thd omzet ops)</i>`,
+                `  Total iklan · <b>${fmt(totalAd)}</b> (${adPct}% omzet ops)`,
+                roasLines,
+                ``,
+            ]
+        })() : []),
 
         sep, ``,
         `🏆 <b>TOP 10 PRODUK MINGGU LALU</b>`,

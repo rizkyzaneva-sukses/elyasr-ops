@@ -3,7 +3,7 @@
 import { AppLayout } from '@/components/layout/app-layout'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Suspense } from 'react'
-import { Wallet, BarChart3, Package, Database, TrendingUp, CreditCard, Megaphone } from 'lucide-react'
+import { Wallet, BarChart3, Package, Database, TrendingUp, CreditCard, Megaphone, Wrench } from 'lucide-react'
 import { WalletTab }    from './_tabs/wallet'
 import { AsetTetapTab } from './_tabs/aset-tetap'
 import { ModalAwalTab } from './_tabs/modal-awal'
@@ -11,6 +11,7 @@ import { PayoutTab }    from './_tabs/payout'
 import { UtangTab }     from './_tabs/utang-piutang'
 import { LaporanTab }   from './_tabs/laporan'
 import { IklanTab }     from './_tabs/iklan'
+import { ToolsTab }     from './_tabs/tools'
 
 const TABS = [
   { key: 'wallet',  label: 'Wallet & Ledger', icon: Wallet,     roles: ['OWNER','FINANCE'] },
@@ -20,6 +21,7 @@ const TABS = [
   { key: 'payout',  label: 'Payout',          icon: TrendingUp, roles: ['OWNER','FINANCE'] },
   { key: 'utang',   label: 'Utang & Piutang', icon: CreditCard, roles: ['OWNER','FINANCE'] },
   { key: 'laporan', label: 'Laporan',         icon: BarChart3,  roles: ['OWNER','FINANCE'] },
+  { key: 'tools',   label: 'Tools Finance',   icon: Wrench,     roles: ['OWNER','FINANCE'] },
 ] as const
 
 type TabKey = typeof TABS[number]['key']
@@ -70,6 +72,7 @@ function FinanceContent() {
       {activeTab === 'payout'  && <PayoutTab />}
       {activeTab === 'utang'   && <UtangTab />}
       {activeTab === 'laporan' && <LaporanTab />}
+      {activeTab === 'tools'   && <ToolsTab />}
     </AppLayout>
   )
 }

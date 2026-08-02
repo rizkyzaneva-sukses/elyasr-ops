@@ -99,15 +99,65 @@ export const GET = withFinance(async (session) => {
   const overdue48h = orderOverdue.filter(o => o.hoursPending > 48)
   const overdue24h = orderOverdue.filter(o => o.hoursPending > 24)
 
+  // Iklan: % spend 3 hari terakhir vs omzet ops 3 hari + ROAS rendah
+  const threeDaysAgo = new Date()
+  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
+  const todayEnd = new Date()
+
+  const [ads3d, omzet3d] = await Promise.all([
+    prisma.$queryRaw<{ total: bigint }[]>`
+      SELECT COALESCE(SUM(ABS(l.amount)), 0)::bigint AS total
+      FROM wallet_ledger l
+      JOIN wallets w ON w.id = l.wallet_id
+      WHERE w.is_ads_budget = true
+        AND l.trx_type = 'EXPENSE'
+        AND l.trx_date >= ${threeDaysAgo}
+        AND l.trx_date <= ${todayEnd}
+    `,
+    prisma.$queryRaw<{ total: bigint }[]>`
+      SELECT COALESCE(SUM(real_omzet), 0)::bigint AS total
+      FROM orders
+      WHERE trx_date >= ${threeDaysAgo}
+        AND trx_date <= ${todayEnd}
+        AND status NOT ILIKE '%batal%'
+        AND status NOT ILIKE '%cancel%'
+        AND status NOT ILIKE '%dibatalkan%'
+    `,
+  ])
+
+  const adSpend3d = Number(ads3d[0]?.total ?? 0)
+  const omzetOps3d = Number(omzet3d[0]?.total ?? 0)
+  const adsPct = omzetOps3d > 0 ? Math.round((adSpend3d / omzetOps3d) * 1000) / 10 : 0
+  const roas3d = adSpend3d > 0 ? Math.round((omzetOps3d / adSpend3d) * 10) / 10 : null
+  // Threshold default: iklan > 25% omzet ops ATAU ROAS < 2x (saat ada spend)
+  const adsHighPct = omzetOps3d > 0 && adsPct > 25
+  const adsLowRoas = roas3d !== null && roas3d < 2 && adSpend3d > 0
+
   return apiSuccess({
     stockEmpty,
     stockLow,
     orderOverdue,
+    adsAlert: {
+      days: 3,
+      adSpend: adSpend3d,
+      omzetOps: omzetOps3d,
+      adsPct,
+      roas: roas3d,
+      highPct: adsHighPct,
+      lowRoas: adsLowRoas,
+      active: adsHighPct || adsLowRoas,
+      message: adsHighPct
+        ? `Iklan ${adsPct}% omzet ops (3 hari) — di atas 25%`
+        : adsLowRoas
+          ? `ROAS ${roas3d}x (3 hari) di bawah BEP ~2x`
+          : null,
+    },
     summary: {
       emptyCount: stockEmpty.length,
       lowCount: stockLow.length,
       overdue24h: overdue24h.length,
       overdue48h: overdue48h.length,
+      adsAlert: adsHighPct || adsLowRoas,
     },
   })
 })

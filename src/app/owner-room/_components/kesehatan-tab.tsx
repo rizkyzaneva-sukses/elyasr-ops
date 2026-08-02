@@ -114,18 +114,20 @@ export function KesehatanTab() {
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [freshness, setFreshness] = useState<any>(null)
 
   const loadAll = async (silent = false) => {
     if (silent) setRefreshing(true)
     else setLoading(true)
     setError(null)
     try {
-      const [h, s, a, r, st] = await Promise.allSettled([
+      const [h, s, a, r, st, fr] = await Promise.allSettled([
         fetch('/api/health', { cache: 'no-store' }).then(r => r.json()),
         fetch('/api/report/scheduler-status', { cache: 'no-store' }).then(r => r.json()),
         fetch('/api/alerts', { cache: 'no-store' }).then(r => r.json()),
         fetch('/api/settings/telegram-recipients', { cache: 'no-store' }).then(r => r.json()),
         fetch('/api/settings', { cache: 'no-store' }).then(r => r.json()),
+        fetch('/api/health/freshness', { cache: 'no-store' }).then(r => r.json()),
       ])
       if (h.status === 'fulfilled') setHealth(h.value)
       if (s.status === 'fulfilled' && s.value.success) setScheduler(s.value)
@@ -135,6 +137,7 @@ export function KesehatanTab() {
         const d = st.value.data ?? {}
         setTelegramConfigured(Boolean(d.telegram_bot_token))
       }
+      if (fr.status === 'fulfilled' && fr.value.success) setFreshness(fr.value.data)
       setLastUpdate(new Date())
     } catch (err: any) {
       setError(err.message || 'Gagal memuat status sistem')
@@ -256,6 +259,36 @@ export function KesehatanTab() {
       {error && (
         <div className="rounded-xl border border-red-800/50 bg-red-950/20 p-3 text-xs text-red-300">
           {error}
+        </div>
+      )}
+
+      {freshness && (
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+          <p className="text-xs font-semibold text-zinc-300 mb-3 flex items-center gap-2">
+            <Clock size={12} className="text-blue-400" /> Data Freshness
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
+            {[
+              { l: 'Order import', v: freshness.lastOrderImport },
+              { l: 'Payout import', v: freshness.lastPayoutImport },
+              { l: 'Ads spend', v: freshness.lastAdsSpend },
+              { l: 'Expense', v: freshness.lastExpense },
+              { l: 'Scan resi', v: freshness.lastResiScan },
+            ].map(x => (
+              <div key={x.l} className="bg-zinc-950/50 rounded-lg px-3 py-2 border border-zinc-800/80">
+                <p className="text-[10px] text-zinc-500">{x.l}</p>
+                <p className="text-zinc-300 mt-0.5">
+                  {x.v?.at ? formatDateTime(typeof x.v.at === 'string' ? x.v.at : new Date(x.v.at).toISOString()) : '—'}
+                </p>
+                <p className="text-[10px] text-zinc-600">
+                  {x.v?.hoursAgo != null ? `${x.v.hoursAgo} jam lalu` : ''}
+                </p>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-zinc-600 mt-2">
+            7 hari: {freshness.activity7d?.ordersInserted ?? 0} order insert · {freshness.activity7d?.payoutsInserted ?? 0} payout insert
+          </p>
         </div>
       )}
 

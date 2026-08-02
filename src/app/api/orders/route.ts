@@ -3,30 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { apiSuccess, apiError, getPagination } from '@/lib/utils'
 import { parseShopeeOrders, parseTikTokOrders, detectPlatform } from '@/lib/order-parsers'
-
-/**
- * Parse raw order_created_at string menjadi Date untuk kolom trx_date
- *
- * Shopee "Waktu Dana Dilepaskan" : "2026-04-09 06:19"     (YYYY-MM-DD HH:mm)
- * TikTok "Order settled time"    : "2026-04-09 00:17:22"  (YYYY-MM-DD HH:mm:ss)
- * TikTok "Created Time" (fallback): "09/04/2026 00:17:22" (DD/MM/YYYY HH:mm:ss)
- */
-function parseOrderDate(raw: string | null | undefined): Date | null {
-  if (!raw) return null
-  // Format YYYY-MM-DD ... (Shopee dana dilepaskan & TikTok settled time)
-  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
-    const normalized = raw.replace(' ', 'T')
-    const withSeconds = normalized.length === 16 ? normalized + ':00' : normalized // handle HH:mm
-    return new Date(withSeconds + '+07:00')
-  }
-  // Format DD/MM/YYYY HH:mm:ss (TikTok Created Time — fallback)
-  if (/^\d{2}\/\d{2}\/\d{4}/.test(raw)) {
-    const [datePart, timePart] = raw.split(' ')
-    const [d, m, y] = datePart.split('/')
-    return new Date(`${y}-${m}-${d}T${timePart || '00:00:00'}+07:00`)
-  }
-  return null
-}
+import { parseOrderDate } from '@/lib/order-date'
 
 // GET /api/orders
 export async function GET(request: NextRequest) {

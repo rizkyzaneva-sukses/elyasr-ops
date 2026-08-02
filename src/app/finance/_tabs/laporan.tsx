@@ -82,6 +82,12 @@ export function LaporanTab() {
             {t.label}
           </button>
         ))}
+        <a
+          href={`/api/reports/pl/export?dateFrom=${dateFrom}&dateTo=${dateTo}`}
+          className="ml-auto px-3 py-2 rounded-lg text-xs font-medium text-emerald-400 border border-emerald-900/50 hover:bg-emerald-900/20 whitespace-nowrap"
+        >
+          Export L/R CSV
+        </a>
       </div>
 
       {isLoading ? (
@@ -231,7 +237,10 @@ export function LaporanTab() {
 
                 {(data.iklanTotal ?? 0) > 0 && (
                   <div className="flex justify-between pl-4 text-xs text-amber-400/90 -mt-2 mb-1">
-                    <span>↳ di antaranya Iklan</span>
+                    <div>
+                      <span>↳ di antaranya Iklan</span>
+                      <p className="text-[10px] text-zinc-600 font-normal">EXPENSE wallet Ads (is_ads_budget) · bukan top-up · bukan AMS payout</p>
+                    </div>
                     <span>{formatRupiah(data.iklanTotal, true)} ({data.iklanPctPencairan ?? 0}% thd pencairan)</span>
                   </div>
                 )}

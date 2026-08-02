@@ -972,6 +972,48 @@ const FAQ_ITEMS: { q: string; a: string[] }[] = [
       'Harian & mingguan tetap basis order masuk (ops), bukan pencairan.',
     ],
   },
+  {
+    q: 'Poin 1 — Restore / audit trx_date historis (apa & kenapa)',
+    a: [
+      'Masalah: dulu import payout menimpa orders.trx_date = tanggal cair. Akibatnya omzet ops/Telegram harian bisa “pindah bulan” ke bulan pencairan.',
+      'Sekarang: import payout TIDAK lagi mengubah trx_date. Tanggal cair hanya di payouts.released_date (Laba Rugi).',
+      'Restore: Finance → Tools Finance → Restore trx_date. Dry-run dulu, lalu eksekusi (OWNER). Sumber: parse order_created_at → tulis ulang trx_date.',
+      'Kapan pakai: setelah migrasi bug lama, atau omzet ops bulan X terlihat aneh dibanding CSV order.',
+      'API: GET/POST /api/orders/restore-trx-date (dryRun default true).',
+    ],
+  },
+  {
+    q: 'Poin 2 — Rekonsiliasi order ↔ payout (apa & kenapa)',
+    a: [
+      'Tujuan: lihat gap antara “order masuk” vs “sudah cair” vs data rusak (payout tanpa order, settlement minus, retur masih payout +).',
+      'Lokasi: Finance → Tools Finance → Rekonsiliasi. Pilih rentang tanggal (WIB).',
+      'ordersBelumCair: normal jika belum settle marketplace. orphanPayouts: upload CSV order dulu agar HPP L/R akurat.',
+      'negativePayouts: fee retur/adjustment — kurangi pencairan. returWithPositivePayout: cek partial/timing status.',
+      'Catatan schema: 1 orderNo = 1 payout (unique) — multi-batch settlement belum didukung.',
+      'API: GET /api/reports/reconcile?dateFrom=&dateTo=',
+    ],
+  },
+  {
+    q: 'Poin 3 — Retur stok terstruktur (alur yang benar)',
+    a: [
+      'Retur sebelum diterima konsumen: biasanya tidak bayar / tidak masuk settlement → tidak di Laba Rugi sebagai penjualan cair.',
+      'Retur setelah diterima: scan stok masuk lewat Inventori → Scan → Scan Retur (RETURN_SALES). Status order jadi RETUR; SOH naik untuk qty Baik.',
+      'Laba Rugi: HPP baris status retur dikeluarkan (stok kembali). Fee/ongkir retur sudah net di settlement (bisa minus) — jangan catat ulang OPEX.',
+      'Partial retur (langka): isi qty per SKU di scan retur; return ratio di PL proporsional realOmzet.',
+      'Retur pembelian ke vendor: mode Retur Pembelian (OUT / RETURN_PURCHASE) — beda alur dari retur customer.',
+      'Jangan andalkan settlement 0 sebagai “retur fisik” — net nol bisa fee/promo offset, bukan barang kembali.',
+    ],
+  },
+  {
+    q: 'Tools Finance baru: Cash vs Ops, Closing, SKU Profit, Saran PO',
+    a: [
+      'Cash vs Ops: bandingan omzet ops (trx_date) vs Laba Rugi kas (released_date) + iklan % di kedua basis.',
+      'Closing bulanan: checklist tgl 1–2 (order, payout, HPP, orphan, iklan, preview L/R).',
+      'SKU Profit Kas: margin per SKU setelah alokasi totalIncome payout (bukan estimasi real_omzet saja).',
+      'Saran PO: velocity 30 hari + ROP + lead time → suggestOrderQty (bukan auto-buat PO).',
+      'Export L/R CSV: tombol di Laporan atau Tools — formula sama computeProfitLoss.',
+    ],
+  },
 ]
 
 function FaqSection() {
@@ -1010,12 +1052,131 @@ function FaqSection() {
   )
 }
 
+type DocTab = RoleKey | 'FAQ' | 'DETAIL'
+
+const APP_CATALOG: {
+  domain: string
+  items: { name: string; path: string; roles: string; desc: string; tips?: string }[]
+}[] = [
+  {
+    domain: 'Sales & Ops',
+    items: [
+      { name: 'Dashboard', path: '/dashboard', roles: 'OWNER · FINANCE · STAFF', desc: 'KPI scoreboard, cashflow, action center, inventory health. STAFF lihat fokus ops.' },
+      { name: 'Pesanan', path: '/orders', roles: 'OWNER · FINANCE · STAFF', desc: 'Import CSV Shopee/TikTok, filter status (termasuk Retur), export, isi HPP kosong.' },
+      { name: 'Scan Resi', path: '/scan-order', roles: 'OWNER · FINANCE · STAFF', desc: 'Scan AWB pack/kirim, bulk CSV, deteksi duplikat.' },
+      { name: 'CRM', path: '/crm', roles: 'OWNER · FINANCE', desc: 'Daftar buyer unik dari order (omzet & frekuensi).' },
+      { name: 'Produk Gabungan', path: '/produk-gabungan', roles: 'OWNER · FINANCE', desc: 'Mapping SKU combo marketplace → SKU internal (HPP import).' },
+      { name: 'Alerts', path: '/alerts', roles: 'OWNER · FINANCE', desc: 'Stok habis/kritis, order pending, alert iklan % / ROAS 3 hari.' },
+    ],
+  },
+  {
+    domain: 'Inventori',
+    items: [
+      { name: 'Stok Overview', path: '/inventory?tab=overview', roles: 'OWNER · FINANCE · STAFF', desc: 'SOH, ROP, pencarian produk.' },
+      { name: 'Inventory Ledger', path: '/inventory?tab=ledger', roles: 'OWNER · FINANCE · STAFF', desc: 'Riwayat IN/OUT per alasan.' },
+      { name: 'Scan Masuk/Keluar/Retur', path: '/inventory?tab=scan', roles: 'OWNER · FINANCE · STAFF', desc: 'Masuk PO, keluar sales, endorsement, Scan Retur customer (RETURN_SALES), retur beli vendor.' },
+      { name: 'Stock Opname', path: '/inventory?tab=opname', roles: 'OWNER · FINANCE', desc: 'Hitung fisik vs sistem, commit penyesuaian.' },
+      { name: 'Master Produk', path: '/inventory?tab=master', roles: 'OWNER · FINANCE', desc: 'SKU, HPP, ROP, lead time, import/export.' },
+      { name: 'External Inventory', path: '/external-inventory', roles: 'EXTERNAL', desc: 'Read-only stok SOH > 0 untuk mitra.' },
+    ],
+  },
+  {
+    domain: 'Procurement',
+    items: [
+      { name: 'Purchase Orders', path: '/procurement?tab=po', roles: 'OWNER · FINANCE', desc: 'Buat PO, terima barang, status OPEN→CLOSED.' },
+      { name: 'Vendors', path: '/procurement?tab=vendor', roles: 'OWNER · FINANCE', desc: 'Master supplier & rekening.' },
+      { name: 'Vendor Payments', path: '/procurement?tab=payment', roles: 'OWNER · FINANCE', desc: 'Bayar DP/partial/lunas dari wallet (bukan OPEX L/R).' },
+      { name: 'Monitor PO', path: '/procurement?tab=monitor', roles: 'OWNER · FINANCE', desc: 'Pantau fulfillment & pembayaran.' },
+    ],
+  },
+  {
+    domain: 'Finance Room',
+    items: [
+      { name: 'Wallet & Ledger', path: '/finance?tab=wallet', roles: 'OWNER · FINANCE', desc: 'Multi-wallet, EXPENSE/TRANSFER/PAYOUT, edit request FINANCE → approve OWNER.' },
+      { name: 'Budget Iklan', path: '/finance?tab=iklan', roles: 'OWNER · FINANCE', desc: 'Top-up TRANSFER + Catat Spending EXPENSE di wallet isAdsBudget. ROAS dashboard.' },
+      { name: 'Aset Tetap', path: '/finance?tab=aset', roles: 'OWNER · FINANCE', desc: 'Penyusutan masuk Laba Rugi otomatis.' },
+      { name: 'Modal Awal', path: '/finance?tab=modal', roles: 'OWNER', desc: 'Modal pembuka per wallet.' },
+      { name: 'Payout', path: '/finance?tab=payout', roles: 'OWNER · FINANCE', desc: 'Import settlement Shopee/TikTok → totalIncome & released_date. Reset all = OWNER.' },
+      { name: 'Utang & Piutang', path: '/finance?tab=utang', roles: 'OWNER · FINANCE', desc: 'Utang modal/bank + piutang karyawan/vendor.' },
+      { name: 'Laporan', path: '/finance?tab=laporan', roles: 'OWNER · FINANCE', desc: 'Ringkasan, Laba Rugi kas, Arus Kas, Neraca, export CSV L/R.' },
+      { name: 'Tools Finance', path: '/finance?tab=tools', roles: 'OWNER · FINANCE', desc: 'Cash vs Ops, Rekonsiliasi order-payout, SKU profit kas, Closing checklist, Saran PO, Restore trx_date (OWNER).' },
+    ],
+  },
+  {
+    domain: 'Laporan Telegram & AI',
+    items: [
+      { name: 'Tele Harian', path: 'Owner Room → Pengaturan', roles: 'OWNER setup', desc: 'Omzet ops order masuk + GP estimasi + % iklan + ROAS. Jadwal dari DB.' },
+      { name: 'Tele Mingguan', path: 'Owner Room → Pengaturan', roles: 'OWNER setup', desc: 'Recap ops minggu lalu + iklan % + eksekusi.' },
+      { name: 'Tele Bulanan', path: 'tgl 2 09:00 WIB', roles: 'auto', desc: 'Laba Rugi basis pencairan + cuplikan ops. Test via bot / Owner Room.' },
+      { name: 'AI Insights', path: '/ai-insights', roles: 'OWNER', desc: 'Analisis strategis (Gemini), cache DB.' },
+      { name: 'AI Assistant', path: '/ai-assistant', roles: 'OWNER · FINANCE · STAFF', desc: 'Chat how-to fitur app.' },
+    ],
+  },
+  {
+    domain: 'Owner Room & Admin',
+    items: [
+      { name: 'Users', path: '/owner-room', roles: 'OWNER', desc: 'CRUD user & role OWNER/FINANCE/STAFF/EXTERNAL.' },
+      { name: 'Edit Requests', path: '/owner-room', roles: 'OWNER', desc: 'Approve/reject edit ledger dari FINANCE.' },
+      { name: 'Audit Log', path: '/owner-room', roles: 'OWNER', desc: 'Jejak CREATE/UPDATE/DELETE.' },
+      { name: 'Kategori', path: '/owner-room', roles: 'OWNER', desc: 'Kategori expense & master.' },
+      { name: 'Kesehatan', path: '/owner-room', roles: 'OWNER', desc: 'DB health, scheduler, last report, data freshness.' },
+      { name: 'Backup', path: '/owner-room', roles: 'OWNER', desc: 'Export/import JSON entitas.' },
+      { name: 'Pengaturan', path: '/owner-room', roles: 'OWNER', desc: 'Fee admin %, Telegram recipients, jadwal report.' },
+      { name: 'Suggest Revision', path: '/suggest-revision', roles: 'Semua login', desc: 'Feedback fitur + gambar.' },
+      { name: 'Dokumentasi', path: '/documentation', roles: 'Semua login', desc: 'Workflow per role + FAQ + Detail App (katalog ini).' },
+    ],
+  },
+]
+
+function DetailAppSection() {
+  return (
+    <div className="space-y-8 max-w-4xl">
+      <p className="text-sm text-zinc-400">
+        Katalog fitur ELYASR Ops — pakai ini agar tim tahu modul mana untuk tugas apa.
+        Perhitungan profit & retur: tab <b className="text-zinc-300">FAQ</b>.
+      </p>
+      <div className="grid sm:grid-cols-2 gap-2 text-xs">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3">
+          <p className="text-emerald-400 font-semibold mb-1">Dua basis angka</p>
+          <p className="text-zinc-500">OPS = order masuk (trx_date). KAS / Laba Rugi = dicairkan (released_date).</p>
+        </div>
+        <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3">
+          <p className="text-amber-400 font-semibold mb-1">Iklan</p>
+          <p className="text-zinc-500">Hanya EXPENSE wallet Ads. Top-up TRANSFER & fee AMS payout bukan metrik iklan.</p>
+        </div>
+      </div>
+      {APP_CATALOG.map(sec => (
+        <div key={sec.domain}>
+          <h3 className="text-sm font-semibold text-zinc-300 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Boxes size={14} className="text-emerald-500" />
+            {sec.domain}
+          </h3>
+          <div className="space-y-2">
+            {sec.items.map(it => (
+              <div key={it.path + it.name} className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2 justify-between">
+                  <a href={it.path.startsWith('/') ? it.path : undefined} className="text-sm font-semibold text-zinc-100 hover:text-emerald-400">
+                    {it.name}
+                  </a>
+                  <span className="text-[10px] text-zinc-600 font-mono">{it.path}</span>
+                </div>
+                <p className="text-[10px] text-emerald-700/80 mt-0.5">{it.roles}</p>
+                <p className="text-sm text-zinc-400 mt-1">{it.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function DocumentationPage() {
-  const [activeRole, setActiveRole] = useState<RoleKey | 'FAQ'>('OWNER')
+  const [activeRole, setActiveRole] = useState<DocTab>('OWNER')
   const [showOwnerSecrets, setShowOwnerSecrets] = useState(false)
   const [userRole, setUserRole] = useState<RoleKey | null>(null)
   const { user } = useAuth()
-  const role = activeRole === 'FAQ' ? null : ROLES.find(r => r.key === activeRole)!
+  const role = activeRole === 'FAQ' || activeRole === 'DETAIL' ? null : ROLES.find(r => r.key === activeRole)!
 
   useEffect(() => {
     setUserRole(user?.userRole ?? null)
@@ -1030,7 +1191,7 @@ export default function DocumentationPage() {
             Panduan Penggunaan
           </h1>
           <p className="text-sm text-zinc-500 mt-1">
-            Workflow dan panduan lengkap per role — ELYASR Management System
+            Workflow per role · Detail App · FAQ perhitungan — ELYASR Ops
           </p>
         </div>
       </div>
@@ -1052,6 +1213,17 @@ export default function DocumentationPage() {
         ))}
         <button
           type="button"
+          onClick={() => setActiveRole('DETAIL')}
+          className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+            activeRole === 'DETAIL'
+              ? 'bg-blue-900/30 text-blue-400 border border-blue-800/50 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60'
+          }`}
+        >
+          Detail App
+        </button>
+        <button
+          type="button"
           onClick={() => setActiveRole('FAQ')}
           className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
             activeRole === 'FAQ'
@@ -1070,6 +1242,14 @@ export default function DocumentationPage() {
             <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">FAQ Perhitungan &amp; Profit</h2>
           </div>
           <FaqSection />
+        </div>
+      ) : activeRole === 'DETAIL' ? (
+        <div className="mb-10">
+          <div className="flex items-center gap-2 mb-4">
+            <Boxes size={14} className="text-blue-400" />
+            <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">Detail App — Apa saja yang bisa dilakukan</h2>
+          </div>
+          <DetailAppSection />
         </div>
       ) : role && (
       <>

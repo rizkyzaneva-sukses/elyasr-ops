@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   AlertTriangle, Package, Clock, RefreshCw,
-  ShoppingCart, ChevronRight, TrendingDown,
+  ShoppingCart, ChevronRight, TrendingDown, Megaphone,
 } from 'lucide-react'
 import { formatRupiah } from '@/lib/utils'
 
@@ -56,10 +56,11 @@ export default function AlertsPage() {
     refetchInterval: 300_000, // 5 menit
   })
 
-  const summary = data?.summary ?? { emptyCount: 0, lowCount: 0, overdue24h: 0, overdue48h: 0 }
+  const summary = data?.summary ?? { emptyCount: 0, lowCount: 0, overdue24h: 0, overdue48h: 0, adsAlert: false }
   const stockEmpty: any[] = data?.stockEmpty ?? []
   const stockLow: any[]   = data?.stockLow ?? []
   const orderOverdue: any[] = data?.orderOverdue ?? []
+  const adsAlert = data?.adsAlert
 
   const activeStock = stockTab === 'empty' ? stockEmpty : stockLow
 
@@ -89,12 +90,29 @@ export default function AlertsPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
         <SummaryCard label="Stok Habis" count={summary.emptyCount} color="red" icon={Package} />
         <SummaryCard label="Stok Kritis" count={summary.lowCount} color="orange" icon={TrendingDown} />
         <SummaryCard label="Order > 48 Jam" count={summary.overdue48h} color="red" icon={Clock} />
         <SummaryCard label="Order > 24 Jam" count={summary.overdue24h} color="yellow" icon={ShoppingCart} />
+        <SummaryCard label="Alert Iklan" count={summary.adsAlert || adsAlert?.active ? 1 : 0} color={adsAlert?.active ? 'red' : 'emerald'} icon={Megaphone} />
       </div>
+
+      {adsAlert?.active && (
+        <div className="mb-6 rounded-xl border border-amber-800/50 bg-amber-900/20 p-4 flex items-start gap-3">
+          <Megaphone size={18} className="text-amber-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-amber-300">Alert Iklan (3 hari terakhir)</p>
+            <p className="text-sm text-amber-200/80 mt-1">{adsAlert.message}</p>
+            <p className="text-xs text-zinc-500 mt-2">
+              Spend {formatRupiah(adsAlert.adSpend ?? 0)} · Omzet ops {formatRupiah(adsAlert.omzetOps ?? 0)} · {adsAlert.adsPct}% · ROAS {adsAlert.roas ?? '—'}x
+              {' · '}
+              <button type="button" className="text-emerald-400 hover:underline" onClick={() => router.push('/finance?tab=iklan')}>Buka Budget Iklan</button>
+            </p>
+            <p className="text-[10px] text-zinc-600 mt-1">Sumber: EXPENSE wallet Ads (is_ads_budget) — bukan top-up, bukan fee AMS payout</p>
+          </div>
+        </div>
+      )}
 
       {/* ── SECTION 1: Stok ─────────────────────────────── */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl mb-6 overflow-hidden">
