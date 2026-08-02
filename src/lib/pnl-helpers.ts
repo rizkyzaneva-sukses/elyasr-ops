@@ -145,16 +145,24 @@ export async function computeProfitLoss(fromDate: Date, toDate: Date): Promise<P
   })
 
   let bebanOperasional = 0
-  let iklanTotal = 0
   const expenseGroups: { group: string; amount: number }[] = expenses.map(e => {
     const amt = Math.abs(e._sum.amount || 0)
     bebanOperasional += amt
-    const cat = (e.category || 'Lain-lain').toLowerCase()
-    if (cat.includes('iklan') || cat.includes('ads') || cat.includes('sample') || cat.includes('ongkir sample')) {
-      iklanTotal += amt
-    }
     return { group: e.category || 'Lain-lain', amount: amt }
   })
+
+  // Iklan = EXPENSE dari wallet is_ads_budget (sama sumber dashboard ROAS)
+  // Top-up TRANSFER ke wallet iklan BUKAN beban — hanya spending EXPENSE yang dihitung
+  const adsSpendAgg = await prisma.$queryRaw<{ total: bigint }[]>`
+    SELECT COALESCE(SUM(ABS(l.amount)), 0)::bigint AS total
+    FROM wallet_ledger l
+    JOIN wallets w ON w.id = l.wallet_id
+    WHERE w.is_ads_budget = true
+      AND l.trx_type = 'EXPENSE'
+      AND l.trx_date >= ${fromDate}
+      AND l.trx_date <= ${toDate}
+  `
+  const iklanTotal = Number(adsSpendAgg[0]?.total ?? 0)
 
   const vendorPayAgg = await prisma.walletLedger.aggregate({
     where: {

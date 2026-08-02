@@ -239,15 +239,17 @@ export async function buildDailyReport(): Promise<string> {
             LIMIT 5
         `,
 
-        // Ad spend hari ini (iklan / ads / sample)
+        // Ad spend hari ini — wallet is_ads_budget (sama dashboard / Laba Rugi)
         prisma.$queryRaw<any[]>`
-            SELECT category, COALESCE(SUM(ABS(amount)), 0)::bigint AS total
-            FROM wallet_ledger
-            WHERE trx_type = 'EXPENSE'
-              AND trx_date >= ${gteToday} AND trx_date <= ${lteToday}
-              AND category IS NOT NULL
-              AND (category ILIKE '%iklan%' OR category ILIKE '%ads%' OR category ILIKE '%sample%' OR category ILIKE '%ongkir sample%')
-            GROUP BY category
+            SELECT
+                COALESCE(w.linked_platform, l.category, 'Iklan') AS category,
+                COALESCE(SUM(ABS(l.amount)), 0)::bigint AS total
+            FROM wallet_ledger l
+            JOIN wallets w ON w.id = l.wallet_id
+            WHERE w.is_ads_budget = true
+              AND l.trx_type = 'EXPENSE'
+              AND l.trx_date >= ${gteToday} AND l.trx_date <= ${lteToday}
+            GROUP BY COALESCE(w.linked_platform, l.category, 'Iklan')
         `,
 
         // Kas masuk / keluar hari ini (wallet ledger)

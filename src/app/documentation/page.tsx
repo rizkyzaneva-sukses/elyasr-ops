@@ -929,11 +929,31 @@ const FAQ_ITEMS: { q: string; a: string[] }[] = [
     ],
   },
   {
-    q: 'Iklan bagaimana dihitung?',
+    q: 'Cara catat biaya iklan (workflow)',
     a: [
-      'Laba Rugi: iklan = bagian OPEX (kategori EXPENSE mengandung iklan/ads/sample). Ditampilkan juga % thd pencairan.',
-      'Telegram harian: % iklan thd omzet ops hari itu + ROAS per platform.',
-      'Pakai kategori ledger yang jelas (mengandung "iklan" / "ads") agar terdeteksi konsisten.',
+      '1) Setup sekali: Finance → Wallet & Ledger → Kelola Wallet → centang "Wallet Iklan (Ads)" + pilih linked platform (Shopee/TikTok).',
+      '2) Top-up budget: Finance → Budget Iklan → mode Deposit/Top-up. TRANSFER dari kas operasional ke wallet iklan. Ini BUKAN beban OPEX — hanya pindah saldo.',
+      '3) Catat spending: Budget Iklan → mode Catat Spending → pilih wallet iklan, tanggal, nominal. Sistem buat EXPENSE kategori "Iklan {platform}" dari wallet ads. Inilah yang dihitung sebagai biaya iklan.',
+      '4) Catat SETIAP HARI (atau saat spend terjadi) agar ROAS dashboard & % iklan akurat.',
+      'Jangan catat spending iklan dari wallet non-ads tanpa flag isAdsBudget — dashboard & L/R tidak menghitungnya sebagai iklan.',
+    ],
+  },
+  {
+    q: 'Iklan di Laba Rugi, Telegram, ROAS — bedanya?',
+    a: [
+      'Sumber tunggal: EXPENSE dari wallet is_ads_budget = true (bukan top-up TRANSFER).',
+      'Laba Rugi & Telegram bulanan: total spending iklan masuk OPEX; ditampilkan baris Iklan + % thd pencairan bersih.',
+      'Telegram harian: total iklan + % thd omzet ops hari itu + ROAS per platform (omzet ops ÷ ad spend).',
+      'Dashboard ROAS: ad spend per linked_platform wallet ads ÷ omzet ops platform (periode filter).',
+      'Fee AMS Shopee di file payout: sudah ter-net di pencairan (totalIncome). JANGAN catat ulang sebagai spending iklan — double count.',
+    ],
+  },
+  {
+    q: 'Iklan: apa yang BUKAN biaya iklan?',
+    a: [
+      'Top-up / deposit ke wallet iklan (TRANSFER) — bukan OPEX.',
+      'Fee AMS / komisi marketplace di settlement — sudah mengurangi pencairan, info di L/R saja.',
+      'Sample produk / ongkir sample: kalau dicatat di wallet non-ads sebagai EXPENSE biasa, masuk OPEX umum, bukan metrik "Iklan/ROAS" (kecuali kamu sengaja pakai wallet ads).',
     ],
   },
   {
