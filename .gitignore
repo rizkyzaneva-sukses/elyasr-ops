@@ -56,3 +56,6 @@ workflow_*.json
 
 # Kiro AI
 .kiro/
+
+# Data mentah / file cek manual (jangan di-push, bisa berisi data sensitif)
+/CEK DATA/

@@ -248,17 +248,80 @@ export function PayoutTab() {
 
       const buffer = await file.arrayBuffer()
       const wb     = XLSX.read(buffer, { type: 'array' })
-      const ws     = wb.Sheets['Income']
-      if (!ws) { throw new Error('Sheet "Income" tidak ditemukan') }
+      // Shopee ganti nama sheet dari "Income" (format lama) jadi "Penghasilan" (format baru, 2026+)
+      const ws     = wb.Sheets['Penghasilan'] || wb.Sheets['Income']
+      if (!ws) { throw new Error('Sheet "Penghasilan"/"Income" tidak ditemukan') }
 
-      const raw = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: 0 }) as unknown[][]
-      const periodeFrom = String((raw[1] as unknown[])[1] ?? '')
-      const periodeTo   = String((raw[1] as unknown[])[2] ?? '')
-      const headers     = raw[5] as string[]
-      const dataRows    = raw.slice(6)
-      const rows = dataRows.map(r =>
-        Object.fromEntries(headers.map((h, i) => [h, (r as unknown[])[i] ?? 0]))
-      )
+      const raw = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' }) as unknown[][]
+
+      // Header row dicari dinamis (format lama: baris 6, format baru: baris 3) via kolom "No. Pesanan"
+      const headerRowIdx = raw.findIndex(r => Array.isArray(r) && r.some(c => String(c).trim() === 'No. Pesanan'))
+      if (headerRowIdx === -1) throw new Error('Kolom "No. Pesanan" tidak ditemukan di file')
+
+      const rawHeaderRow = raw[headerRowIdx] as unknown[]
+      let lastCol = rawHeaderRow.length - 1
+      while (lastCol >= 0 && (rawHeaderRow[lastCol] === '' || rawHeaderRow[lastCol] == null)) lastCol--
+      const headerRow = rawHeaderRow.slice(0, lastCol + 1)
+
+      // Format baru punya kolom "Lihat berdasarkan" (Order/Sku) & tanpa kolom "Total Penghasilan"
+      const isNewFormat = headerRow.some(c => String(c).trim() === 'Lihat berdasarkan')
+
+      // Dedup nama kolom kembar (mis. dua kolom "...Kategori G" di format baru) supaya tidak saling timpa
+      const seenHeaders = new Map<string, number>()
+      const headers = headerRow.map(c => {
+        const name = String(c ?? '').trim() || '(kosong)'
+        const count = (seenHeaders.get(name) ?? 0) + 1
+        seenHeaders.set(name, count)
+        return count === 1 ? name : `${name} #${count}`
+      })
+
+      // Format baru tidak punya kolom "Total Penghasilan" — total pelepasan dana dihitung
+      // dari sum seluruh kolom di grup "Rincian Jumlah Pelepasan Dana" (diverifikasi = "Total yang Dilepas" di sheet Summary)
+      let settlementStartCol = -1
+      let settlementEndCol = headers.length
+      if (isNewFormat) {
+        const groupRow = (raw[headerRowIdx - 2] || []) as unknown[]
+        settlementStartCol = groupRow.findIndex(c => String(c).trim() === 'Rincian Jumlah Pelepasan Dana')
+        if (settlementStartCol === -1) throw new Error('Kolom grup "Rincian Jumlah Pelepasan Dana" tidak ditemukan')
+        for (let i = settlementStartCol + 1; i < groupRow.length; i++) {
+          if (String(groupRow[i] ?? '').trim()) { settlementEndCol = i; break }
+        }
+      }
+
+      const dataRows = raw.slice(headerRowIdx + 1)
+        .filter(r => Array.isArray(r) && r.some(c => c !== '' && c != null))
+      const rows = dataRows.map(r => {
+        const arr = r as unknown[]
+        const obj: Record<string, unknown> = {}
+        headers.forEach((h, i) => { obj[h] = arr[i] ?? 0 })
+        if (isNewFormat) {
+          let sum = 0
+          for (let i = settlementStartCol; i < settlementEndCol; i++) {
+            const v = arr[i]
+            const num = typeof v === 'number' ? v : Number(String(v ?? '').replace(/,/g, '').trim())
+            if (!isNaN(num)) sum += num
+          }
+          obj.__settlementSum = sum
+        }
+        return obj
+      })
+
+      let periodeFrom = ''
+      let periodeTo   = ''
+      if (!isNewFormat) {
+        periodeFrom = String((raw[1] as unknown[])?.[1] ?? '')
+        periodeTo   = String((raw[1] as unknown[])?.[2] ?? '')
+      } else {
+        const wsSummary = wb.Sheets['Summary']
+        if (wsSummary) {
+          const summaryRaw = XLSX.utils.sheet_to_json<unknown[]>(wsSummary, { header: 1, defval: '' }) as unknown[][]
+          for (const row of summaryRaw) {
+            const label = String((row as unknown[])?.[0] ?? '').trim().toLowerCase()
+            if (label === 'dari') periodeFrom = normalizeDateText((row as unknown[])[1])
+            if (label === 'ke')   periodeTo   = normalizeDateText((row as unknown[])[1])
+          }
+        }
+      }
 
       const payload = {
         source: 'shopee_income',

@@ -95,34 +95,49 @@ interface ShopeeCalc {
   yangDiterima: number
 }
 
+// Shopee ganti nama/susunan kolom di export baru (2026+, sheet "Penghasilan" bukan "Income")
+// firstNumber() dipakai supaya nama kolom lama & baru sama-sama dikenali
 function calcShopee(row: Record<string, unknown>): ShopeeCalc {
   const omzet =
-    n(row['Harga Asli Produk']) +
+    firstNumber(row, ['Harga Asli Produk', 'Harga Produk']) +
     n(row['Total Diskon Produk']) +
-    n(row['Voucher disponsor oleh Penjual']) +
-    n(row['Voucher co-fund disponsor oleh Penjual'])
+    firstNumber(row, ['Voucher disponsor oleh Penjual', 'Penyesuaian Penjual - 1']) +
+    firstNumber(row, ['Voucher co-fund disponsor oleh Penjual', 'Penyesuaian Penjual - 2'])
 
   const biayaPlatform =
     n(row['Biaya Administrasi']) +
     n(row['Biaya Layanan']) +
-    n(row['Biaya Proses Pesanan'])
+    n(row['Biaya Proses Pesanan']) +
+    n(row['Biaya Layanan Promo XTRA'])
 
-  const biayaAms = n(row['Biaya Komisi AMS'])
+  const biayaAms =
+    n(row['Biaya Komisi AMS']) +
+    n(row['AMS Service Fee'])
 
   const biayaPlatformLainnya =
     n(row['Premi']) +
     n(row['Biaya Program Hemat Biaya Kirim']) +
     n(row['Biaya Transaksi']) +
     n(row['Biaya Kampanye']) +
-    n(row['Bea Masuk, PPN & PPh']) +
-    n(row['Biaya Isi Saldo Otomatis (dari Penghasilan)'])
+    firstNumber(row, ['Bea Masuk, PPN & PPh', 'PPh 22']) +
+    n(row['Biaya Isi Saldo Otomatis (dari Penghasilan)']) +
+    n(row['Biaya Lainnya']) +
+    n(row['FBS Fee']) +
+    n(row['Biaya Gratis Ongkir XTRA - Ukuran Biasa (Kategori D)']) +
+    n(row['Biaya Gratis Ongkir XTRA - Ukuran Biasa (Kategori G)']) +
+    n(row['Biaya Gratis Ongkir XTRA - Ukuran Biasa (Kategori G) #2'])
 
   const bebanOngkir =
     n(row['Ongkos Kirim Pengembalian Barang']) +
     n(row['Kembali ke Biaya Pengiriman Pengirim']) +
-    n(row['Pengembalian Biaya Kirim'])
+    n(row['Pengembalian Biaya Kirim']) +
+    n(row['Return to Seller Fee'])
 
-  const yangDiterima = n(row['Total Penghasilan'])
+  // Export baru Shopee tidak punya kolom "Total Penghasilan" lagi — total pelepasan dana
+  // sudah dihitung di client (__settlementSum = sum grup "Rincian Jumlah Pelepasan Dana")
+  const yangDiterima = row['__settlementSum'] !== undefined
+    ? n(row['__settlementSum'])
+    : n(row['Total Penghasilan'])
 
   return { omzet, biayaPlatform, biayaAms, biayaPlatformLainnya, bebanOngkir, yangDiterima }
 }
@@ -358,6 +373,14 @@ export async function POST(request: NextRequest) {
       if (!TIKTOK_TYPE_COLS.some(col => col in r)) return true
       // Accept Order/Pesanan rows only — skip Refund/Adjustment/Return rows
       return typeStr === 'order' || typeStr === 'pesanan'
+    })
+  } else if (source === 'shopee_income') {
+    // Export baru Shopee ("Penghasilan") punya kolom "Lihat berdasarkan" dengan baris
+    // "Order" (ringkasan per order) + "Sku" (rincian per SKU) yang jumlahnya sama —
+    // ambil baris "Order" saja supaya tidak dobel hitung. Format lama tidak punya kolom ini.
+    filteredRows = mappedRows.filter((r: any) => {
+      if (!('Lihat berdasarkan' in r)) return true
+      return String(r['Lihat berdasarkan'] ?? '').trim().toLowerCase() === 'order'
     })
   } else {
     filteredRows = mappedRows
