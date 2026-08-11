@@ -69,8 +69,9 @@ export async function GET(request: NextRequest) {
       ? prisma.$queryRaw<{ group_key: string; cnt: bigint; total_omzet: bigint }[]>`
           SELECT
             CASE
-              WHEN status LIKE 'TERKIRIM%' THEN 'terkirim'
+              WHEN status ILIKE '%terkirim%' OR status ILIKE '%shipped%' THEN 'terkirim'
               WHEN status ILIKE '%batal%' OR status ILIKE '%cancel%' OR status ILIKE '%dibatalkan%' THEN 'batal'
+              WHEN status ILIKE '%retur%' OR status ILIKE '%return%' OR status ILIKE '%dikembalikan%' THEN 'retur'
               ELSE 'perlu_dikirim'
             END AS group_key,
             COUNT(DISTINCT order_no) AS cnt,
@@ -82,8 +83,9 @@ export async function GET(request: NextRequest) {
       : prisma.$queryRaw<{ group_key: string; cnt: bigint; total_omzet: bigint }[]>`
           SELECT
             CASE
-              WHEN status LIKE 'TERKIRIM%' THEN 'terkirim'
+              WHEN status ILIKE '%terkirim%' OR status ILIKE '%shipped%' THEN 'terkirim'
               WHEN status ILIKE '%batal%' OR status ILIKE '%cancel%' OR status ILIKE '%dibatalkan%' THEN 'batal'
+              WHEN status ILIKE '%retur%' OR status ILIKE '%return%' OR status ILIKE '%dikembalikan%' THEN 'retur'
               ELSE 'perlu_dikirim'
             END AS group_key,
             COUNT(DISTINCT order_no) AS cnt,
@@ -111,10 +113,14 @@ export async function GET(request: NextRequest) {
         END AS bucket,
         COUNT(*) AS cnt
       FROM orders
-      WHERE status NOT LIKE 'TERKIRIM%'
+      WHERE status NOT ILIKE '%terkirim%'
+        AND status NOT ILIKE '%shipped%'
         AND status NOT ILIKE '%batal%'
         AND status NOT ILIKE '%cancel%'
         AND status NOT ILIKE '%dibatalkan%'
+        AND status NOT ILIKE '%retur%'
+        AND status NOT ILIKE '%return%'
+        AND status NOT ILIKE '%dikembalikan%'
       GROUP BY bucket
       ORDER BY MIN(created_at)
     `,

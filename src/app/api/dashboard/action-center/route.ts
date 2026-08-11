@@ -42,7 +42,7 @@ const SEVERITY_RANK: Record<Severity, number> = {
  * Agregasi alert kritikal:
  * - Stok minus & habis
  * - Piutang overdue >30 hari
- * - Utang & PO jatuh tempo dalam 7 hari
+ * - Utang jatuh tempo dalam 7 hari & PO aktif
  * - Order pending >48 jam
  * - Cancel rate spike (vs avg 30 hari)
  * - ROAS drop signifikan vs bulan lalu
@@ -83,7 +83,7 @@ export async function GET(_req: NextRequest) {
     stockEmpty,
     piutangOverdue,
     utangDueSoon,
-    poDueSoon,
+    activePos,
     orderOverdue48,
     mtdOrderStats,
     last30CancelStats,
@@ -140,23 +140,25 @@ export async function GET(_req: NextRequest) {
         AND due_date <= ${next7}
     `,
 
-    // PO unpaid jatuh tempo 7 hari (pakai expected_date sbg proxy karena PO tidak punya due_date)
-    prisma.$queryRaw<{ cnt: bigint; total: bigint }[]>`
-      SELECT COUNT(*)::bigint AS cnt, COALESCE(SUM(total_amount - total_paid), 0)::bigint AS total
+    // PO aktif: masih OPEN atau PARTIAL, terlepas dari tanggal expected/payment.
+    prisma.$queryRaw<{ cnt: bigint }[]>`
+      SELECT COUNT(*)::bigint AS cnt
       FROM purchase_orders
-      WHERE payment_status IN ('UNPAID', 'PARTIAL_PAID')
-        AND expected_date IS NOT NULL
-        AND expected_date <= ${next7}
+      WHERE status IN ('OPEN', 'PARTIAL')
     `,
 
     // Order pending >48 jam
     prisma.$queryRaw<{ cnt: bigint }[]>`
       SELECT COUNT(*)::bigint AS cnt
       FROM orders
-      WHERE status NOT LIKE 'TERKIRIM%'
+      WHERE status NOT ILIKE '%terkirim%'
+        AND status NOT ILIKE '%shipped%'
         AND status NOT ILIKE '%batal%'
         AND status NOT ILIKE '%cancel%'
         AND status NOT ILIKE '%dibatalkan%'
+        AND status NOT ILIKE '%retur%'
+        AND status NOT ILIKE '%return%'
+        AND status NOT ILIKE '%dikembalikan%'
         AND created_at < (NOW() - INTERVAL '48 hours')
     `,
 
@@ -279,18 +281,16 @@ export async function GET(_req: NextRequest) {
     })
   }
 
-  // 5. PO/vendor jatuh tempo 7 hari
-  const poCnt = Number((poDueSoon as any[])[0]?.cnt ?? 0)
-  const poAmt = Number((poDueSoon as any[])[0]?.total ?? 0)
+  // 5. PO aktif
+  const poCnt = Number((activePos as any[])[0]?.cnt ?? 0)
   if (poCnt > 0) {
     push({
-      id: 'po-due-7',
+      id: 'po-active',
       severity: poCnt > 5 ? 'high' : 'medium',
       category: 'finance',
-      title: `${poCnt} PO vendor butuh dibayar`,
-      detail: 'Expected date dalam 7 hari, payment_status masih unpaid/partial.',
+      title: `PO AKTIF saat ini ada ${poCnt}`,
+      detail: 'Purchase order dengan status OPEN atau PARTIAL.',
       count: poCnt,
-      amount: poAmt,
       href: '/procurement',
     })
   }
