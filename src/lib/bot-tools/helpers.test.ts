@@ -55,7 +55,7 @@ describe('fmtWIBDate', () => {
   it('formats January date correctly', () => {
     const d = new Date('2026-01-02T00:00:00+07:00')
     const result = fmtWIBDate(d)
-    expect(result).toBe('1 Jan 2026')
+    expect(result).toBe('2 Jan 2026')
   })
 
   it('formats a date in December', () => {
