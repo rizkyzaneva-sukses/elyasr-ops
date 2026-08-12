@@ -14,7 +14,9 @@ export async function GET(request: NextRequest) {
   if (type === 'utang') {
     const utangs = await prisma.utang.findMany({
       orderBy: { createdAt: 'desc' },
-      include: { payments: true },
+      include: {
+        payments: { orderBy: { paymentDate: 'desc' } },
+      },
     })
     const totalOutstanding = utangs
       .filter(u => u.status !== 'PAID')
@@ -23,7 +25,9 @@ export async function GET(request: NextRequest) {
   } else {
     const piutangs = await prisma.piutang.findMany({
       orderBy: { createdAt: 'desc' },
-      include: { collections: true },
+      include: {
+        collections: { orderBy: { collectionDate: 'desc' } },
+      },
     })
     const totalOutstanding = piutangs
       .filter(p => p.status !== 'COLLECTED')
