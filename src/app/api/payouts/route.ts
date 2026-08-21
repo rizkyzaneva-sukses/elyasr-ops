@@ -133,11 +133,10 @@ function calcShopee(row: Record<string, unknown>): ShopeeCalc {
     n(row['Pengembalian Biaya Kirim']) +
     n(row['Return to Seller Fee'])
 
-  // Export baru Shopee tidak punya kolom "Total Penghasilan" lagi — total pelepasan dana
-  // sudah dihitung di client (__settlementSum = sum grup "Rincian Jumlah Pelepasan Dana")
-  const yangDiterima = row['__settlementSum'] !== undefined
-    ? n(row['__settlementSum'])
-    : n(row['Total Penghasilan'])
+  // Total Cair = kolom "Total Penghasilan" langsung (sudah final di export).
+  // Jangan hitung ulang dari komponen — sum grup "Rincian Jumlah Pelepasan Dana"
+  // double-count karena grup berisi Total Penghasilan + detail komponennya.
+  const yangDiterima = n(row['Total Penghasilan'])
 
   return { omzet, biayaPlatform, biayaAms, biayaPlatformLainnya, bebanOngkir, yangDiterima }
 }

@@ -263,7 +263,7 @@ export function PayoutTab() {
       while (lastCol >= 0 && (rawHeaderRow[lastCol] === '' || rawHeaderRow[lastCol] == null)) lastCol--
       const headerRow = rawHeaderRow.slice(0, lastCol + 1)
 
-      // Format baru punya kolom "Lihat berdasarkan" (Order/Sku) & tanpa kolom "Total Penghasilan"
+      // Format baru punya kolom "Lihat berdasarkan" (Order/Sku)
       const isNewFormat = headerRow.some(c => String(c).trim() === 'Lihat berdasarkan')
 
       // Dedup nama kolom kembar (mis. dua kolom "...Kategori G" di format baru) supaya tidak saling timpa
@@ -275,17 +275,11 @@ export function PayoutTab() {
         return count === 1 ? name : `${name} #${count}`
       })
 
-      // Format baru tidak punya kolom "Total Penghasilan" — total pelepasan dana dihitung
-      // dari sum seluruh kolom di grup "Rincian Jumlah Pelepasan Dana" (diverifikasi = "Total yang Dilepas" di sheet Summary)
-      let settlementStartCol = -1
-      let settlementEndCol = headers.length
-      if (isNewFormat) {
-        const groupRow = (raw[headerRowIdx - 2] || []) as unknown[]
-        settlementStartCol = groupRow.findIndex(c => String(c).trim() === 'Rincian Jumlah Pelepasan Dana')
-        if (settlementStartCol === -1) throw new Error('Kolom grup "Rincian Jumlah Pelepasan Dana" tidak ditemukan')
-        for (let i = settlementStartCol + 1; i < groupRow.length; i++) {
-          if (String(groupRow[i] ?? '').trim()) { settlementEndCol = i; break }
-        }
+      // Total Cair = kolom "Total Penghasilan" langsung (sudah final di export Shopee).
+      // Jangan sum grup "Rincian Jumlah Pelepasan Dana" — grup itu berisi Total Penghasilan
+      // PLUS komponennya, jadi double-count (mis. 547457 → 1094914).
+      if (!headers.some(h => h === 'Total Penghasilan')) {
+        throw new Error('Kolom "Total Penghasilan" tidak ditemukan di file')
       }
 
       const dataRows = raw.slice(headerRowIdx + 1)
@@ -294,15 +288,6 @@ export function PayoutTab() {
         const arr = r as unknown[]
         const obj: Record<string, unknown> = {}
         headers.forEach((h, i) => { obj[h] = arr[i] ?? 0 })
-        if (isNewFormat) {
-          let sum = 0
-          for (let i = settlementStartCol; i < settlementEndCol; i++) {
-            const v = arr[i]
-            const num = typeof v === 'number' ? v : Number(String(v ?? '').replace(/,/g, '').trim())
-            if (!isNaN(num)) sum += num
-          }
-          obj.__settlementSum = sum
-        }
         return obj
       })
 
