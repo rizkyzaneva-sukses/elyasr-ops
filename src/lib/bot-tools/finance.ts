@@ -108,8 +108,7 @@ export async function getExpenseBreakdown(period?: string, startDate?: string, e
 // ─────────────────────────────────────────────
 export async function getUtangPiutangSummary() {
     const nowWIB = getNowWIB()
-    const in7DaysWIB = new Date(nowWIB)
-    in7DaysWIB.setDate(in7DaysWIB.getDate() + 7)
+    const in7DaysWIB = new Date(nowWIB.getTime() + 7 * 86400000)
 
     // Utang outstanding
     const utangRows = await prisma.$queryRaw<any[]>`

@@ -25,10 +25,11 @@ RUN npm run build
 
 # ── Stage 3: runner ────────────────────────────────────
 FROM node:20-alpine AS runner
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl tzdata
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV TZ=Asia/Jakarta
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup --system --gid 1001 nodejs

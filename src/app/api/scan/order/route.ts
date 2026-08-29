@@ -1,9 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError } from '@/lib/utils'
-import { format } from 'date-fns'
-import { formatInTimeZone } from 'date-fns-tz'
+import { apiSuccess, apiError, todayWIBStr } from '@/lib/utils'
 
 // POST /api/scan/order — scan airwaybill → update status TERKIRIM
 export async function POST(request: NextRequest) {
@@ -25,9 +23,7 @@ export async function POST(request: NextRequest) {
     return apiError(`Resi "${airwaybill}" tidak ditemukan`, 404)
   }
 
-  // Gunakan waktu Jakarta (WIB)
-  const jakartaNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
-  const terkirimStatus = `TERKIRIM | ${format(jakartaNow, 'yyyy-MM-dd')}`
+  const terkirimStatus = `TERKIRIM | ${todayWIBStr()}`
   const orderNo = matchedOrder.orderNo
 
   // Update ALL orders with same order_no

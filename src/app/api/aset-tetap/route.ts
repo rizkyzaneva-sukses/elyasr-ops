@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError } from '@/lib/utils'
+import { apiSuccess, apiError, parseWibDateInput } from '@/lib/utils'
 
 // GET /api/aset-tetap
 export async function GET(request: NextRequest) {
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     data: {
       namaAset,
       nilaiPerolehan: parseInt(nilaiPerolehan),
-      tanggalBeli: new Date(tanggalBeli),
+      tanggalBeli: parseWibDateInput(tanggalBeli),
       umurEkonomisThn: parseInt(umurEkonomisThn),
       walletId: walletId || null,
       note: note || null,
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       await prisma.walletLedger.create({
         data: {
           walletId,
-          trxDate: new Date(tanggalBeli),
+          trxDate: parseWibDateInput(tanggalBeli),
           trxType: 'INVESTASI',
           category: `Pembelian Aset - ${namaAset}`,
           amount: -Math.abs(parseInt(nilaiPerolehan)),

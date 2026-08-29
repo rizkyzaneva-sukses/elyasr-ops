@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError, generateGRNumber, getPagination } from '@/lib/utils'
+import { apiSuccess, apiError, generateGRNumber, getPagination, parseWibDateInput } from '@/lib/utils'
 
 // GET /api/procurement/receive — list goods receipts
 export async function GET(request: NextRequest) {
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     if (po.status === 'CLOSED') return apiError(`PO ${po.poNumber} sudah ditutup, tidak bisa menerima kiriman baru`)
   }
 
-  const date = new Date(receiptDate || new Date())
+  const date = receiptDate ? parseWibDateInput(receiptDate) : new Date()
   const existingGRNumbers = (await prisma.goodsReceipt.findMany({
     select: { receiptNumber: true },
   })).map(r => r.receiptNumber)

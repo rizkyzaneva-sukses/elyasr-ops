@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError } from '@/lib/utils'
+import { apiSuccess, apiError, addWibDays, wibDateRange } from '@/lib/utils'
 
 /**
  * GET /api/dashboard/stats
@@ -22,16 +22,17 @@ export async function GET(request: NextRequest) {
   const dateTo   = searchParams.get('dateTo')   // YYYY-MM-DD
 
   // Build date filter menggunakan trxDate (DateTime) — reliable untuk semua format
-  const dateFilter = dateFrom && dateTo ? {
+  const range = dateFrom && dateTo ? wibDateRange(dateFrom, dateTo) : null
+  const dateFilter = range ? {
     trxDate: {
-      gte: new Date(dateFrom + 'T00:00:00+07:00'),
-      lte: new Date(dateTo   + 'T23:59:59+07:00'),
+      gte: range.fromDate,
+      lte: range.toDate,
     }
   } : {}
 
   // Raw date bounds untuk queryRaw
-  const gteDate = dateFrom ? new Date(dateFrom + 'T00:00:00+07:00') : null
-  const lteDate = dateTo   ? new Date(dateTo   + 'T23:59:59+07:00') : null
+  const gteDate = range?.fromDate ?? null
+  const lteDate = range?.toDate ?? null
 
   // Periode pembanding (panjang sama, mundur ke belakang) untuk delta KPI
   let prevGte: Date | null = null
@@ -137,8 +138,8 @@ export async function GET(request: NextRequest) {
 
     // Payout stats dalam range
     prisma.payout.aggregate({
-      where: dateFrom ? {
-        releasedDate: { gte: new Date(dateFrom), lte: new Date(dateTo + 'T23:59:59') }
+      where: range ? {
+        releasedDate: { gte: range.fromDate, lte: range.toDate }
       } : {},
       _sum: { totalIncome: true, omzet: true },
       _count: { id: true },
@@ -432,20 +433,18 @@ export async function GET(request: NextRequest) {
     }])
   )
   const trend: any[] = []
-  if (gteDate && lteDate) {
-    const cur = new Date(gteDate)
-    const end = new Date(lteDate)
-    while (cur <= end) {
-      const dayStr = cur.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
-      const v = trendMap.get(dayStr) ?? { omzet: 0, hpp: 0, ordersValid: 0, ordersBatal: 0 }
+  if (dateFrom && dateTo) {
+    let cur = dateFrom
+    while (cur <= dateTo) {
+      const v = trendMap.get(cur) ?? { omzet: 0, hpp: 0, ordersValid: 0, ordersBatal: 0 }
       trend.push({
-        day: dayStr,
+        day: cur,
         omzet: v.omzet,
         grossProfit: v.omzet - v.hpp,
         ordersValid: v.ordersValid,
         ordersBatal: v.ordersBatal,
       })
-      cur.setDate(cur.getDate() + 1)
+      cur = addWibDays(cur, 1)
     }
   }
 

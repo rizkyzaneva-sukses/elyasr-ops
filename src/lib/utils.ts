@@ -1,39 +1,143 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import { toZonedTime, format as formatTz } from 'date-fns-tz'
+import { formatInTimeZone } from 'date-fns-tz'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
 // ── Timezone WIB (Asia/Jakarta) ─────────────────────────
-// Centralized WIB helpers — gunakan ini daripada manual
-// `new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' })`
+// Aturan:
+// - Instant nyata = `new Date()` / `nowWIB()` (UTC di dalamnya).
+// - Kalender/tampilan = `wibYmd` / `formatWIB` / `formatDate` (kunci Asia/Jakarta).
+// - Filter & simpan input YYYY-MM-DD = `wibDateRange` / `parseWibDateInput` (`+07:00`).
+// JANGAN: toISOString().slice(0,10), new Date('YYYY-MM-DD'),
+//         toLocaleString() lalu new Date(string), toZonedTime + formatTz.
 export const WIB = 'Asia/Jakarta'
 
-/** Dapatkan "sekarang" dalam zona WIB */
+/** Instant UTC sekarang. Jangan pakai getHours/getDate — pakai wibYmd / formatWIB. */
 export function nowWIB(): Date {
-  return toZonedTime(new Date(), WIB)
+  return new Date()
 }
 
-/** Format Date ke string di zona WIB */
+/** Format Date (instant nyata) ke string di zona WIB. */
 export function formatWIB(d: Date, pattern: string): string {
-  return formatTz(d, pattern, { timeZone: WIB })
+  return formatInTimeZone(d, WIB, pattern)
 }
 
-/** Dapatkan tanggal hari ini di WIB sebagai string YYYY-MM-DD */
+/** Kalender YYYY-MM-DD di zona WIB untuk suatu instant (default: sekarang). */
+export function wibYmd(date: Date | string = new Date()): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  if (isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('en-CA', { timeZone: WIB })
+}
+
+/** Tanggal hari ini di WIB sebagai YYYY-MM-DD. */
 export function todayWIBStr(): string {
-  return formatTz(nowWIB(), 'yyyy-MM-dd', { timeZone: WIB })
+  return wibYmd(new Date())
 }
 
-/** Range tanggal filter keuangan (WIB eksplisit, hindari geser UTC). */
+export function wibDayStart(ymd: string): Date {
+  return new Date(`${ymd.slice(0, 10)}T00:00:00+07:00`)
+}
+
+export function wibDayEnd(ymd: string): Date {
+  return new Date(`${ymd.slice(0, 10)}T23:59:59.999+07:00`)
+}
+
+/** Range tanggal filter (WIB eksplisit, hindari geser UTC). */
 export function wibDateRange(dateFrom: string, dateTo: string): { fromDate: Date; toDate: Date } {
-  const from = dateFrom.slice(0, 10)
-  const to = dateTo.slice(0, 10)
   return {
-    fromDate: new Date(`${from}T00:00:00+07:00`),
-    toDate: new Date(`${to}T23:59:59.999+07:00`),
+    fromDate: wibDayStart(dateFrom),
+    toDate: wibDayEnd(dateTo),
   }
+}
+
+/**
+ * Parse input form/API tanggal sebagai WIB.
+ * `YYYY-MM-DD` → 00:00:00+07:00. Datetime tanpa offset dianggap WIB.
+ */
+export function parseWibDateInput(value: string | Date): Date {
+  if (value instanceof Date) return value
+  const s = String(value).trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return wibDayStart(s)
+  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(s) && !/(Z|[+-]\d{2}:?\d{2})$/i.test(s)) {
+    const normalized = s.replace(' ', 'T')
+    const withSeconds = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(normalized)
+      ? `${normalized}:00`
+      : normalized
+    return new Date(`${withSeconds}+07:00`)
+  }
+  return new Date(s)
+}
+
+/** Geser kalender YYYY-MM-DD di WIB (aman lintas TZ proses). */
+export function addWibDays(ymd: string, days: number): string {
+  const d = new Date(`${ymd.slice(0, 10)}T12:00:00+07:00`)
+  return wibYmd(new Date(d.getTime() + days * 86400000))
+}
+
+export function wibMonthStartStr(ymd = todayWIBStr()): string {
+  return `${ymd.slice(0, 7)}-01`
+}
+
+export function wibMonthEndStr(ymd = todayWIBStr()): string {
+  const [y, m] = ymd.slice(0, 7).split('-').map(Number)
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate()
+  return `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+}
+
+export function wibMondayOfWeek(ymd = todayWIBStr()): string {
+  const noon = new Date(`${ymd.slice(0, 10)}T12:00:00+07:00`)
+  const utcDay = noon.getUTCDay()
+  const diff = utcDay === 0 ? -6 : 1 - utcDay
+  return addWibDays(ymd, diff)
+}
+
+export type WibPreset =
+  | 'today'
+  | 'yesterday'
+  | 'week'
+  | 'month'
+  | 'lastmonth'
+  | 'quarter'
+  | 'this_month'
+  | 'last_month'
+
+/** Preset filter UI. `month` = MTD; `this_month` = 1 s/d akhir bulan kalender. */
+export function wibPresetRange(preset: WibPreset, today = todayWIBStr()): { from: string; to: string } {
+  switch (preset) {
+    case 'today':
+      return { from: today, to: today }
+    case 'yesterday': {
+      const y = addWibDays(today, -1)
+      return { from: y, to: y }
+    }
+    case 'week':
+      return { from: wibMondayOfWeek(today), to: today }
+    case 'month':
+      return { from: wibMonthStartStr(today), to: today }
+    case 'this_month':
+      return { from: wibMonthStartStr(today), to: wibMonthEndStr(today) }
+    case 'lastmonth':
+    case 'last_month': {
+      const prevLast = addWibDays(wibMonthStartStr(today), -1)
+      return { from: wibMonthStartStr(prevLast), to: prevLast }
+    }
+    case 'quarter': {
+      const [y, m] = today.split('-').map(Number)
+      const qStart = Math.floor((m - 1) / 3) * 3 + 1
+      return { from: `${y}-${String(qStart).padStart(2, '0')}-01`, to: today }
+    }
+    default:
+      return { from: today, to: today }
+  }
+}
+
+/** Awal hari WIB, N-1 hari ke belakang (inklusif, untuk sparkline/cashflow). */
+export function wibStartDaysAgo(days: number, from = new Date()): Date {
+  const ymd = addWibDays(wibYmd(from), -(Math.max(1, days) - 1))
+  return wibDayStart(ymd)
 }
 
 // ── Format currency (IDR) ──────────────────────────────
@@ -58,23 +162,27 @@ export function formatDate(date: Date | string | null | undefined, format: 'shor
 
   if (format === 'datetime') {
     return new Intl.DateTimeFormat('id-ID', {
+      timeZone: WIB,
       day: '2-digit', month: 'short', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
+      hour12: false,
     }).format(d)
   }
   if (format === 'long') {
     return new Intl.DateTimeFormat('id-ID', {
+      timeZone: WIB,
       day: 'numeric', month: 'long', year: 'numeric',
     }).format(d)
   }
   return new Intl.DateTimeFormat('id-ID', {
+    timeZone: WIB,
     day: '2-digit', month: 'short', year: 'numeric',
   }).format(d)
 }
 
 // ── PO Number Generator ────────────────────────────────
 export function generatePONumber(poDate: Date, existingPONumbers: string[]): string {
-  const dateStr = poDate.toISOString().slice(0, 10).replace(/-/g, '')
+  const dateStr = wibYmd(poDate).replace(/-/g, '')
   const prefix = `PO-${dateStr}-`
   const existing = existingPONumbers
     .filter(n => n.startsWith(prefix))
@@ -86,7 +194,7 @@ export function generatePONumber(poDate: Date, existingPONumbers: string[]): str
 
 // ── GR Number Generator ────────────────────────────────
 export function generateGRNumber(receiptDate: Date, existingGRNumbers: string[]): string {
-  const yearMonth = `${receiptDate.getFullYear()}${(receiptDate.getMonth() + 1).toString().padStart(2, '0')}`
+  const yearMonth = wibYmd(receiptDate).slice(0, 7).replace('-', '')
   const prefix = `GR-${yearMonth}-`
   const existing = existingGRNumbers
     .filter(n => n.startsWith(prefix))

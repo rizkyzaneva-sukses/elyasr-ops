@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError, getPagination } from '@/lib/utils'
+import { apiSuccess, apiError, getPagination, parseWibDateInput, wibDateRange, wibDayEnd, wibDayStart, wibYmd } from '@/lib/utils'
 
 // ─────────────────────────────────────────────
 // Helper: safe number coercion
@@ -32,19 +32,23 @@ function parseDateValue(value: unknown): Date | null {
   if (value instanceof Date && !isNaN(value.getTime())) return value
 
   const raw = String(value).trim()
-  const ymd = raw.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/)
+  const ymd = raw.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})(.*)$/)
   if (ymd) {
-    const d = new Date(`${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}`)
+    const rest = (ymd[4] || '').trim()
+    const iso = `${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}${rest ? ` ${rest}` : ''}`
+    const d = parseWibDateInput(iso)
     return isNaN(d.getTime()) ? null : d
   }
 
-  const dmy = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/)
+  const dmy = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})(.*)$/)
   if (dmy) {
-    const d = new Date(`${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`)
+    const rest = (dmy[4] || '').trim()
+    const iso = `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}${rest ? ` ${rest}` : ''}`
+    const d = parseWibDateInput(iso)
     return isNaN(d.getTime()) ? null : d
   }
 
-  const d = new Date(raw.replace(/\//g, '-'))
+  const d = parseWibDateInput(raw)
   return isNaN(d.getTime()) ? null : d
 }
 
@@ -205,8 +209,15 @@ export async function GET(request: NextRequest) {
   if (platform)  where.platform = platform
   if (dateFrom || dateTo) {
     const rf: Record<string, Date> = {}
-    if (dateFrom) rf.gte = new Date(dateFrom)
-    if (dateTo)   rf.lte = new Date(`${dateTo}T23:59:59.999Z`)
+    if (dateFrom && dateTo) {
+      const { fromDate, toDate } = wibDateRange(dateFrom, dateTo)
+      rf.gte = fromDate
+      rf.lte = toDate
+    } else if (dateFrom) {
+      rf.gte = wibDayStart(dateFrom)
+    } else if (dateTo) {
+      rf.lte = wibDayEnd(dateTo)
+    }
     where.releasedDate = rf
   }
 
@@ -298,7 +309,8 @@ export async function POST(request: NextRequest) {
         const platformFee = n(p.platform_fee || p.platformFee)
         const amsFee      = n(p.ams_fee || p.amsFee)
         const totalIncome = omzet - platformFee - amsFee
-        const releasedDate = new Date(String(p.released_date || p.releasedDate || new Date()))
+        const rawReleased = p.released_date || p.releasedDate
+        const releasedDate = rawReleased ? parseWibDateInput(String(rawReleased)) : new Date()
         return {
           orderNo, omzet, platformFee, amsFee, totalIncome,
           releasedDate, walletId, source: 'manual_csv',
@@ -312,7 +324,8 @@ export async function POST(request: NextRequest) {
         const platformFee = n(p.platform_fee || p.platformFee)
         const amsFee      = n(p.ams_fee || p.amsFee)
         const totalIncome = omzet - platformFee - amsFee
-        const releasedDate = new Date(String(p.released_date || p.releasedDate || new Date()))
+        const rawReleased = p.released_date || p.releasedDate
+        const releasedDate = rawReleased ? parseWibDateInput(String(rawReleased)) : new Date()
         return {
           walletId, trxDate: releasedDate, trxType: 'PAYOUT' as const,
           category: 'Payout Marketplace', amount: totalIncome,
@@ -399,22 +412,19 @@ export async function POST(request: NextRequest) {
       if (d) times.push(d.getTime())
     }
     if (times.length > 0) {
-      periodeFrom = new Date(Math.min(...times)).toISOString().slice(0, 10)
-      periodeTo   = new Date(Math.max(...times)).toISOString().slice(0, 10)
+      periodeFrom = wibYmd(new Date(Math.min(...times)))
+      periodeTo   = wibYmd(new Date(Math.max(...times)))
     }
   }
   if (source === 'shopee_income' && (!periodeFrom || !periodeTo)) {
     const times: number[] = []
     for (const row of filteredRows) {
-      const raw = String((row as Record<string, unknown>)['Tanggal Dana Dilepaskan'] || '').trim()
-      if (raw) {
-        const d = new Date(raw)
-        if (!isNaN(d.getTime())) times.push(d.getTime())
-      }
+      const d = parseDateValue((row as Record<string, unknown>)['Tanggal Dana Dilepaskan'])
+      if (d) times.push(d.getTime())
     }
     if (times.length > 0) {
-      periodeFrom = new Date(Math.min(...times)).toISOString().slice(0, 10)
-      periodeTo   = new Date(Math.max(...times)).toISOString().slice(0, 10)
+      periodeFrom = wibYmd(new Date(Math.min(...times)))
+      periodeTo   = wibYmd(new Date(Math.max(...times)))
     }
   }
 
@@ -488,7 +498,7 @@ export async function POST(request: NextRequest) {
         bebanCount++
         totalBeban += settlement
         detailBeban.push({ orderNo, amount: settlement })
-        const releasedDateNeg = parseDateValue(row['Tanggal Dana Dilepaskan']) ?? (periodeFrom ? new Date(periodeFrom) : new Date())
+        const releasedDateNeg = parseDateValue(row['Tanggal Dana Dilepaskan']) ?? (periodeFrom ? parseWibDateInput(periodeFrom) : new Date())
         // Shopee minus: masuk sebagai PAYOUT negatif (sama seperti TikTok) supaya mengurangi total pencairan
         allPayoutInserts.push({
           orderNo,

@@ -15,6 +15,7 @@ import {
   ymWIB,
   monthPacing,
 } from '@/lib/dashboard-helpers'
+import { todayWIBStr, addWibDays, wibMondayOfWeek, wibYmd } from '@/lib/utils'
 
 function fmt(n: number): string {
     return 'Rp ' + Math.round(n || 0).toLocaleString('id-ID')
@@ -35,35 +36,19 @@ function trendIcon(current: number, previous: number): string {
     return current >= previous ? '📈' : '📉'
 }
 
-function todayWIBStr(): string {
-    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
-}
-
-function addDays(dateStr: string, days: number): string {
-    const d = new Date(`${dateStr}T12:00:00+07:00`)
-    d.setDate(d.getDate() + days)
-    return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
-}
-
-function getMondayOfWeek(dateStr: string): string {
-    const d = new Date(`${dateStr}T12:00:00+07:00`)
-    const day = d.getDay()
-    const diff = day === 0 ? -6 : 1 - day
-    d.setDate(d.getDate() + diff)
-    return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
-}
-
 function fmtTglShort(d: any): string {
-    const dt = new Date(d)
+    const ymd = wibYmd(new Date(d))
+    if (!ymd) return '-'
+    const [, m, day] = ymd.split('-')
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des']
-    return `${dt.getDate()} ${months[dt.getMonth()]}`
+    return `${Number(day)} ${months[Number(m) - 1]}`
 }
 
 export async function buildDailyReport(): Promise<string> {
     const today      = todayWIBStr()
-    const yesterday  = addDays(today, -1)
-    const weekMinus7 = addDays(today, -7)
-    const weekStart  = getMondayOfWeek(today)
+    const yesterday  = addWibDays(today, -1)
+    const weekMinus7 = addWibDays(today, -7)
+    const weekStart  = wibMondayOfWeek(today)
     const monthStart = today.slice(0, 7) + '-01'
 
     const gteToday    = new Date(`${today}T00:00:00+07:00`)
@@ -74,11 +59,11 @@ export async function buildDailyReport(): Promise<string> {
     const lteH7       = new Date(`${weekMinus7}T23:59:59+07:00`)
     const gteWeek     = new Date(`${weekStart}T00:00:00+07:00`)
     const gteMonth    = new Date(`${monthStart}T00:00:00+07:00`)
-    const gte10d      = new Date(`${addDays(today, -9)}T00:00:00+07:00`)
+    const gte10d      = new Date(`${addWibDays(today, -9)}T00:00:00+07:00`)
 
     // ── Eksekusi Besok: jendela tempo ±7 hari (sedikit ke belakang utk yg lewat) ──
-    const tempoFrom = new Date(`${addDays(today, -3)}T00:00:00+07:00`)
-    const tempoTo   = new Date(`${addDays(today, 7)}T23:59:59+07:00`)
+    const tempoFrom = new Date(`${addWibDays(today, -3)}T00:00:00+07:00`)
+    const tempoTo   = new Date(`${addWibDays(today, 7)}T23:59:59+07:00`)
 
     const [
         todayRows,

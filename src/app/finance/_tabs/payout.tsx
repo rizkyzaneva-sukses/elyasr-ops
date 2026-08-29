@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef, useCallback } from 'react'
-import { formatRupiah, formatDate } from '@/lib/utils'
+import { formatRupiah, formatDate, wibPresetRange, wibYmd } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
@@ -54,23 +54,8 @@ interface SummaryData {
 
 // ─── Date presets ─────────────────────────────────────
 function getPreset(preset: 'this_month' | 'last_month' | 'all') {
-  const now = new Date()
   if (preset === 'all') return { from: '', to: '' }
-  if (preset === 'this_month') {
-    const from = new Date(now.getFullYear(), now.getMonth(), 1)
-    const to   = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    return {
-      from: from.toISOString().slice(0, 10),
-      to:   to.toISOString().slice(0, 10),
-    }
-  }
-  // last_month
-  const from = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-  const to   = new Date(now.getFullYear(), now.getMonth(), 0)
-  return {
-    from: from.toISOString().slice(0, 10),
-    to:   to.toISOString().slice(0, 10),
-  }
+  return wibPresetRange(preset)
 }
 
 function getWorkbookSheet(wb: XLSX.WorkBook, names: string[]) {
@@ -79,7 +64,7 @@ function getWorkbookSheet(wb: XLSX.WorkBook, names: string[]) {
 
 function normalizeDateText(value: unknown): string {
   if (!value) return ''
-  if (value instanceof Date && !isNaN(value.getTime())) return value.toISOString().slice(0, 10)
+  if (value instanceof Date && !isNaN(value.getTime())) return wibYmd(value)
 
   const s = String(value).trim()
   const ymd = s.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/)
@@ -89,7 +74,7 @@ function normalizeDateText(value: unknown): string {
   if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`
 
   const d = new Date(s.replace(/\//g, '-'))
-  return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10)
+  return isNaN(d.getTime()) ? '' : wibYmd(d)
 }
 
 function extractPeriodFromSheet(ws: XLSX.WorkSheet | undefined) {

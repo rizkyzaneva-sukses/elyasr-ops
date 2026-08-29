@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/components/ui/toaster'
-import { formatRupiah } from '@/lib/utils'
+import { formatRupiah, todayWIBStr } from '@/lib/utils'
 import { X, CreditCard, Info } from 'lucide-react'
 
 interface PayVendorModalProps {
@@ -25,7 +25,7 @@ export function PayVendorModal({ prefillVendorId, prefillPoId, onClose, onSucces
   const [vendorId, setVendorId] = useState(prefillVendorId || '')
   const [poId, setPoId] = useState(prefillPoId || '')
   const [walletId, setWalletId] = useState('')
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10))
+  const [paymentDate, setPaymentDate] = useState(todayWIBStr())
   const [amount, setAmount] = useState('')
   const [paymentType, setPaymentType] = useState<'DP' | 'PARTIAL' | 'PELUNASAN'>('PELUNASAN')
   const [note, setNote] = useState('')

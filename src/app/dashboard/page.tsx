@@ -3,7 +3,7 @@
 import { AppLayout } from '@/components/layout/app-layout'
 import { useAuth, usePermission } from '@/components/providers'
 import { useQuery } from '@tanstack/react-query'
-import { formatRupiah } from '@/lib/utils'
+import { formatRupiah, wibPresetRange } from '@/lib/utils'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   TrendingUp, ShoppingCart, AlertTriangle,
@@ -26,12 +26,7 @@ import { SectionHeader } from './_components/section-header'
 
 // ── Date helpers ───────────────────────────────────────
 function getDefaultRange() {
-  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
-  return {
-    from: firstDay.toISOString().slice(0, 10),
-    to: now.toISOString().slice(0, 10),
-  }
+  return wibPresetRange('month')
 }
 
 // ── View mode toggle ────────────────────────────────────
@@ -115,25 +110,9 @@ export default function DashboardPage() {
 
   // ── Quick range presets ────────────────────────────────
   const setRange = useCallback((preset: string) => {
-    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
-    const today = now.toISOString().slice(0, 10)
-    if (preset === 'today') {
-      setDateFrom(today); setDateTo(today)
-    } else if (preset === 'yesterday') {
-      const yday = new Date(now); yday.setDate(yday.getDate() - 1)
-      const y = yday.toISOString().slice(0, 10)
-      setDateFrom(y); setDateTo(y)
-    } else if (preset === 'week') {
-      const mon = new Date(now); mon.setDate(now.getDate() - now.getDay() + 1)
-      setDateFrom(mon.toISOString().slice(0, 10)); setDateTo(today)
-    } else if (preset === 'month') {
-      setDateFrom(new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10))
-      setDateTo(today)
-    } else if (preset === 'lastmonth') {
-      const first = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-      const last  = new Date(now.getFullYear(), now.getMonth(), 0)
-      setDateFrom(first.toISOString().slice(0, 10)); setDateTo(last.toISOString().slice(0, 10))
-    }
+    const { from, to } = wibPresetRange(preset as 'today' | 'yesterday' | 'week' | 'month' | 'lastmonth')
+    setDateFrom(from)
+    setDateTo(to)
   }, [])
 
   // ── Derived values ────────────────────────────────────

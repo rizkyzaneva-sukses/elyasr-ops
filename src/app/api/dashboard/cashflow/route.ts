@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError } from '@/lib/utils'
+import { addWibDays, apiSuccess, apiError, wibStartDaysAgo, wibYmd } from '@/lib/utils'
 import { getBurnRate, getTotalCash } from '@/lib/dashboard-helpers'
 
 /**
@@ -23,9 +23,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const days = Math.max(7, Math.min(90, Number(searchParams.get('days') ?? '30')))
 
-  const since = new Date()
-  since.setDate(since.getDate() - (days - 1))
-  since.setHours(0, 0, 0, 0)
+  const since = wibStartDaysAgo(days)
+  const startYmd = wibYmd(since)
 
   const [daily, byCategory, cash, burn] = await Promise.all([
     // Daily cash in vs out
@@ -69,9 +68,7 @@ export async function GET(request: NextRequest) {
   let totalIn = 0
   let totalOut = 0
   for (let i = 0; i < days; i++) {
-    const d = new Date(since)
-    d.setDate(d.getDate() + i)
-    const ymd = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
+    const ymd = addWibDays(startYmd, i)
     const r = dailyMap.get(ymd)
     const cashIn = r ? Number(r.in_amount) : 0
     const cashOut = r ? Number(r.out_amount) : 0

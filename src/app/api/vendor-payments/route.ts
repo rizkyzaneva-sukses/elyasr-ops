@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError, getPagination } from '@/lib/utils'
+import { apiSuccess, apiError, getPagination, parseWibDateInput } from '@/lib/utils'
 
 export async function GET(request: NextRequest) {
   const session = await getSession()
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     // Create payment record
     const pay = await tx.vendorPayment.create({
       data: {
-        paymentDate: new Date(paymentDate),
+        paymentDate: parseWibDateInput(paymentDate),
         vendorId,
         vendorName: vendor.namaVendor,
         poId: poId || null,
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     await tx.walletLedger.create({
       data: {
         walletId,
-        trxDate: new Date(paymentDate),
+        trxDate: parseWibDateInput(paymentDate),
         trxType: 'VENDOR_PAYMENT',
         category: `Bayar Vendor - ${vendor.namaVendor}`,
         amount: -Math.abs(Number(amount)),

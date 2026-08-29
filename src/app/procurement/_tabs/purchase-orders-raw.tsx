@@ -3,7 +3,7 @@
 import { AppLayout } from '@/components/layout/app-layout'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { formatRupiah, formatDate, downloadCSV } from '@/lib/utils'
+import { formatRupiah, formatDate, downloadCSV, todayWIBStr } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
 import { useAuth } from '@/components/providers'
 import { FileText, Plus, ChevronLeft, ChevronRight, Search, Eye, FileDown, Printer, X, CreditCard, ChevronDown, Pencil, Trash2, AlertTriangle } from 'lucide-react'
@@ -133,7 +133,7 @@ function POFormModal({
 
   const [poNumberOverride, setPoNumberOverride] = useState(isEdit ? editPO.poNumber : '')
   const [vendorId, setVendorId] = useState(isEdit ? editPO.vendorId : '')
-  const [poDate, setPoDate] = useState(isEdit ? editPO.poDate?.slice(0, 10) : new Date().toISOString().slice(0, 10))
+  const [poDate, setPoDate] = useState(isEdit ? editPO.poDate?.slice(0, 10) : todayWIBStr())
   const [expectedDate, setExpectedDate] = useState(isEdit ? (editPO.expectedDate?.slice(0, 10) || '') : '')
   const [note, setNote] = useState(isEdit ? (editPO.note || '') : '')
   const [items, setItems] = useState<{ sku: string; productName?: string; qtyOrder: number }[]>(

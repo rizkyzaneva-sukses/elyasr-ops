@@ -6,25 +6,22 @@
  */
 
 import { prisma } from '@/lib/prisma'
+import { todayWIBStr, wibYmd, wibMonthEndStr, wibStartDaysAgo } from '@/lib/utils'
 
 export const TARGET_KEY_PREFIX = 'target.'
 
 /** Format YYYY-MM dari Date di zona WIB. */
 export function ymWIB(date: Date = new Date()): string {
-  const wib = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
-  const y = wib.getFullYear()
-  const m = String(wib.getMonth() + 1).padStart(2, '0')
-  return `${y}-${m}`
+  return wibYmd(date).slice(0, 7)
 }
 
 /** Tanggal awal & akhir bulan (WIB) untuk YYYY-MM tertentu. */
 export function monthRangeWIB(ym: string): { start: Date; end: Date; daysInMonth: number; today: Date } {
-  const [y, m] = ym.split('-').map(Number)
   const start = new Date(`${ym}-01T00:00:00+07:00`)
-  // last day of month
-  const lastDay = new Date(y, m, 0).getDate()
-  const end = new Date(`${ym}-${String(lastDay).padStart(2, '0')}T23:59:59+07:00`)
-  const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
+  const endYmd = wibMonthEndStr(`${ym}-01`)
+  const lastDay = Number(endYmd.slice(8, 10))
+  const end = new Date(`${endYmd}T23:59:59+07:00`)
+  const today = new Date()
   return { start, end, daysInMonth: lastDay, today }
 }
 
@@ -129,8 +126,7 @@ export async function getBurnRate(days = 90): Promise<{
   totalSpend: number
   days: number
 }> {
-  const since = new Date()
-  since.setDate(since.getDate() - days)
+  const since = wibStartDaysAgo(days)
   const rows = await prisma.$queryRaw<{ total: bigint }[]>`
     SELECT COALESCE(SUM(ABS(amount)), 0)::bigint AS total
     FROM wallet_ledger
@@ -149,10 +145,11 @@ export async function getBurnRate(days = 90): Promise<{
 
 /** Hitung pacing target: Berapa % dari hari di bulan ini yg sudah lewat. */
 export function monthPacing(ym: string): { dayIndex: number; daysInMonth: number; pacingPct: number } {
-  const { daysInMonth, today } = monthRangeWIB(ym)
+  const { daysInMonth } = monthRangeWIB(ym)
+  const [ty, tm, td] = todayWIBStr().split('-').map(Number)
   const [y, m] = ym.split('-').map(Number)
-  const isCurrentMonth = today.getFullYear() === y && today.getMonth() + 1 === m
-  const dayIndex = isCurrentMonth ? today.getDate() : daysInMonth
+  const isCurrentMonth = ty === y && tm === m
+  const dayIndex = isCurrentMonth ? td : daysInMonth
   const pacingPct = (dayIndex / daysInMonth) * 100
   return { dayIndex, daysInMonth, pacingPct }
 }

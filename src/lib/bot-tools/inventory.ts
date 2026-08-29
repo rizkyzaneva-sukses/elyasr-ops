@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { resolveRange, formatRp } from './helpers'
-import { nowWIB as getNowWIB } from '@/lib/utils'
+import { todayWIBStr, addWibDays, wibDayStart, wibDayEnd } from '@/lib/utils'
 
 // ─────────────────────────────────────────────
 // Tool 3: Status stok produk
@@ -80,9 +80,7 @@ export async function getStockLevels(filter: string = 'low', limit: number = 20)
 // Tool 11: Dead stock — produk dengan stok tinggi tapi tidak ada penjualan
 // ─────────────────────────────────────────────
 export async function getDeadStock(days: number = 30, limit: number = 25) {
-    const nowWIB = getNowWIB()
-    const cutoffDate = new Date(nowWIB)
-    cutoffDate.setDate(cutoffDate.getDate() - days)
+    const cutoffDate = wibDayStart(addWibDays(todayWIBStr(), -days))
 
     // Cari produk dengan stok > 0 tapi qty_terjual = 0 dalam N hari terakhir
     const rows = await prisma.$queryRaw<any[]>`
@@ -178,13 +176,9 @@ export async function getScanFulfillment(period?: string, startDate?: string, en
     `
 
     // Scan progress hari ini (siapa yang scan, berapa banyak)
-    const todayWIB = getNowWIB()
-    const y = todayWIB.getFullYear()
-    const m = String(todayWIB.getMonth() + 1).padStart(2, '0')
-    const d = String(todayWIB.getDate()).padStart(2, '0')
-    const todayStr = `${y}-${m}-${d}`
-    const todayGte = new Date(todayStr + 'T00:00:00+07:00')
-    const todayLte = new Date(todayStr + 'T23:59:59+07:00')
+    const todayStr = todayWIBStr()
+    const todayGte = wibDayStart(todayStr)
+    const todayLte = wibDayEnd(todayStr)
 
     const todayScans = await prisma.$queryRaw<any[]>`
         SELECT

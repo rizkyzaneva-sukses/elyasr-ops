@@ -2,14 +2,14 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { formatRupiah, formatDate } from '@/lib/utils'
+import { formatRupiah, formatDate, todayWIBStr } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
 import { useAuth } from '@/components/providers'
 import { Plus } from 'lucide-react'
 
 export function ModalAwalTab() {
   const { user } = useAuth(); const { toast } = useToast(); const qc = useQueryClient()
-  const [form, setForm] = useState({ walletId:'', jumlah:'', tanggalSetup:new Date().toISOString().slice(0,10), note:'' })
+  const [form, setForm] = useState({ walletId:'', jumlah:'', tanggalSetup:todayWIBStr(), note:'' })
   const [loading, setLoading] = useState(false)
 
   const { data, isLoading } = useQuery({ queryKey:['modal-awal'], queryFn: async () => fetch('/api/modal-awal').then(r=>r.json()).then(d=>d.data) })

@@ -3,7 +3,7 @@
 import { AppLayout } from '@/components/layout/app-layout'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { formatRupiah, formatDate } from '@/lib/utils'
+import { formatRupiah, formatDate, todayWIBStr } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
 import { Database, Plus } from 'lucide-react'
 import { useAuth } from '@/components/providers'
@@ -16,7 +16,7 @@ export default function ModalAwalPage() {
   const [form, setForm] = useState<{ walletId: string, jumlah: string, tanggalSetup: string, note: string }>({
     walletId: '',
     jumlah: '',
-    tanggalSetup: new Date().toISOString().slice(0, 10),
+    tanggalSetup: todayWIBStr(),
     note: ''
   })
   const [loading, setLoading] = useState(false)

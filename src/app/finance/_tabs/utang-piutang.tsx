@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { formatRupiah, formatDate } from '@/lib/utils'
+import { formatRupiah, formatDate, todayWIBStr } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
 import { useAuth } from '@/components/providers'
 import {
@@ -26,7 +26,7 @@ function AddModal({ type, wallets, onClose }: { type: 'utang' | 'piutang'; walle
     name: '',
     sourceWalletId: '',
     amount: '',
-    trxDate: new Date().toISOString().slice(0, 10),
+    trxDate: todayWIBStr(),
     dueDate: '',
     note: '',
   })
@@ -210,7 +210,7 @@ function PayModal({
 
   const [walletId, setWalletId] = useState(item.sourceWalletId || '')
   const [amount, setAmount] = useState(String(sisa > 0 ? sisa : ''))
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10))
+  const [paymentDate, setPaymentDate] = useState(todayWIBStr())
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
 

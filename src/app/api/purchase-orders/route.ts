@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError, generatePONumber, getPagination } from '@/lib/utils'
+import { apiSuccess, apiError, generatePONumber, getPagination, parseWibDateInput } from '@/lib/utils'
 
 // GET /api/purchase-orders
 export async function GET(request: NextRequest) {
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 
   // Generate PO number
   const existingPOs = await prisma.purchaseOrder.findMany({ select: { poNumber: true } })
-  const poNumber = poNumberOverride || generatePONumber(new Date(poDate), existingPOs.map(p => p.poNumber))
+  const poNumber = poNumberOverride || generatePONumber(parseWibDateInput(poDate), existingPOs.map(p => p.poNumber))
 
   // Check duplicate PO number
   const dupCheck = await prisma.purchaseOrder.findUnique({ where: { poNumber } })
@@ -104,8 +104,8 @@ export async function POST(request: NextRequest) {
         poNumber,
         vendorId,
         vendorName: vendor.namaVendor,
-        poDate: new Date(poDate),
-        expectedDate: expectedDate ? new Date(expectedDate) : null,
+        poDate: parseWibDateInput(poDate),
+        expectedDate: expectedDate ? parseWibDateInput(expectedDate) : null,
         totalItems: items.length,
         totalQtyOrder: items.reduce((s: number, i: any) => s + i.qtyOrder, 0),
         totalAmount,
@@ -183,8 +183,8 @@ export async function PATCH(request: NextRequest) {
       updateData.vendorId = vendorId
       updateData.vendorName = vendor.namaVendor
     }
-    if (poDate) updateData.poDate = new Date(poDate)
-    if (expectedDate !== undefined) updateData.expectedDate = expectedDate ? new Date(expectedDate) : null
+    if (poDate) updateData.poDate = parseWibDateInput(poDate)
+    if (expectedDate !== undefined) updateData.expectedDate = expectedDate ? parseWibDateInput(expectedDate) : null
     if (note !== undefined) updateData.note = note || null
 
     if (items?.length) {

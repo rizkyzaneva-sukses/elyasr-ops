@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError } from '@/lib/utils'
+import { apiSuccess, apiError, parseWibDateInput } from '@/lib/utils'
 
 // POST /api/wallet/ledger/edit-requests/[id]/action — Approve or Reject (OWNER only)
 export async function POST(
@@ -63,7 +63,7 @@ export async function POST(
       auditChanges.push(`amount: ${c.oldValue} → ${newAmt}`)
     }
     if (c.field === 'trxDate') {
-      updateData.trxDate = new Date(c.newValue)
+      updateData.trxDate = parseWibDateInput(c.newValue)
       auditChanges.push(`trxDate: ${c.oldValue} → ${c.newValue}`)
     }
     if (c.field === 'category') {

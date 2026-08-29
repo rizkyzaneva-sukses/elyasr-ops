@@ -2,25 +2,18 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { formatRupiah } from '@/lib/utils'
+import { formatRupiah, wibPresetRange } from '@/lib/utils'
 import {
   GitCompare, Scale, PackageSearch, ClipboardCheck,
   RefreshCw, Download, Info, Loader2, AlertTriangle,
 } from 'lucide-react'
 
 function getDefaultRange() {
-  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
-  return {
-    from: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10),
-    to: now.toISOString().slice(0, 10),
-  }
+  return wibPresetRange('month')
 }
 
 function getLastMonthYm() {
-  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
-  const m = now.getMonth() === 0 ? 12 : now.getMonth()
-  const y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
-  return `${y}-${String(m).padStart(2, '0')}`
+  return wibPresetRange('lastmonth').from.slice(0, 7)
 }
 
 export function ToolsTab() {

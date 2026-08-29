@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef } from 'react'
-import { formatRupiah, formatDate } from '@/lib/utils'
+import { formatRupiah, formatDate, todayWIBStr } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
 import { Plus, X, Upload, FileDown } from 'lucide-react'
 import { useAuth } from '@/components/providers'
@@ -10,7 +10,7 @@ import Papa from 'papaparse'
 
 function AddAsetModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient(); const { toast } = useToast()
-  const [form, setForm] = useState({ namaAset:'', nilaiPerolehan:'', tanggalBeli:new Date().toISOString().slice(0,10), umurEkonomisThn:'4', walletId:'', note:'' })
+  const [form, setForm] = useState({ namaAset:'', nilaiPerolehan:'', tanggalBeli:todayWIBStr(), umurEkonomisThn:'4', walletId:'', note:'' })
   const [loading, setLoading] = useState(false)
   const { data: wallets } = useQuery({ queryKey:['wallets'], queryFn: async () => fetch('/api/wallet').then(r=>r.json()).then(d=>d.data??[]) })
 

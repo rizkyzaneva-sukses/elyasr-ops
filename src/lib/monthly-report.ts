@@ -5,6 +5,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { computeProfitLoss } from '@/lib/pnl-helpers'
+import { todayWIBStr } from '@/lib/utils'
 
 function fmt(n: number): string {
     return 'Rp ' + Math.round(n || 0).toLocaleString('id-ID')
@@ -23,10 +24,6 @@ function pctChange(current: number, previous: number): string {
 
 function trendIcon(current: number, previous: number): string {
     return current >= previous ? '📈' : '📉'
-}
-
-function todayWIBStr(): string {
-    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
 }
 
 function getPrevMonthRange(): { start: string; end: string; label: string; prevStart: string; prevEnd: string; prevLabel: string } {

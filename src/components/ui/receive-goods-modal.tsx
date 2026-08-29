@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/components/ui/toaster'
 import { X, Package, ChevronDown, Plus, Trash2 } from 'lucide-react'
-import { formatRupiah } from '@/lib/utils'
+import { formatRupiah, todayWIBStr } from '@/lib/utils'
 
 interface ReceiveItem {
   poId: string | null
@@ -21,7 +21,7 @@ export function ReceiveGoodsModal({ onClose, onSuccess }: { onClose: () => void;
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [vendorId, setVendorId] = useState('')
-  const [receiptDate, setReceiptDate] = useState(new Date().toISOString().slice(0, 10))
+  const [receiptDate, setReceiptDate] = useState(todayWIBStr())
   const [suratJalanNumber, setSuratJalanNumber] = useState('')
   const [note, setNote] = useState('')
   const [selectedPOIds, setSelectedPOIds] = useState<Set<string>>(new Set())

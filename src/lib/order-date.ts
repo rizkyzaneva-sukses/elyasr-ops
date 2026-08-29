@@ -1,3 +1,5 @@
+import { wibYmd } from '@/lib/utils'
+
 /**
  * Parse string tanggal order (dari CSV marketplace) ke Date WIB.
  *
@@ -27,11 +29,7 @@ export function parseOrderDate(raw: string | null | undefined): Date | null {
   return null
 }
 
-/** Bandingkan dua tanggal per-hari (abaikan jam). */
+/** Bandingkan dua tanggal per-hari kalender WIB (abaikan jam). */
 export function sameCalendarDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  )
+  return wibYmd(a) === wibYmd(b)
 }

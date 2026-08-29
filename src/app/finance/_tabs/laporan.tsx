@@ -2,15 +2,11 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
-import { formatRupiah, formatDate } from '@/lib/utils'
+import { formatRupiah, formatDate, wibPresetRange } from '@/lib/utils'
 import { BarChart3, TrendingUp, TrendingDown, Info } from 'lucide-react'
 
 function getDefaultRange() {
-  const now = new Date(new Date().toLocaleString('en-US', { timeZone:'Asia/Jakarta' }))
-  return {
-    from: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10),
-    to: now.toISOString().slice(0,10),
-  }
+  return wibPresetRange('month')
 }
 
 export function LaporanTab() {
@@ -48,11 +44,9 @@ export function LaporanTab() {
   }, [qc])
 
   const setRange = (preset: string) => {
-    const now = new Date(new Date().toLocaleString('en-US', { timeZone:'Asia/Jakarta' }))
-    const today = now.toISOString().slice(0,10)
-    if (preset==='month') { setDateFrom(new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10)); setDateTo(today) }
-    else if (preset==='lastmonth') { setDateFrom(new Date(now.getFullYear(),now.getMonth()-1,1).toISOString().slice(0,10)); setDateTo(new Date(now.getFullYear(),now.getMonth(),0).toISOString().slice(0,10)) }
-    else if (preset==='quarter') { const q=Math.floor(now.getMonth()/3); setDateFrom(new Date(now.getFullYear(),q*3,1).toISOString().slice(0,10)); setDateTo(today) }
+    const { from, to } = wibPresetRange(preset as 'month' | 'lastmonth' | 'quarter')
+    setDateFrom(from)
+    setDateTo(to)
   }
 
   return (

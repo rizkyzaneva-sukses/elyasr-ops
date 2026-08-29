@@ -16,6 +16,7 @@ import {
   ymWIB,
   monthPacing,
 } from '@/lib/dashboard-helpers'
+import { todayWIBStr, addWibDays, wibMondayOfWeek, wibYmd } from '@/lib/utils'
 
 function fmt(n: number): string {
     return 'Rp ' + Math.round(n || 0).toLocaleString('id-ID')
@@ -36,44 +37,28 @@ function trendIcon(current: number, previous: number): string {
     return current >= previous ? '📈' : '📉'
 }
 
-function todayWIBStr(): string {
-    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
-}
-
-function addDays(dateStr: string, days: number): string {
-    const d = new Date(`${dateStr}T12:00:00+07:00`)
-    d.setDate(d.getDate() + days)
-    return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
-}
-
-function getMondayOfWeek(dateStr: string): string {
-    const d = new Date(`${dateStr}T12:00:00+07:00`)
-    const day = d.getDay()
-    const diff = day === 0 ? -6 : 1 - day
-    d.setDate(d.getDate() + diff)
-    return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
-}
-
 function fmtWIBDateShort(dateStr: string): string {
-    const d = new Date(`${dateStr}T12:00:00+07:00`)
+    const [, m, day] = dateStr.split('-')
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des']
-    return `${d.getDate()} ${months[d.getMonth()]}`
+    return `${Number(day)} ${months[Number(m) - 1]}`
 }
 
 function fmtTglShort(d: any): string {
-    const dt = new Date(d)
+    const ymd = wibYmd(new Date(d))
+    if (!ymd) return '-'
+    const [, m, day] = ymd.split('-')
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des']
-    return `${dt.getDate()} ${months[dt.getMonth()]}`
+    return `${Number(day)} ${months[Number(m) - 1]}`
 }
 
 export async function buildWeeklyReport(): Promise<string> {
     const today = todayWIBStr()
     // "Minggu lalu" = Senin minus 7 sampai Minggu minus 1
-    const thisMonday = getMondayOfWeek(today)
-    const lastMonday = addDays(thisMonday, -7)
-    const lastSunday = addDays(thisMonday, -1)
-    const prevMonday = addDays(lastMonday, -7)
-    const prevSunday = addDays(lastMonday, -1)
+    const thisMonday = wibMondayOfWeek(today)
+    const lastMonday = addWibDays(thisMonday, -7)
+    const lastSunday = addWibDays(thisMonday, -1)
+    const prevMonday = addWibDays(lastMonday, -7)
+    const prevSunday = addWibDays(lastMonday, -1)
 
     const lastWeekStart = new Date(`${lastMonday}T00:00:00+07:00`)
     const lastWeekEnd = new Date(`${lastSunday}T23:59:59+07:00`)
@@ -88,7 +73,7 @@ export async function buildWeeklyReport(): Promise<string> {
     const gteMonth = new Date(`${monthStart}T00:00:00+07:00`)
     // Tempo "minggu depan" (forward 7 hari)
     const tempoFrom = gteToday
-    const tempoTo = new Date(`${addDays(today, 7)}T23:59:59+07:00`)
+    const tempoTo = new Date(`${addWibDays(today, 7)}T23:59:59+07:00`)
 
     const [
         lastWeekStats,

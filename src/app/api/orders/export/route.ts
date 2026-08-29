@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
+import { todayWIBStr, wibDateRange, wibDayEnd, wibDayStart, wibYmd } from '@/lib/utils'
 
 function normalizeStatus(status: string | null | undefined): string {
   return String(status ?? '').trim().toLowerCase()
@@ -64,8 +65,15 @@ export async function GET(request: NextRequest) {
     // (Tidak pakai relasi payout.orderId: order bisa multi-SKU per orderNo,
     // sedangkan Payout.orderId hanya di-assign ke salah satu row saja saat import.)
     const dateFilter: any = {}
-    if (dateFrom) dateFilter.gte = new Date(dateFrom)
-    if (dateTo)   dateFilter.lte = new Date(`${dateTo}T23:59:59.999Z`)
+    if (dateFrom && dateTo) {
+      const { fromDate, toDate } = wibDateRange(dateFrom, dateTo)
+      dateFilter.gte = fromDate
+      dateFilter.lte = toDate
+    } else if (dateFrom) {
+      dateFilter.gte = wibDayStart(dateFrom)
+    } else if (dateTo) {
+      dateFilter.lte = wibDayEnd(dateTo)
+    }
 
     const matchingPayouts = await prisma.payout.findMany({
       where: Object.keys(dateFilter).length ? { releasedDate: dateFilter } : {},
@@ -112,8 +120,15 @@ export async function GET(request: NextRequest) {
     const where: any = {}
     if (dateFrom || dateTo) {
       const f: any = {}
-      if (dateFrom) f.gte = new Date(dateFrom)
-      if (dateTo)   f.lte = new Date(`${dateTo}T23:59:59.999Z`)
+      if (dateFrom && dateTo) {
+        const { fromDate, toDate } = wibDateRange(dateFrom, dateTo)
+        f.gte = fromDate
+        f.lte = toDate
+      } else if (dateFrom) {
+        f.gte = wibDayStart(dateFrom)
+      } else if (dateTo) {
+        f.lte = wibDayEnd(dateTo)
+      }
       where.trxDate = f
     }
     if (platform) where.platform = platform
@@ -169,7 +184,7 @@ export async function GET(request: NextRequest) {
   ].join(','))
 
   const csv = BOM + [header, ...rows].join('\n')
-  const filename = `orders-export-${mode}-${new Date().toISOString().slice(0, 10)}.csv`
+  const filename = `orders-export-${mode}-${todayWIBStr()}.csv`
 
   return new Response(csv, {
     status: 200,
@@ -205,6 +220,5 @@ function csvEscape(val: string): string {
 
 function fmtDate(d: Date | string | null | undefined): string {
   if (!d) return ''
-  const date = typeof d === 'string' ? new Date(d) : d
-  return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
+  return wibYmd(d)
 }

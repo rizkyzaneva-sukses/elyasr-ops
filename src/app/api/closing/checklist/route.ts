@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError, wibDateRange } from '@/lib/utils'
+import { apiSuccess, apiError, wibDateRange, todayWIBStr, wibMonthEndStr } from '@/lib/utils'
 import { computeProfitLoss } from '@/lib/pnl-helpers'
 
 /**
@@ -15,19 +15,15 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   let month = url.searchParams.get('month')
   if (!month) {
-    const now = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
+    const now = todayWIBStr()
     const [y, m] = now.split('-').map(Number)
     const lm = m === 1 ? 12 : m - 1
     const ly = m === 1 ? y - 1 : y
     month = `${ly}-${String(lm).padStart(2, '0')}`
   }
 
-  const [yStr, mStr] = month.split('-')
-  const y = parseInt(yStr)
-  const m = parseInt(mStr)
-  const lastDay = new Date(y, m, 0).getDate()
   const dateFrom = `${month}-01`
-  const dateTo = `${month}-${String(lastDay).padStart(2, '0')}`
+  const dateTo = wibMonthEndStr(dateFrom)
   const { fromDate, toDate } = wibDateRange(dateFrom, dateTo)
 
   const [orderCnt, payoutCnt, hppZero, unpaid, orphan, pl, lastAds, adsWallets] = await Promise.all([

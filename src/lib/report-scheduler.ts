@@ -9,6 +9,8 @@
  * - Cross-check DB sebelum kirim untuk cegah double-send
  */
 
+import { todayWIBStr, wibYmd } from '@/lib/utils'
+
 let schedulerStarted = false
 let lastSentDate: string | null = null
 let tickCount = 0          // total tick sejak start
@@ -36,15 +38,11 @@ async function dbGet(key: string): Promise<string | null> {
 
 // ── Waktu WIB sekarang ──────────────────────────────────────────────────────
 function getWIBTime(): { hours: number; minutes: number; dateStr: string } {
-    const now = new Date()
-    const wibStr = now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' })
-    const wib = new Date(wibStr)
-    const hours = wib.getHours()
-    const minutes = wib.getMinutes()
-    const y = wib.getFullYear()
-    const m = String(wib.getMonth() + 1).padStart(2, '0')
-    const d = String(wib.getDate()).padStart(2, '0')
-    const dateStr = `${y}-${m}-${d}`
+    const dateStr = todayWIBStr()
+    const [hours, minutes] = new Date()
+        .toLocaleTimeString('en-GB', { timeZone: 'Asia/Jakarta', hour12: false })
+        .split(':')
+        .map(Number)
     return { hours, minutes, dateStr }
 }
 
@@ -53,12 +51,7 @@ async function alreadySentToday(dateStr: string): Promise<boolean> {
     const val = await dbGet('last_auto_report_sent')
     if (!val) return false
     try {
-        const sent = new Date(val)
-        const sentWib = new Date(sent.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
-        const sy = sentWib.getFullYear()
-        const sm = String(sentWib.getMonth() + 1).padStart(2, '0')
-        const sd = String(sentWib.getDate()).padStart(2, '0')
-        return `${sy}-${sm}-${sd}` === dateStr
+        return wibYmd(new Date(val)) === dateStr
     } catch { return false }
 }
 

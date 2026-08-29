@@ -3,7 +3,7 @@
 import { AppLayout } from '@/components/layout/app-layout'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { formatRupiah, formatDate } from '@/lib/utils'
+import { formatRupiah, formatDate, todayWIBStr } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
 import { Package, Plus, X } from 'lucide-react'
 import { useAuth } from '@/components/providers'
@@ -14,7 +14,7 @@ function AddAsetModal({ onClose }: { onClose: () => void }) {
   const [form, setForm] = useState({
     namaAset: '',
     nilaiPerolehan: '',
-    tanggalBeli: new Date().toISOString().slice(0, 10),
+    tanggalBeli: todayWIBStr(),
     umurEkonomisThn: '4',
     walletId: '',
     note: '',

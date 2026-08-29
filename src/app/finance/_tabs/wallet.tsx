@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { formatRupiah, formatDate, downloadCSV } from '@/lib/utils'
+import { formatRupiah, formatDate, downloadCSV, todayWIBStr } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
 import { useAuth } from '@/components/providers'
 import { Plus, Download, Settings, ChevronLeft, ChevronRight, HelpCircle, X, ChevronDown, Search, Pencil } from 'lucide-react'
@@ -170,7 +170,7 @@ function AddCategoryModal({ onClose, onCreated }: { onClose: () => void; onCreat
 function AddTransactionModal({ onClose, wallets }: { onClose: () => void; wallets: any[] }) {
   const qc = useQueryClient(); const { toast } = useToast()
   const [form, setForm] = useState({
-    walletId: wallets[0]?.id ?? '', trxDate: new Date().toISOString().slice(0,10),
+    walletId: wallets[0]?.id ?? '', trxDate: todayWIBStr(),
     trxType: 'EXPENSE', category: '', amount: '', note: '', destWalletId: '',
   })
   const [loading, setLoading] = useState(false)

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useToast } from '@/components/ui/toaster'
+import { todayWIBStr } from '@/lib/utils'
 import { Settings, Loader2, AlertTriangle, Trash2, X, Wallet, Plus } from 'lucide-react'
 import { TelegramSection } from './telegram-section'
 
@@ -207,7 +208,7 @@ function SaldoAwalSection() {
   const [wallets, setWallets] = useState<any[]>([])
   const [modals, setModals] = useState<Record<string, any>>({})
   const [inputs, setInputs] = useState<Record<string, string>>({})
-  const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10))
+  const [tanggal, setTanggal] = useState(todayWIBStr())
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState<string | null>(null)
 

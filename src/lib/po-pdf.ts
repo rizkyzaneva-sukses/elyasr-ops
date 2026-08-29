@@ -27,7 +27,7 @@ export function generatePOPDF(po: POData): jsPDF {
   doc.setFontSize(8)
   doc.setTextColor(128)
   doc.text('ELYASR Business Operation', margin, y)
-  doc.text(new Date().toLocaleDateString('id-ID'), pageWidth - margin, y, { align: 'right' })
+  doc.text(new Date().toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' }), pageWidth - margin, y, { align: 'right' })
 
   y += 12
   doc.setFontSize(18)
@@ -57,13 +57,13 @@ export function generatePOPDF(po: POData): jsPDF {
   doc.setFont('helvetica', 'bold')
   doc.text('Tanggal PO:', leftX, y)
   doc.setFont('helvetica', 'normal')
-  doc.text(new Date(po.poDate).toLocaleDateString('id-ID'), leftX + 25, y)
+  doc.text(new Date(po.poDate).toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' }), leftX + 25, y)
 
   if (po.expectedDate) {
     doc.setFont('helvetica', 'bold')
     doc.text('Estimasi Tiba:', rightX, y)
     doc.setFont('helvetica', 'normal')
-    doc.text(new Date(po.expectedDate).toLocaleDateString('id-ID'), rightX + 30, y)
+    doc.text(new Date(po.expectedDate).toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' }), rightX + 30, y)
   }
 
   y += 10

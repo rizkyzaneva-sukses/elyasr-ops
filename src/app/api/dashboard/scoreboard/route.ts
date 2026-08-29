@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError } from '@/lib/utils'
+import { apiSuccess, apiError, addWibDays, todayWIBStr, wibDayEnd, wibYmd } from '@/lib/utils'
 import {
   ymWIB,
   monthRangeWIB,
@@ -28,8 +28,8 @@ export async function GET(_req: NextRequest) {
   if (!['OWNER', 'FINANCE'].includes(session.userRole)) return apiError('Forbidden', 403)
 
   const ym = ymWIB()
-  const { start: monthStart, today, daysInMonth } = monthRangeWIB(ym)
-  const lteToday = new Date(`${today.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })}T23:59:59+07:00`)
+  const { start: monthStart, daysInMonth } = monthRangeWIB(ym)
+  const lteToday = wibDayEnd(todayWIBStr())
   const { dayIndex, pacingPct } = monthPacing(ym)
 
   const prevYm = (() => {
@@ -151,9 +151,7 @@ export async function GET(_req: NextRequest) {
 
   // Untuk MoM, compare same-day-of-month (apples-to-apples)
   // Hitung omzet bulan lalu sd hari ke-N saja
-  const prevSameDayCutoff = new Date(prevStart)
-  prevSameDayCutoff.setDate(prevSameDayCutoff.getDate() + dayIndex - 1)
-  prevSameDayCutoff.setHours(23, 59, 59, 999)
+  const prevSameDayCutoff = wibDayEnd(addWibDays(wibYmd(prevStart), dayIndex - 1))
 
   const prevSameDayRows = await prisma.$queryRaw<{ omzet: bigint }[]>`
     SELECT COALESCE(SUM(real_omzet), 0)::bigint AS omzet

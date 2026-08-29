@@ -20,6 +20,7 @@ import {
     getScanFulfillment,
     getPeriodComparison,
 } from '@/lib/bot-tools'
+import { todayWIBStr } from '@/lib/utils'
 
 // ─────────────────────────────────────────────
 // Config — 3 Slot Provider (auto-failover)
@@ -42,8 +43,7 @@ const API_TIMEOUT_MS = 30_000
 // System prompt — di-generate fresh setiap call agar tanggal selalu akurat
 // ─────────────────────────────────────────────
 function getSystemPrompt(): string {
-    const nowWIB = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
-    const todayStr = `${nowWIB.getFullYear()}-${String(nowWIB.getMonth() + 1).padStart(2, '0')}-${String(nowWIB.getDate()).padStart(2, '0')}`
+    const todayStr = todayWIBStr()
 
     return `Kamu adalah asisten bisnis AI untuk Elyasr Ops — sistem manajemen operasional toko online.
 Kamu membantu owner mendapatkan insights dari data bisnisnya melalui Telegram.

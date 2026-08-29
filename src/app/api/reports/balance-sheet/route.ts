@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError } from '@/lib/utils'
+import { apiSuccess, apiError, todayWIBStr, wibDayEnd } from '@/lib/utils'
 
 // GET /api/reports/balance-sheet?asOf=YYYY-MM-DD
 export async function GET(request: NextRequest) {
@@ -10,9 +10,8 @@ export async function GET(request: NextRequest) {
   if (!['OWNER', 'FINANCE'].includes(session.userRole)) return apiError('Forbidden', 403)
 
   const { searchParams } = request.nextUrl
-  const asOfStr = searchParams.get('asOf') || new Date().toISOString().slice(0, 10)
-  const asOf = new Date(asOfStr)
-  asOf.setHours(23, 59, 59, 999)
+  const asOfStr = searchParams.get('asOf') || todayWIBStr()
+  const asOf = wibDayEnd(asOfStr)
 
   // ── ASET LANCAR ──────────────────────────────────────────────────────────
 

@@ -15,6 +15,17 @@ export async function register() {
     if (process.env.NEXT_RUNTIME === 'edge') return
 
     try {
+        const { todayWIBStr } = await import('@/lib/utils')
+        function wibClock(): { today: string; hour: number; minute: number; weekday: string } {
+            const today = todayWIBStr()
+            const [hour, minute] = new Date()
+                .toLocaleTimeString('en-GB', { timeZone: 'Asia/Jakarta', hour12: false })
+                .split(':')
+                .map(Number)
+            const weekday = new Date().toLocaleDateString('en-US', { timeZone: 'Asia/Jakarta', weekday: 'short' })
+            return { today, hour, minute, weekday }
+        }
+
         const nodeCron                            = await import('node-cron')
         const { buildDailyReport }                = await import('@/lib/daily-report')
         const { buildWeeklyReport }               = await import('@/lib/weekly-report')
@@ -60,16 +71,14 @@ export async function register() {
             try {
                 const { hour, minute, isActive } = await getReportSchedule('daily')
 
-                const nowJkt = new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' })
-                const d      = new Date(nowJkt)
-                const today  = d.toLocaleDateString('en-CA')
-                const currentTotalMin   = d.getHours() * 60 + d.getMinutes()
+                const { today, hour: hourNow, minute: minuteNow } = wibClock()
+                const currentTotalMin   = hourNow * 60 + minuteNow
 
                 const heartbeatBucket = `${today}:${Math.floor(currentTotalMin / 5)}`
                 if (lastHeartbeatBucket !== heartbeatBucket) {
                     lastHeartbeatBucket = heartbeatBucket
                     await markSetting('scheduler_heartbeat', new Date().toISOString())
-                    await markSetting('scheduler_last_wib', `${today} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`)
+                    await markSetting('scheduler_last_wib', `${today} ${String(hourNow).padStart(2,'0')}:${String(minuteNow).padStart(2,'0')}`)
                     await markSetting('scheduler_schedule', `${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')} WIB`)
                 }
 
@@ -88,7 +97,7 @@ export async function register() {
                 }
 
                 dailySending = true
-                console.log(`[daily-report] 🚀 ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')} WIB — kirim laporan harian (jadwal: ${hour}:${String(minute).padStart(2,'0')})...`)
+                console.log(`[daily-report] 🚀 ${hourNow}:${String(minuteNow).padStart(2,'0')} WIB — kirim laporan harian (jadwal: ${hour}:${String(minute).padStart(2,'0')})...`)
 
                 const report           = await buildDailyReport()
                 const { sent, failed } = await broadcastTelegramReport(report, 'daily')
@@ -117,18 +126,16 @@ export async function register() {
         nodeCron.schedule('* * * * *', async () => {
             try {
                 const { hour, minute, isActive } = await getReportSchedule('weekly')
-                const nowJkt = new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' })
-                const d      = new Date(nowJkt)
-                const today  = d.toLocaleDateString('en-CA')
+                const { today, hour: hourNow, minute: minuteNow, weekday } = wibClock()
 
                 if (!isActive) return
-                if (d.getDay() !== 1) return
+                if (weekday !== 'Mon') return
                 if (lastWeeklySent === today) return
                 if (weeklySending) return
 
                 // Window: jadwal weekly s/d +29 menit
                 const scheduledMin = hour * 60 + minute
-                const currentMin   = d.getHours() * 60 + d.getMinutes()
+                const currentMin   = hourNow * 60 + minuteNow
                 const inWindow = currentMin >= scheduledMin && currentMin < scheduledMin + 30
                 if (!inWindow) return
 
@@ -138,7 +145,7 @@ export async function register() {
                 }
 
                 weeklySending = true
-                console.log(`[weekly-report] 🚀 ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')} WIB — kirim laporan mingguan (jadwal: ${hour}:${String(minute).padStart(2,'0')})...`)
+                console.log(`[weekly-report] 🚀 ${hourNow}:${String(minuteNow).padStart(2,'0')} WIB — kirim laporan mingguan (jadwal: ${hour}:${String(minute).padStart(2,'0')})...`)
 
                 const report = await buildWeeklyReport()
                 const { sent, failed } = await broadcastTelegramReport(report, 'weekly')
@@ -163,18 +170,17 @@ export async function register() {
 
         nodeCron.schedule('* * * * *', async () => {
             try {
-                const nowJkt = new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' })
-                const d      = new Date(nowJkt)
-                const today  = d.toLocaleDateString('en-CA')
+                const { today, hour: hourNow, minute: minuteNow } = wibClock()
+                const dayOfMonth = Number(today.slice(8, 10))
 
                 // Hanya tanggal 2 (Laba Rugi bulan sebelumnya)
-                if (d.getDate() !== 2) return
+                if (dayOfMonth !== 2) return
                 if (lastMonthlySent === today) return
                 if (monthlySending) return
 
                 // Window: 09:00 – 09:29 WIB
                 const scheduledMin = 9 * 60
-                const currentMin   = d.getHours() * 60 + d.getMinutes()
+                const currentMin   = hourNow * 60 + minuteNow
                 const inWindow = currentMin >= scheduledMin && currentMin < scheduledMin + 30
                 if (!inWindow) return
 
@@ -184,7 +190,7 @@ export async function register() {
                 }
 
                 monthlySending = true
-                console.log(`[monthly-report] 🚀 ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')} WIB — kirim Laba Rugi bulanan...`)
+                console.log(`[monthly-report] 🚀 ${hourNow}:${String(minuteNow).padStart(2,'0')} WIB — kirim Laba Rugi bulanan...`)
 
                 const report = await buildMonthlyReport()
                 const { sent, failed } = await broadcastTelegramReport(report, 'monthly')

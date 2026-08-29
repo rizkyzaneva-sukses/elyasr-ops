@@ -3,7 +3,7 @@
 import { AppLayout } from '@/components/layout/app-layout'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef } from 'react'
-import { formatRupiah, formatDate } from '@/lib/utils'
+import { formatRupiah, formatDate, todayWIBStr } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
 import { usePermission } from '@/components/providers'
 import Papa from 'papaparse'
@@ -69,7 +69,7 @@ function ExportModal({
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement('a')
       a.href     = url
-      a.download = `orders-${mode}-${new Date().toISOString().slice(0, 10)}.csv`
+      a.download = `orders-${mode}-${todayWIBStr()}.csv`
       document.body.appendChild(a)
       a.click()
       a.remove()

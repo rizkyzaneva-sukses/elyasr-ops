@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError } from '@/lib/utils'
+import { apiSuccess, apiError, wibDateRange, wibDayEnd, wibDayStart } from '@/lib/utils'
 
 // GET /api/payouts/summary
 // Query: dateFrom, dateTo, walletId
@@ -17,8 +17,15 @@ export async function GET(request: NextRequest) {
 
   // ── Build date range ────────────────────────────────
   const dateFilter: { gte?: Date; lte?: Date } = {}
-  if (dateFrom) dateFilter.gte = new Date(dateFrom)
-  if (dateTo)   dateFilter.lte = new Date(`${dateTo}T23:59:59.999Z`)
+  if (dateFrom && dateTo) {
+    const { fromDate, toDate } = wibDateRange(dateFrom, dateTo)
+    dateFilter.gte = fromDate
+    dateFilter.lte = toDate
+  } else if (dateFrom) {
+    dateFilter.gte = wibDayStart(dateFrom)
+  } else if (dateTo) {
+    dateFilter.lte = wibDayEnd(dateTo)
+  }
 
   const payoutWhere: Record<string, unknown> = {}
   if (Object.keys(dateFilter).length) payoutWhere.releasedDate = dateFilter

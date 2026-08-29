@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError } from '@/lib/utils'
+import { apiSuccess, apiError, parseWibDateInput } from '@/lib/utils'
 
 export async function GET(request: NextRequest) {
   const session = await getSession()
@@ -56,8 +56,8 @@ export async function POST(request: NextRequest) {
           sourceWalletId: data.sourceWalletId,
           sourceWalletName: wallet.name,
           amount: Number(data.amount),
-          trxDate: new Date(data.trxDate),
-          dueDate: data.dueDate ? new Date(data.dueDate) : null,
+          trxDate: parseWibDateInput(data.trxDate),
+          dueDate: data.dueDate ? parseWibDateInput(data.dueDate) : null,
           note: data.note || null,
           createdBy: session.username,
         },
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       await tx.walletLedger.create({
         data: {
           walletId: data.sourceWalletId,
-          trxDate: new Date(data.trxDate),
+          trxDate: parseWibDateInput(data.trxDate),
           trxType: 'OTHER_INCOME',
           category: `Utang - ${data.creditorName}`,
           amount: Number(data.amount),
@@ -91,8 +91,8 @@ export async function POST(request: NextRequest) {
           sourceWalletId: data.sourceWalletId,
           sourceWalletName: wallet.name,
           amount: Number(data.amount),
-          trxDate: new Date(data.trxDate),
-          dueDate: data.dueDate ? new Date(data.dueDate) : null,
+          trxDate: parseWibDateInput(data.trxDate),
+          dueDate: data.dueDate ? parseWibDateInput(data.dueDate) : null,
           note: data.note || null,
           createdBy: session.username,
         },
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       await tx.walletLedger.create({
         data: {
           walletId: data.sourceWalletId,
-          trxDate: new Date(data.trxDate),
+          trxDate: parseWibDateInput(data.trxDate),
           trxType: 'EXPENSE',
           category: `Piutang - ${data.debtorName}`,
           amount: -Number(data.amount),

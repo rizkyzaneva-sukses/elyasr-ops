@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError } from '@/lib/utils'
+import { apiSuccess, apiError, parseWibDateInput } from '@/lib/utils'
 
 // POST /api/aset-tetap/batch — bulk import dari CSV
 export async function POST(request: NextRequest) {
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     if (!r.namaAset?.trim())       { errors.push(`Baris ${rowNum}: namaAset kosong`); continue }
     const nilai = parseInt(String(r.nilaiPerolehan).replace(/[^0-9]/g, ''))
     if (!nilai || isNaN(nilai))    { errors.push(`Baris ${rowNum}: nilaiPerolehan tidak valid`); continue }
-    const tgl = new Date(r.tanggalBeli)
+    const tgl = parseWibDateInput(r.tanggalBeli)
     if (isNaN(tgl.getTime()))      { errors.push(`Baris ${rowNum}: tanggalBeli tidak valid (gunakan YYYY-MM-DD)`); continue }
     const umur = parseInt(r.umurEkonomisThn)
     if (!umur || isNaN(umur) || umur <= 0) { errors.push(`Baris ${rowNum}: umurEkonomisThn tidak valid`); continue }

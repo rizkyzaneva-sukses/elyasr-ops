@@ -1,9 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError } from '@/lib/utils'
-import { format } from 'date-fns'
-import { formatInTimeZone } from 'date-fns-tz'
+import { apiSuccess, apiError, todayWIBStr, nowWIB } from '@/lib/utils'
 
 export async function POST(request: NextRequest) {
   const session = await getSession()
@@ -28,8 +26,8 @@ export async function POST(request: NextRequest) {
       dateIdx = 1
     }
 
-    const todayDate = formatInTimeZone(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd')
-    const jakartaNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
+    const todayDate = todayWIBStr()
+    const scannedAt = nowWIB()
 
     const result = {
       success: 0,
@@ -72,7 +70,7 @@ export async function POST(request: NextRequest) {
           data: {
             orderId: matchedOrder.id,
             orderNo: matchedOrder.orderNo,
-            scannedAt: jakartaNow,
+            scannedAt,
             scannedBy: session.userId,
             note: 'Bulk Upload'
           }

@@ -7,6 +7,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useToast } from '@/components/ui/toaster'
+import { todayWIBStr } from '@/lib/utils'
 import { ScanLine, Plus, Minus, CheckCircle, Trash2, Upload, Search, X, AlertCircle, Camera, CameraOff } from 'lucide-react'
 import Papa from 'papaparse'
 
@@ -460,7 +461,7 @@ export function ScanTab() {
   const fileRef  = useRef<HTMLInputElement>(null)
   const suggestDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const [rpDate, setRpDate]         = useState(new Date().toISOString().split('T')[0])
+  const [rpDate, setRpDate]         = useState(todayWIBStr())
   const [rpSupplier, setRpSupplier] = useState('')
   const [rpReason, setRpReason]     = useState('')
   const [rpNote, setRpNote]         = useState('')

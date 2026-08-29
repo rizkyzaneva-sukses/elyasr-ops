@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError, getPagination } from '@/lib/utils'
+import { apiSuccess, apiError, getPagination, wibDateRange } from '@/lib/utils'
 import { parseShopeeOrders, parseTikTokOrders, detectPlatform } from '@/lib/order-parsers'
 import { parseOrderDate } from '@/lib/order-date'
 
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const where = {
+  const baseWhere = {
     ...(search && {
       OR: [
         { orderNo: { contains: search, mode: 'insensitive' as const } },
@@ -87,10 +87,31 @@ export async function GET(request: NextRequest) {
       ],
     }),
     ...(platform && { platform }),
-    ...(dateFrom && { orderCreatedAt: { gte: dateFrom } }),
-    ...(dateTo && { orderCreatedAt: { lte: dateTo } }),
     ...statusFilter,
   }
+
+  let dateOr: object | undefined
+  if (dateFrom || dateTo) {
+    const { fromDate, toDate } = wibDateRange(dateFrom || dateTo!, dateTo || dateFrom!)
+    const trxBound: { gte?: Date; lte?: Date } = {}
+    const createdBound: { gte?: string; lte?: string } = {}
+    if (dateFrom) {
+      trxBound.gte = fromDate
+      createdBound.gte = dateFrom
+    }
+    if (dateTo) {
+      trxBound.lte = toDate
+      createdBound.lte = `${dateTo} 23:59:59`
+    }
+    dateOr = {
+      OR: [
+        { trxDate: trxBound },
+        { AND: [{ trxDate: null }, { orderCreatedAt: createdBound }] },
+      ],
+    }
+  }
+
+  const where = dateOr ? { AND: [baseWhere, dateOr] } : baseWhere
 
   const [orders, total] = await Promise.all([
     prisma.order.findMany({

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError } from '@/lib/utils'
+import { apiSuccess, apiError, parseWibDateInput } from '@/lib/utils'
 
 // POST /api/utang-piutang/pay — bayar utang atau terima piutang
 export async function POST(request: NextRequest) {
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       await tx.utangPayment.create({
         data: {
           utangId: entityId,
-          paymentDate: new Date(paymentDate),
+          paymentDate: parseWibDateInput(paymentDate),
           amount: Number(amount),
           walletId,
           walletName: wallet.name,
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
       await tx.walletLedger.create({
         data: {
           walletId,
-          trxDate: new Date(paymentDate),
+          trxDate: parseWibDateInput(paymentDate),
           trxType: 'EXPENSE',
           category: `Bayar Utang - ${utang.creditorName}`,
           amount: -Math.abs(Number(amount)),
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       await tx.piutangCollection.create({
         data: {
           piutangId: entityId,
-          collectionDate: new Date(paymentDate),
+          collectionDate: parseWibDateInput(paymentDate),
           amount: Number(amount),
           walletId,
           walletName: wallet.name,
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       await tx.walletLedger.create({
         data: {
           walletId,
-          trxDate: new Date(paymentDate),
+          trxDate: parseWibDateInput(paymentDate),
           trxType: 'OTHER_INCOME',
           category: `Terima Piutang - ${piutang.debtorName}`,
           amount: Math.abs(Number(amount)),

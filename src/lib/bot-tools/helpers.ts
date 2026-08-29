@@ -1,11 +1,19 @@
 // ─────────────────────────────────────────────
 // Helper: Rentang waktu WIB (Asia/Jakarta)
-// Menggunakan date-fns-tz untuk timezone handling yang robust
+// Instant nyata + kalender via @/lib/utils
 // ─────────────────────────────────────────────
-import { toZonedTime, format as formatTz } from 'date-fns-tz'
-import { subDays, startOfMonth } from 'date-fns'
+import { formatInTimeZone } from 'date-fns-tz'
+import {
+    WIB,
+    todayWIBStr,
+    addWibDays,
+    wibMonthStartStr,
+    wibDateRange,
+    wibDayStart,
+    wibDayEnd,
+} from '@/lib/utils'
 
-export const WIB = 'Asia/Jakarta'
+export { WIB }
 
 export type Period = 'today' | 'yesterday' | 'week' | 'month'
 
@@ -15,54 +23,43 @@ export interface DateRangeResult {
     label: string
 }
 
-/** Dapatkan "hari ini" dalam zona WIB */
-function todayWIB(): Date {
-    return toZonedTime(new Date(), WIB)
-}
-
-function formatDateStr(d: Date): string {
-    return formatTz(d, 'yyyy-MM-dd', { timeZone: WIB })
-}
-
 export function getDateRange(period: Period): DateRangeResult {
-    const now = todayWIB()
-    const todayStr = formatDateStr(now)
+    const todayStr = todayWIBStr()
 
     if (period === 'today') {
         return {
-            gte: new Date(todayStr + 'T00:00:00+07:00'),
-            lte: new Date(todayStr + 'T23:59:59+07:00'),
+            gte: wibDayStart(todayStr),
+            lte: wibDayEnd(todayStr),
             label: 'Hari Ini',
         }
     }
     if (period === 'yesterday') {
-        const prev = subDays(now, 1)
-        const prevStr = formatDateStr(prev)
+        const prevStr = addWibDays(todayStr, -1)
         return {
-            gte: new Date(prevStr + 'T00:00:00+07:00'),
-            lte: new Date(prevStr + 'T23:59:59+07:00'),
+            gte: wibDayStart(prevStr),
+            lte: wibDayEnd(prevStr),
             label: 'Kemarin',
         }
     }
     if (period === 'week') {
-        const weekAgo = subDays(now, 6)
+        const weekAgo = addWibDays(todayStr, -6)
+        const { fromDate, toDate } = wibDateRange(weekAgo, todayStr)
         return {
-            gte: new Date(formatDateStr(weekAgo) + 'T00:00:00+07:00'),
-            lte: new Date(todayStr + 'T23:59:59+07:00'),
+            gte: fromDate,
+            lte: toDate,
             label: '7 Hari Terakhir',
         }
     }
-    // month
-    const monthStart = startOfMonth(now)
+    const { fromDate, toDate } = wibDateRange(wibMonthStartStr(), todayStr)
     return {
-        gte: new Date(formatDateStr(monthStart) + 'T00:00:00+07:00'),
-        lte: new Date(todayStr + 'T23:59:59+07:00'),
+        gte: fromDate,
+        lte: toDate,
         label: 'Bulan Ini',
     }
 }
 
 export function fmtWIBDate(d: Date): string {
-    return formatTz(d, 'd MMM yyyy', { timeZone: WIB })
+    return formatInTimeZone(d, WIB, 'd MMM yyyy')
 }
 
 export function getCustomDateRange(startDate: string, endDate?: string): DateRangeResult {

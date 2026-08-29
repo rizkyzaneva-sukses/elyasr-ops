@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useToast } from '@/components/ui/toaster'
+import { todayWIBStr } from '@/lib/utils'
 import { Download, Loader2, Upload, CheckCircle2, AlertCircle, FileJson } from 'lucide-react'
 
 interface ImportResult {
@@ -36,7 +37,7 @@ function BackupEntityRow({ entityKey, label, desc, canImport }: {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `elyasr-backup-${entityKey}-${new Date().toISOString().slice(0, 10)}.json`
+      a.download = `elyasr-backup-${entityKey}-${todayWIBStr()}.json`
       a.click()
       URL.revokeObjectURL(url)
       toast({ title: `Export "${label}" berhasil`, type: 'success' })

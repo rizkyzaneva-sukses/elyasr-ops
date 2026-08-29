@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { formatRupiah } from '@/lib/utils'
+import { formatRupiah, todayWIBStr, wibMonthStartStr } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
 import {
   ArrowDownToLine, TrendingUp, Megaphone, RefreshCw, Clock,
@@ -10,10 +10,6 @@ import {
 } from 'lucide-react'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
-
-function todayStr() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' })
-}
 
 function StatCard({ label, value, sub, color = 'text-white' }: {
   label: string; value: string; sub?: string; color?: string
@@ -36,7 +32,7 @@ export function IklanTab() {
   const [mode, setMode]         = useState<'deposit' | 'spending'>('spending')
   const [adsWalletId, setAdsWalletId] = useState('')
   const [srcWalletId, setSrcWalletId] = useState('')
-  const [date, setDate]         = useState(todayStr())
+  const [date, setDate]         = useState(todayWIBStr())
   const [amount, setAmount]     = useState('')
   const [note, setNote]         = useState('')
   const [loading, setLoading]   = useState(false)
@@ -53,10 +49,10 @@ export function IklanTab() {
   const srcWallets: any[] = allWallets.filter((w: any) => !w.isAdsBudget && w.isActive)
 
   // Data ROAS bulan ini per ads wallet — dari dashboard stats (bulan ini)
-  const monthStart = todayStr().slice(0, 7) + '-01'
+  const monthStart = wibMonthStartStr()
   const { data: dashData } = useQuery({
     queryKey: ['dashboard-stats-iklan', monthStart],
-    queryFn: () => fetch(`/api/dashboard/stats?dateFrom=${monthStart}&dateTo=${todayStr()}`).then(r => r.json()).then(d => d.data),
+    queryFn: () => fetch(`/api/dashboard/stats?dateFrom=${monthStart}&dateTo=${todayWIBStr()}`).then(r => r.json()).then(d => d.data),
   })
 
   // Riwayat ledger untuk wallet iklan yang dipilih

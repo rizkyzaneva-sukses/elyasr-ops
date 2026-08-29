@@ -39,4 +39,11 @@ describe('sameCalendarDay', () => {
     const b = new Date('2026-07-16T01:00:00+07:00')
     expect(sameCalendarDay(a, b)).toBe(false)
   })
+
+  it('rejects 23:00 WIB 15 Jul vs 01:00 WIB 16 Jul even in UTC process TZ', () => {
+    // 15 Jul 23:00 WIB = 15 Jul 16:00 UTC; 16 Jul 01:00 WIB = 15 Jul 18:00 UTC
+    const a = new Date('2026-07-15T23:00:00+07:00')
+    const b = new Date('2026-07-16T01:00:00+07:00')
+    expect(sameCalendarDay(a, b)).toBe(false)
+  })
 })

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getSession } from '@/lib/session'
+import { todayWIBStr } from '@/lib/utils'
 
 const SLOT1_URL  = process.env.ANTIGRAVITY_URL_1 || ''
 const SLOT1_KEY  = process.env.ANTIGRAVITY_KEY_1 || ''
@@ -9,8 +10,7 @@ const SLOT2_KEY  = process.env.ANTIGRAVITY_KEY_2 || ''
 const SLOT2_MODEL = process.env.ANTIGRAVITY_MODEL_2 || ''
 
 function getSystemPrompt(): string {
-  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const today = todayWIBStr()
 
   return `Kamu adalah AI Assistant untuk Elyasr Ops — sistem manajemen operasional bisnis online.
 Tugasmu membantu user memahami cara menggunakan aplikasi, menjelaskan fitur, definisi istilah, dan membantu menyelesaikan masalah seputar aplikasi ini.

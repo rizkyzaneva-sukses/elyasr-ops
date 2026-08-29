@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError } from '@/lib/utils'
+import { addWibDays, apiSuccess, apiError, todayWIBStr, wibDayEnd, wibDayStart, wibMonthStartStr, wibPresetRange, wibStartDaysAgo } from '@/lib/utils'
 import {
   getTotalCash,
   getBurnRate,
@@ -17,29 +17,22 @@ function fmt(n: number): string {
 
 // ── Kumpulkan data performa untuk dikirim ke AI ──
 async function collectPerformanceData(periodType: 'monthly' | 'weekly' = 'monthly') {
-  const nowWIB = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
+  const today = todayWIBStr()
 
-  let gteDate: Date;
-  let lteDate = new Date(nowWIB.toISOString().slice(0, 10) + 'T23:59:59+07:00');
-  let periodLabel = '30 Hari Terakhir';
+  let gteDate: Date
+  const lteDate = wibDayEnd(today)
+  let periodLabel = '30 Hari Terakhir'
 
   if (periodType === 'weekly') {
-    // Mingguan (Senin - saat ini)
-    const day = nowWIB.getDay();
-    const diff = nowWIB.getDate() - day + (day === 0 ? -6 : 1); // Senin
-    const monday = new Date(nowWIB.setDate(diff));
-    gteDate = new Date(monday.toISOString().slice(0, 10) + 'T00:00:00+07:00');
-    periodLabel = 'Minggu Ini (Senin - Sekarang)';
+    const { from } = wibPresetRange('week', today)
+    gteDate = wibDayStart(from)
+    periodLabel = 'Minggu Ini (Senin - Sekarang)'
   } else {
-    // 30 hari terakhir
-    const last30Start = new Date(nowWIB);
-    last30Start.setDate(last30Start.getDate() - 30);
-    gteDate = new Date(last30Start.toISOString().slice(0, 10) + 'T00:00:00+07:00');
+    gteDate = wibDayStart(addWibDays(today, -30))
   }
 
   // Bulan ini (untuk target pacing & creative)
-  const monthStart = new Date(nowWIB.getFullYear(), nowWIB.getMonth(), 1)
-  const gteMonth   = new Date(monthStart.toISOString().slice(0, 10) + 'T00:00:00+07:00')
+  const gteMonth = wibDayStart(wibMonthStartStr(today))
 
   const [
     omzetStats, omzetByPlatform, agingBacklog, stokKritis, topProvinces,
@@ -125,7 +118,7 @@ async function collectPerformanceData(periodType: 'monthly' | 'weekly' = 'monthl
         COUNT(*) AS cnt,
         COALESCE(SUM(real_omzet), 0) AS omzet
       FROM orders
-      WHERE trx_date >= ${new Date(new Date(nowWIB).setDate(nowWIB.getDate() - 7))}
+      WHERE trx_date >= ${wibStartDaysAgo(8)}
         AND status NOT ILIKE '%batal%' AND status NOT ILIKE '%cancel%' AND status NOT ILIKE '%dibatalkan%'
       GROUP BY day ORDER BY day
     `,
@@ -215,7 +208,7 @@ async function collectPerformanceData(periodType: 'monthly' | 'weekly' = 'monthl
   const marketingTotal = (marketingCosts as any[]).reduce((s: number, c: any) => s + Number(c.amount), 0)
 
   return {
-    nowWIB: nowWIB.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'long' }),
+    nowWIB: new Date().toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'long' }),
     periodLabel,
     omzetTotal: totalOmzet,
     hppTotal: totalHpp,
@@ -425,8 +418,7 @@ export async function POST(request: NextRequest) {
       return apiError(`Semua AI provider gagal: ${errors.join(' | ')}`, 500)
     }
 
-    const nowWIB  = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
-    const period  = nowWIB.toISOString().slice(0, 7)
+    const period  = todayWIBStr().slice(0, 7)
     const insight = await prisma.aiInsight.create({
       data: {
         period,

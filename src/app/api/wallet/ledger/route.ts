@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError, getPagination } from '@/lib/utils'
+import { apiSuccess, apiError, getPagination, parseWibDateInput, wibDateRange, wibDayEnd, wibDayStart } from '@/lib/utils'
 
 // GET /api/wallet/ledger
 export async function GET(request: NextRequest) {
@@ -19,11 +19,20 @@ export async function GET(request: NextRequest) {
     limit: Number(searchParams.get('limit') || 50),
   })
 
+  let trxDateWhere: { gte?: Date; lte?: Date } | undefined
+  if (dateFrom && dateTo) {
+    const { fromDate, toDate } = wibDateRange(dateFrom, dateTo)
+    trxDateWhere = { gte: fromDate, lte: toDate }
+  } else if (dateFrom) {
+    trxDateWhere = { gte: wibDayStart(dateFrom) }
+  } else if (dateTo) {
+    trxDateWhere = { lte: wibDayEnd(dateTo) }
+  }
+
   const where = {
     ...(walletId && { walletId }),
     ...(trxType && { trxType: trxType as any }),
-    ...(dateFrom && { trxDate: { gte: new Date(dateFrom) } }),
-    ...(dateTo && { trxDate: { lte: new Date(dateTo) } }),
+    ...(trxDateWhere && { trxDate: trxDateWhere }),
   }
 
   const [entries, total] = await Promise.all([
@@ -68,7 +77,7 @@ export async function POST(request: NextRequest) {
       prisma.walletLedger.create({
         data: {
           walletId,
-          trxDate: new Date(trxDate),
+          trxDate: parseWibDateInput(trxDate),
           trxType: 'TRANSFER',
           category: `Transfer ke ${destWallet.name}`,
           amount: -Math.abs(amount),
@@ -79,7 +88,7 @@ export async function POST(request: NextRequest) {
       prisma.walletLedger.create({
         data: {
           walletId: destWalletId,
-          trxDate: new Date(trxDate),
+          trxDate: parseWibDateInput(trxDate),
           trxType: 'TRANSFER',
           category: `Transfer dari ${wallet.name}`,
           amount: Math.abs(amount),
@@ -101,7 +110,7 @@ export async function POST(request: NextRequest) {
   const entry = await prisma.walletLedger.create({
     data: {
       walletId,
-      trxDate: new Date(trxDate),
+      trxDate: parseWibDateInput(trxDate),
       trxType,
       category: category || null,
       amount: finalAmount,

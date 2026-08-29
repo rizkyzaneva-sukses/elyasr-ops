@@ -3,7 +3,7 @@
 import { AppLayout } from '@/components/layout/app-layout'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { formatRupiah, formatDate } from '@/lib/utils'
+import { formatRupiah, formatDate, todayWIBStr } from '@/lib/utils'
 import { useToast } from '@/components/ui/toaster'
 import { CreditCard, Plus } from 'lucide-react'
 
@@ -16,7 +16,7 @@ function AddModal({ type, wallets, onClose }: { type: 'utang' | 'piutang'; walle
   const { toast } = useToast()
   const [form, setForm] = useState({
     type: type === 'utang' ? 'SUNTIKAN_MODAL' : 'PINJAMAN_KARYAWAN',
-    name: '', sourceWalletId: '', amount: '', trxDate: new Date().toISOString().slice(0, 10), dueDate: '', note: '',
+    name: '', sourceWalletId: '', amount: '', trxDate: todayWIBStr(), dueDate: '', note: '',
   })
   const [loading, setLoading] = useState(false)
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))

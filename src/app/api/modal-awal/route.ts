@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError } from '@/lib/utils'
+import { apiSuccess, apiError, parseWibDateInput } from '@/lib/utils'
 
 // GET /api/modal-awal
 export async function GET(request: NextRequest) {
@@ -46,8 +46,8 @@ export async function POST(request: NextRequest) {
     // Upsert modal awal
     const modal = await prisma.modalAwal.upsert({
       where: { walletId },
-      update: { jumlah, tanggalSetup: new Date(tanggalSetup), note: note || null },
-      create: { walletId, jumlah, tanggalSetup: new Date(tanggalSetup), note: note || null },
+      update: { jumlah, tanggalSetup: parseWibDateInput(tanggalSetup), note: note || null },
+      create: { walletId, jumlah, tanggalSetup: parseWibDateInput(tanggalSetup), note: note || null },
     })
 
     // Buat WalletLedger MODAL_MASUK jika belum ada
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       await prisma.walletLedger.create({
         data: {
           walletId,
-          trxDate: new Date(tanggalSetup),
+          trxDate: parseWibDateInput(tanggalSetup),
           trxType: 'MODAL_MASUK',
           category: 'Modal Awal',
           amount: Math.abs(jumlah),
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       // Update jika berubah
       await prisma.walletLedger.update({
         where: { id: existing.id },
-        data: { amount: Math.abs(jumlah), trxDate: new Date(tanggalSetup), note: 'Setup modal awal sistem' },
+        data: { amount: Math.abs(jumlah), trxDate: parseWibDateInput(tanggalSetup), note: 'Setup modal awal sistem' },
       })
     }
 

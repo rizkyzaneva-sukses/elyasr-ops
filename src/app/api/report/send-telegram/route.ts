@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
+import { addWibDays, todayWIBStr, wibDateRange, wibDayStart } from '@/lib/utils'
 
 // ── Helper: ambil setting dari DB ──
 async function getSetting(key: string): Promise<string | null> {
@@ -46,24 +47,10 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
   const dateParam: string | undefined = body.date
 
-  let dateFrom: string
-  if (dateParam) {
-    dateFrom = dateParam
-  } else {
-    const nowWIB = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
-    const y = nowWIB.getFullYear()
-    const m = String(nowWIB.getMonth() + 1).padStart(2, '0')
-    const d = String(nowWIB.getDate()).padStart(2, '0')
-    dateFrom = `${y}-${m}-${d}`
-  }
-
-  const gteDate = new Date(dateFrom + 'T00:00:00+07:00')
-  const lteDate = new Date(dateFrom + 'T23:59:59+07:00')
-  const prevDay = new Date(gteDate)
-  prevDay.setDate(prevDay.getDate() - 1)
-  const prevFrom = `${prevDay.getFullYear()}-${String(prevDay.getMonth() + 1).padStart(2, '0')}-${String(prevDay.getDate()).padStart(2, '0')}`
-  const prevGte = new Date(prevFrom + 'T00:00:00+07:00')
-  const prevLte = new Date(prevFrom + 'T23:59:59+07:00')
+  const dateFrom = dateParam || todayWIBStr()
+  const { fromDate: gteDate, toDate: lteDate } = wibDateRange(dateFrom, dateFrom)
+  const prevFrom = addWibDays(dateFrom, -1)
+  const { fromDate: prevGte, toDate: prevLte } = wibDateRange(prevFrom, prevFrom)
 
   try {
     const [todayOrders, prevOrders, stokKritis, aging, topPlatform] = await Promise.all([
@@ -163,7 +150,8 @@ export async function POST(request: NextRequest) {
     // Tanggal Indonesia
     let tgl = dateFrom
     try {
-      tgl = new Date(dateFrom + 'T00:00:00+07:00').toLocaleDateString('id-ID', {
+      tgl = wibDayStart(dateFrom).toLocaleDateString('id-ID', {
+        timeZone: 'Asia/Jakarta',
         weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
       })
     } catch {}

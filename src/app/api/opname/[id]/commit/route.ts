@@ -1,13 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError } from '@/lib/utils'
-
-// Waktu Jakarta (WIB)
-function nowJakarta(): Date {
-  return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
-}
-
+import { apiSuccess, apiError, nowWIB } from '@/lib/utils'
 
 // POST /api/opname/[id]/commit
 export async function POST(
@@ -25,7 +19,7 @@ export async function POST(
   if (!batch) return apiError('Batch opname tidak ditemukan', 404)
   if (batch.status !== 'DRAFT') return apiError('Batch sudah diproses')
 
-  const now = nowJakarta()
+  const now = nowWIB()
 
   await prisma.$transaction(async (tx) => {
     for (const item of batch.items) {

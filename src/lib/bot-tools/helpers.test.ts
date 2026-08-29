@@ -6,6 +6,7 @@ import {
   formatRp,
   fmtWIBDate,
 } from '@/lib/bot-tools/helpers'
+import { todayWIBStr } from '@/lib/utils'
 
 // ── formatRp ────────────────────────────────────────────
 
@@ -79,6 +80,11 @@ describe('getDateRange', () => {
     expect(result.label).toBe('Hari Ini')
     expect(result.gte).toBeInstanceOf(Date)
     expect(result.lte).toBeInstanceOf(Date)
+  })
+
+  it('today gte is start of today WIB (T00:00:00+07:00)', () => {
+    const result = getDateRange('today')
+    expect(result.gte.toISOString()).toBe(new Date(todayWIBStr() + 'T00:00:00+07:00').toISOString())
   })
 
   it('today gte is before or equal to lte', () => {

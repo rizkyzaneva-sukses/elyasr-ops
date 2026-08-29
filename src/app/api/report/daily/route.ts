@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { addWibDays, todayWIBStr, wibDateRange } from '@/lib/utils'
 
 /**
  * GET /api/report/daily?date=YYYY-MM-DD
@@ -24,32 +25,10 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
   const dateParam = searchParams.get('date') // YYYY-MM-DD
 
-  // Determine dateFrom (target date string YYYY-MM-DD)
-  let dateFrom: string
-  if (dateParam) {
-    dateFrom = dateParam
-  } else {
-    // Default: hari ini WIB
-    const nowWIB = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }))
-    const y = nowWIB.getFullYear()
-    const m = String(nowWIB.getMonth() + 1).padStart(2, '0')
-    const d = String(nowWIB.getDate()).padStart(2, '0')
-    dateFrom = `${y}-${m}-${d}`
-  }
-
-  // EXACT same date construction as dashboard/stats
-  const gteDate = new Date(dateFrom + 'T00:00:00+07:00')
-  const lteDate = new Date(dateFrom + 'T23:59:59+07:00')
-
-  // Hari sebelumnya untuk perbandingan
-  const prevDay = new Date(gteDate)
-  prevDay.setDate(prevDay.getDate() - 1)
-  const prevY = prevDay.getFullYear()
-  const prevM = String(prevDay.getMonth() + 1).padStart(2, '0')
-  const prevD = String(prevDay.getDate()).padStart(2, '0')
-  const prevFrom = `${prevY}-${prevM}-${prevD}`
-  const prevGte = new Date(prevFrom + 'T00:00:00+07:00')
-  const prevLte = new Date(prevFrom + 'T23:59:59+07:00')
+  const dateFrom = dateParam || todayWIBStr()
+  const { fromDate: gteDate, toDate: lteDate } = wibDateRange(dateFrom, dateFrom)
+  const prevFrom = addWibDays(dateFrom, -1)
+  const { fromDate: prevGte, toDate: prevLte } = wibDateRange(prevFrom, prevFrom)
 
   try {
     const [todayOrders, prevOrders, stokKritis, aging, topPlatform] = await Promise.all([

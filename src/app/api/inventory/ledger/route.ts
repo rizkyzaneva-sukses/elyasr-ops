@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError } from '@/lib/utils'
+import { apiSuccess, apiError, wibDateRange, wibDayEnd, wibDayStart } from '@/lib/utils'
 
 export async function GET(request: NextRequest) {
   const session = await getSession()
@@ -21,15 +21,13 @@ export async function GET(request: NextRequest) {
   
   if (dateFrom || dateTo) {
     whereCondition.trxDate = {}
-    if (dateFrom) {
-      const from = new Date(dateFrom)
-      from.setHours(0,0,0,0)
-      whereCondition.trxDate.gte = from
-    }
-    if (dateTo) {
-      const to = new Date(dateTo)
-      to.setHours(23,59,59,999)
-      whereCondition.trxDate.lte = to
+    if (dateFrom && dateTo) {
+      const { fromDate, toDate } = wibDateRange(dateFrom, dateTo)
+      whereCondition.trxDate.gte = fromDate
+      whereCondition.trxDate.lte = toDate
+    } else {
+      if (dateFrom) whereCondition.trxDate.gte = wibDayStart(dateFrom)
+      if (dateTo) whereCondition.trxDate.lte = wibDayEnd(dateTo)
     }
   }
 
