@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
-import { apiSuccess, apiError, todayWIBStr } from '@/lib/utils'
+import { apiSuccess, apiError, todayWIBStr, formatWIB } from '@/lib/utils'
 
 // POST /api/scan/order — scan airwaybill → update status TERKIRIM
 export async function POST(request: NextRequest) {
@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
       const user = await prisma.appUser.findFirst({ where: { id: operator } })
       if (user) operator = user.username
     }
-    scannedAtStr = formatInTimeZone(scanLog.scannedAt, 'Asia/Jakarta', 'yyyy-MM-dd HH:mm:ss') + ' WIB'
+    scannedAtStr = formatWIB(scanLog.scannedAt, 'yyyy-MM-dd HH:mm:ss') + ' WIB'
   }
 
   return apiSuccess({
